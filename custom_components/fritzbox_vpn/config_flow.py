@@ -411,7 +411,6 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         config_data = entry.data or {}
                         options_data = entry.options or {}
                         
-                        # Debug: Log what we're checking
                         _LOGGER.info("Checking entry '%s' (entry_id: %s) for credentials", entry.title, entry.entry_id)
                         _LOGGER.info("  Config data keys: %s", list(config_data.keys()))
                         _LOGGER.info("  Options data keys: %s", list(options_data.keys()))
@@ -529,10 +528,10 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                             "Config keys: %s, Options keys: %s",
                             domain, list(config_data.keys()), list(options_data.keys())
                         )
-                        # Log full config for debugging (password masked)
-                        _LOGGER.warning("Full config_data: %s", {k: v if k not in ['password', 'pass'] else '***' for k, v in config_data.items()})
+                        # Log full config for debugging (password masked) - only in debug mode
+                        _LOGGER.debug("Full config_data: %s", {k: v if k not in ['password', 'pass'] else '***' for k, v in config_data.items()})
                         if options_data:
-                            _LOGGER.warning("Full options_data: %s", {k: v if k not in ['password', 'pass'] else '***' for k, v in options_data.items()})
+                            _LOGGER.debug("Full options_data: %s", {k: v if k not in ['password', 'pass'] else '***' for k, v in options_data.items()})
                         
             except KeyError:
                 # Domain doesn't exist, try next one

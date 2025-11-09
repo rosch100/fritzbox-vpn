@@ -65,10 +65,10 @@ Jede VPN-Switch-Entity bietet folgende Attribute:
 - **active**: `true` wenn die VPN-Verbindung aktiviert ist, `false` wenn deaktiviert
 - **connected**: `true` wenn die VPN-Verbindung aktiv verbunden ist, `false` wenn nicht verbunden
 - **status**: Textuelle Statusbeschreibung:
-  - `"verbunden"` - VPN ist aktiviert und verbunden
-  - `"aktiviert (nicht verbunden)"` - VPN ist aktiviert, aber nicht verbunden
-  - `"deaktiviert"` - VPN ist deaktiviert
-  - `"unbekannt"` - Status konnte nicht ermittelt werden
+  - `"connected"` - VPN ist aktiviert und verbunden
+  - `"active_not_connected"` - VPN ist aktiviert, aber nicht verbunden
+  - `"inactive"` - VPN ist deaktiviert
+  - `"unknown"` - Status konnte nicht ermittelt werden
 
 ## Automatisierungen
 

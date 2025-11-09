@@ -68,15 +68,15 @@ class FritzBoxVPNSwitch(CoordinatorEntity, SwitchEntity):
             active = conn.get('active', False)
             connected = conn.get('connected', False)
             
-            # Determine status text
+            # Determine status text based on active and connected states
             if active and connected:
-                status = "verbunden"
+                status = "connected"
             elif active and not connected:
-                status = "aktiviert (nicht verbunden)"
+                status = "active_not_connected"
             elif not active:
-                status = "deaktiviert"
+                status = "inactive"
             else:
-                status = "unbekannt"
+                status = "unknown"
             
             return {
                 'name': conn.get('name'),
