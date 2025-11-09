@@ -28,11 +28,17 @@ async def async_setup_entry(
     # Create a switch entity for each VPN connection
     entities = []
     if coordinator.data:
+        _LOGGER.info("Found %d VPN connections, creating switch entities", len(coordinator.data))
         for connection_uid, connection_data in coordinator.data.items():
+            vpn_name = connection_data.get('name', 'Unknown')
+            _LOGGER.debug("Creating switch for VPN: %s (UID: %s)", vpn_name, connection_uid)
             entities.append(
                 FritzBoxVPNSwitch(coordinator, entry, connection_uid, connection_data)
             )
+    else:
+        _LOGGER.warning("No VPN connections found in coordinator data")
 
+    _LOGGER.info("Adding %d switch entities", len(entities))
     async_add_entities(entities, update_before_add=True)
 
 

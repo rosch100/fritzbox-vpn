@@ -27,12 +27,16 @@ async def async_setup_entry(
     # Create binary sensor entities for each VPN connection
     entities = []
     if coordinator.data:
+        _LOGGER.info("Found %d VPN connections, creating binary sensor entities", len(coordinator.data))
         for connection_uid, connection_data in coordinator.data.items():
             # Connected status binary sensor (enabled by default)
             entities.append(
                 FritzBoxVPNConnectedBinarySensor(coordinator, entry, connection_uid, connection_data)
             )
+    else:
+        _LOGGER.warning("No VPN connections found in coordinator data")
 
+    _LOGGER.info("Adding %d binary sensor entities", len(entities))
     async_add_entities(entities, update_before_add=True)
 
 

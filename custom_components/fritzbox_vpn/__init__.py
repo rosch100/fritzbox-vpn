@@ -18,10 +18,17 @@ PLATFORMS: list[Platform] = [Platform.SWITCH, Platform.BINARY_SENSOR, Platform.S
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up FritzBox VPN from a config entry."""
+    _LOGGER.info("Setting up FritzBox VPN integration for host: %s", entry.data.get('host', 'Unknown'))
+    
     coordinator = FritzBoxVPNCoordinator(hass, entry.data)
 
     # Fetch initial data so we have data when the entities are added
-    await coordinator.async_config_entry_first_refresh()
+    try:
+        await coordinator.async_config_entry_first_refresh()
+        _LOGGER.info("Initial data refresh successful. Found %d VPN connections", len(coordinator.data) if coordinator.data else 0)
+    except Exception as err:
+        _LOGGER.error("Failed to fetch initial VPN data: %s", err, exc_info=True)
+        return False
 
     hass.data.setdefault(DOMAIN, {})
     hass.data[DOMAIN][entry.entry_id] = {
@@ -39,12 +46,18 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         model="FritzBox",
         configuration_url=f"http://{host}",
     )
+    _LOGGER.info("Created parent device: %s (ID: %s)", parent_device.name, parent_device.id)
 
     # VPN connection devices will be created automatically by the entities
     # They use via_device to link to the parent device
 
     # Forward the setup to the switch platform
-    await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+    try:
+        await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+        _LOGGER.info("Successfully set up all platforms")
+    except Exception as err:
+        _LOGGER.error("Failed to set up platforms: %s", err, exc_info=True)
+        return False
 
     return True
 
