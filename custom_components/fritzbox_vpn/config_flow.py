@@ -121,8 +121,18 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         if not host:
             return self.async_abort(reason="no_host")
         
+        # Try to get a more stable unique ID from USN or use host as fallback
+        # USN typically contains device identifier like: uuid:device-uuid::urn:schemas-upnp-org:device:InternetGatewayDevice:1
+        unique_id = host  # Default to host
+        if discovery_info.ssdp_usn:
+            # Try to extract UUID from USN
+            usn_parts = discovery_info.ssdp_usn.split("::")
+            if usn_parts and usn_parts[0].startswith("uuid:"):
+                unique_id = usn_parts[0].replace("uuid:", "")
+                _LOGGER.debug("Using UUID from USN as unique_id: %s", unique_id)
+        
         # Check if already configured
-        await self.async_set_unique_id(host)
+        await self.async_set_unique_id(unique_id)
         self._abort_if_unique_id_configured()
         
         self._discovered_host = host
@@ -188,6 +198,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         st = discovery_info.ssdp_st or ""
         usn = discovery_info.ssdp_usn or ""
         server = discovery_info.ssdp_server or ""
+        location = discovery_info.ssdp_location or ""
         
         # FritzBox devices typically have these identifiers
         fritzbox_indicators = [
@@ -196,21 +207,30 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             "fritz!box",
             "avm",
             "FRITZ!Box",
+            "FRITZ",
         ]
         
-        combined = f"{st} {usn} {server}".lower()
+        # Check in all SSDP fields
+        combined = f"{st} {usn} {server} {location}".lower()
+        
+        # Also check in headers if available
+        if hasattr(discovery_info, "ssdp_headers") and discovery_info.ssdp_headers:
+            headers_str = " ".join(str(v) for v in discovery_info.ssdp_headers.values()).lower()
+            combined += f" {headers_str}"
+        
         return any(indicator.lower() in combined for indicator in fritzbox_indicators)
 
     @staticmethod
     def _extract_host_from_ssdp(discovery_info: ssdp.SsdpServiceInfo) -> Optional[str]:
         """Extract host IP from SSDP discovery info."""
-        # Try to get host from location URL
+        # Try to get host from location URL (primary method)
         if discovery_info.ssdp_location:
             try:
                 parsed = urlparse(discovery_info.ssdp_location)
-                return parsed.hostname
-            except Exception:
-                pass
+                if parsed.hostname:
+                    return parsed.hostname
+            except Exception as err:
+                _LOGGER.debug("Failed to parse ssdp_location: %s", err)
         
         # Try to get from headers
         if hasattr(discovery_info, "ssdp_headers") and discovery_info.ssdp_headers:
@@ -218,41 +238,107 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             if location:
                 try:
                     parsed = urlparse(location)
-                    return parsed.hostname
-                except Exception:
-                    pass
+                    if parsed.hostname:
+                        return parsed.hostname
+                except Exception as err:
+                    _LOGGER.debug("Failed to parse location from headers: %s", err)
         
+        # Try to get from USN (fallback - contains hostname sometimes)
+        if discovery_info.ssdp_usn:
+            # USN format: uuid:device-uuid::urn:schemas-upnp-org:device:InternetGatewayDevice:1
+            # Sometimes contains hostname
+            usn_lower = discovery_info.ssdp_usn.lower()
+            if "fritz.box" in usn_lower:
+                return "fritz.box"
+        
+        _LOGGER.warning("Could not extract host from SSDP discovery info")
         return None
 
     async def _get_existing_fritz_config(self) -> Optional[Dict[str, Any]]:
-        """Get configuration from existing FritzBox integration if available."""
-        try:
-            # Check for official FritzBox integration (domain: "fritz")
-            fritz_entries = [
-                entry
-                for entry in self.hass.config_entries.async_entries("fritz")
-                if entry.state in (config_entries.ConfigEntryState.LOADED, config_entries.ConfigEntryState.NOT_LOADED)
-            ]
-            
-            if fritz_entries:
-                # Use the first available FritzBox entry
-                entry = fritz_entries[0]
-                config_data = entry.data
-                
-                # Extract relevant config - try different possible key names
-                host = config_data.get(CONF_HOST) or config_data.get("host") or config_data.get("hosts", [None])[0] if isinstance(config_data.get("hosts"), list) else None
-                username = config_data.get(CONF_USERNAME) or config_data.get("username")
-                password = config_data.get(CONF_PASSWORD) or config_data.get("password")
-                
-                if host:
-                    return {
-                        CONF_HOST: host,
-                        CONF_USERNAME: username,
-                        CONF_PASSWORD: password,
-                    }
-        except Exception as err:
-            _LOGGER.debug("Could not get existing FritzBox config: %s", err)
+        """Get configuration from existing FritzBox integration if available.
         
+        Checks for:
+        - Official FritzBox integration (domain: "fritz")
+        - FritzBox Tools integration (domain: "fritzbox" or "fritzbox_tools")
+        """
+        # Possible domain names for FritzBox integrations
+        possible_domains = ["fritz", "fritzbox", "fritzbox_tools"]
+        
+        for domain in possible_domains:
+            try:
+                # Check for existing FritzBox integration
+                fritz_entries = [
+                    entry
+                    for entry in self.hass.config_entries.async_entries(domain)
+                    if entry.state in (
+                        config_entries.ConfigEntryState.LOADED,
+                        config_entries.ConfigEntryState.NOT_LOADED,
+                        config_entries.ConfigEntryState.SETUP_ERROR,  # Also check entries with setup errors
+                    )
+                ]
+                
+                if fritz_entries:
+                    # Use the first available FritzBox entry
+                    entry = fritz_entries[0]
+                    config_data = entry.data
+                    
+                    _LOGGER.debug("Found existing FritzBox integration '%s' with entry_id: %s", domain, entry.entry_id)
+                    _LOGGER.debug("Config data keys: %s", list(config_data.keys()))
+                    
+                    # Extract relevant config - try different possible key names
+                    # Official integration uses: host, username, password
+                    # Some integrations might use: hosts (list), hostname, etc.
+                    host = (
+                        config_data.get(CONF_HOST) 
+                        or config_data.get("host")
+                        or (config_data.get("hosts", [None])[0] if isinstance(config_data.get("hosts"), list) and config_data.get("hosts") else None)
+                        or config_data.get("hostname")
+                    )
+                    
+                    username = (
+                        config_data.get(CONF_USERNAME)
+                        or config_data.get("username")
+                        or config_data.get("user")
+                    )
+                    
+                    password = (
+                        config_data.get(CONF_PASSWORD)
+                        or config_data.get("password")
+                        or config_data.get("pass")
+                    )
+                    
+                    # Also check options if data doesn't have the values
+                    if not host or not username or not password:
+                        options = entry.options or {}
+                        host = host or options.get(CONF_HOST) or options.get("host")
+                        username = username or options.get(CONF_USERNAME) or options.get("username")
+                        password = password or options.get(CONF_PASSWORD) or options.get("password")
+                    
+                    if host:
+                        _LOGGER.info(
+                            "Using config from existing FritzBox integration '%s': host=%s, username=%s, password=%s",
+                            domain,
+                            host,
+                            username if username else "not found",
+                            "***" if password else "not found"
+                        )
+                        return {
+                            CONF_HOST: host,
+                            CONF_USERNAME: username,
+                            CONF_PASSWORD: password,
+                        }
+                    else:
+                        _LOGGER.debug("Found FritzBox integration '%s' but could not extract host", domain)
+                        
+            except KeyError:
+                # Domain doesn't exist, try next one
+                _LOGGER.debug("Domain '%s' not found, trying next", domain)
+                continue
+            except Exception as err:
+                _LOGGER.debug("Error checking domain '%s': %s", domain, err)
+                continue
+        
+        _LOGGER.debug("No existing FritzBox integration found")
         return None
 
     @staticmethod
