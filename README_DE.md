@@ -70,33 +70,46 @@ Alle Zugangsdaten (Benutzername und Passwort) werden sicher von Home Assistant g
 
 Nach der Konfiguration finden Sie für jede VPN-Verbindung folgende Entitäten:
 
-### Switch Entity
-- **Entity-ID**: `switch.fritzbox_vpn_<connection_uid>_switch`
-- **Zweck**: VPN-Verbindungen ein- und ausschalten
-- **Status**: Zeigt an, ob die VPN-Verbindung aktiviert (ein) oder deaktiviert (aus) ist
+### Switch-Entität
+- **Entitäts-ID**: `switch.fritzbox_vpn_<connection_uid>_switch`
+- **Zweck**: VPN-Verbindungen ein- und ausschalten (Aktiviert/Deaktiviert)
+- **Status**: Zeigt an, ob die VPN aktiviert (ein) oder deaktiviert (aus) ist
+
+### Binary Sensor-Entität
+
+1. **Connected Binary Sensor** (standardmäßig aktiviert)
+   - **Entitäts-ID**: `binary_sensor.fritzbox_vpn_<connection_uid>_connected`
+   - **Zweck**: Zeigt an, ob die VPN-Verbindung aktiv verbunden ist
+   - **Wert**: `on` wenn verbunden, `off` wenn nicht verbunden
+   - **Device Class**: `connectivity`
 
 ### Sensor-Entitäten
 
-1. **Connected Sensor** (standardmäßig aktiviert)
-   - **Entity-ID**: `sensor.fritzbox_vpn_<connection_uid>_connected`
-   - **Zweck**: Zeigt an, ob die VPN-Verbindung aktiv verbunden ist
-   - **Wert**: `true` wenn verbunden, `false` wenn nicht verbunden
+1. **Status Sensor** (standardmäßig aktiviert)
+   - **Entitäts-ID**: `sensor.fritzbox_vpn_<connection_uid>_status`
+   - **Zweck**: Zeigt den kombinierten VPN-Status als Text an
+   - **Werte**: 
+     - `connected` - VPN ist aktiviert und verbunden
+     - `enabled` - VPN ist aktiviert, aber nicht verbunden
+     - `disabled` - VPN ist deaktiviert
+     - `unknown` - Status konnte nicht ermittelt werden
 
 2. **UID Sensor** (standardmäßig deaktiviert)
-   - **Entity-ID**: `sensor.fritzbox_vpn_<connection_uid>_uid`
+   - **Entitäts-ID**: `sensor.fritzbox_vpn_<connection_uid>_uid`
    - **Zweck**: Zeigt die eindeutige Verbindungs-ID (Connection UID)
-   - **Wert**: Die Verbindungs-UID als String
+   - **Wert**: Die Connection UID als Zeichenkette
 
 3. **VPN UID Sensor** (standardmäßig deaktiviert)
-   - **Entity-ID**: `sensor.fritzbox_vpn_<connection_uid>_vpn_uid`
-   - **Zweck**: Zeigt die interne VPN-UID der FritzBox
-   - **Wert**: Die interne VPN-UID als String
+   - **Entitäts-ID**: `sensor.fritzbox_vpn_<connection_uid>_vpn_uid`
+   - **Zweck**: Zeigt die interne VPN UID der FritzBox
+   - **Wert**: Die interne VPN UID als Zeichenkette
 
-Die Entity-IDs basieren auf der eindeutigen ID (UID) der VPN-Verbindung. Der Anzeigename zeigt den tatsächlichen Namen der VPN-Verbindung an.
+Die Entitäts-IDs basieren auf der eindeutigen ID (UID) der VPN-Verbindung. Die Anzeigenamen zeigen den tatsächlichen Namen der VPN-Verbindung an.
 
 Sie können diese Entitäten verwenden, um:
 - VPN-Verbindungen ein- und auszuschalten (Switch)
-- Den Verbindungsstatus zu überwachen (Connected Sensor)
+- Verbindungsstatus zu überwachen (Connected Binary Sensor)
+- Detaillierte Statusinformationen anzuzeigen (Status Sensor)
 - Technische Identifikatoren abzurufen (UID Sensoren, standardmäßig deaktiviert)
 - Automatisierungen basierend auf dem Verbindungsstatus zu erstellen
 
