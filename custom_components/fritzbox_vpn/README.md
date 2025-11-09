@@ -2,6 +2,8 @@
 
 Diese Integration ermöglicht die Steuerung von WireGuard VPN-Verbindungen auf einer AVM FritzBox direkt über Home Assistant.
 
+**Hinweis**: Das Logo wird automatisch aus dem [Home Assistant Brands-Repository](https://github.com/home-assistant/brands) geladen, sobald es dort registriert ist. Das lokale Logo (`logo.png`) dient als Fallback.
+
 ## Features
 
 - ✅ Automatische Erkennung aller WireGuard VPN-Verbindungen
@@ -18,7 +20,7 @@ Diese Integration ermöglicht die Steuerung von WireGuard VPN-Verbindungen auf e
 2. Gehen Sie zu **Integrations**
 3. Klicken Sie auf **Custom repositories**
 4. Fügen Sie dieses Repository hinzu:
-   - Repository: `https://github.com/yourusername/fritzbox-vpn`
+   - Repository: `https://github.com/rosch100/fritzbox-vpn`
    - Category: **Integration**
 5. Suchen Sie nach **FritzBox VPN** und installieren Sie es
 6. Starten Sie Home Assistant neu
@@ -44,31 +46,33 @@ Die Integration erkennt automatisch alle WireGuard VPN-Verbindungen auf Ihrer Fr
 ## Verwendung
 
 Nach der Konfiguration finden Sie für jede VPN-Verbindung eine Switch Entity unter:
-- **Entitäten**: `switch.fritzbox_vpn_<connection_name>`
+- **Entitäten**: `switch.fritzbox_vpn_<connection_uid>`
+  
+Die Entity-ID basiert auf der eindeutigen ID (UID) der VPN-Verbindung. Der Anzeigename zeigt den tatsächlichen Namen der VPN-Verbindung an.
 
 Sie können diese Switches verwenden, um:
 - VPN-Verbindungen ein- und auszuschalten
 - Den aktuellen Status zu überwachen
 - Automatisierungen zu erstellen
 
+### Status-Attribute
+
+Jede VPN-Switch-Entity bietet folgende Attribute:
+
+- **name**: Der Name der VPN-Verbindung (wie auf der FritzBox konfiguriert)
+- **uid**: Die eindeutige Verbindungs-ID (Connection UID)
+- **vpn_uid**: Die interne VPN-UID der FritzBox
+- **active**: `true` wenn die VPN-Verbindung aktiviert ist, `false` wenn deaktiviert
+- **connected**: `true` wenn die VPN-Verbindung aktiv verbunden ist, `false` wenn nicht verbunden
+- **status**: Textuelle Statusbeschreibung:
+  - `"verbunden"` - VPN ist aktiviert und verbunden
+  - `"aktiviert (nicht verbunden)"` - VPN ist aktiviert, aber nicht verbunden
+  - `"deaktiviert"` - VPN ist deaktiviert
+  - `"unbekannt"` - Status konnte nicht ermittelt werden
+
 ## Automatisierungen
 
-Beispiel-Automatisierung:
-
-```yaml
-automation:
-  - alias: "VPN bei App-Start aktivieren"
-    trigger:
-      - platform: state
-        entity_id: media_player.apple_tv
-        to: "playing"
-    condition:
-      - condition: template
-        value_template: "{{ trigger.to_state.attributes.app_name in ['Netflix', 'Disney+'] }}"
-    action:
-      - service: switch.turn_on
-        entity_id: switch.fritzbox_vpn_mathias_vermont
-```
+Sie können die VPN-Switches in Automatisierungen verwenden, um VPN-Verbindungen basierend auf verschiedenen Bedingungen automatisch ein- und auszuschalten.
 
 ## Voraussetzungen
 
