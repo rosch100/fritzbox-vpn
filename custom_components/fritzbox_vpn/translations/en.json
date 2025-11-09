@@ -25,6 +25,19 @@
       "not_fritzbox": "The discovered device is not a FritzBox.",
       "no_host": "Could not determine the IP address."
     }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "FritzBox VPN Options",
+        "description": "Update your FritzBox connection details. Leave the password field empty to keep the current password.",
+        "data": {
+          "host": "FritzBox IP Address",
+          "username": "Username",
+          "password": "Password"
+        }
+      }
+    }
   }
 }
 

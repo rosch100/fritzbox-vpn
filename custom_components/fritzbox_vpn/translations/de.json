@@ -25,6 +25,19 @@
       "not_fritzbox": "Das gefundene Gerät ist keine FritzBox.",
       "no_host": "Die IP-Adresse konnte nicht ermittelt werden."
     }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "FritzBox VPN Optionen",
+        "description": "Aktualisieren Sie die FritzBox-Verbindungsdaten. Lassen Sie das Passwort-Feld leer, um das aktuelle Passwort beizubehalten.",
+        "data": {
+          "host": "FritzBox IP-Adresse",
+          "username": "Benutzername",
+          "password": "Passwort"
+        }
+      }
+    }
   }
 }
 

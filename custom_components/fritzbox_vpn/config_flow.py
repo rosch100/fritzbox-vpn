@@ -76,8 +76,32 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             self._existing_config = await self._get_existing_fritz_config()
             if self._existing_config:
                 _LOGGER.info("Found existing FritzBox integration, using its configuration (SSDP will be skipped)")
-                # Pre-fill with existing config
-                # Pre-fill password from existing config if available
+                
+                # Check if we have complete configuration (host, username, password)
+                has_host = bool(self._existing_config.get(CONF_HOST))
+                has_username = bool(self._existing_config.get(CONF_USERNAME))
+                has_password = bool(self._existing_config.get(CONF_PASSWORD))
+                
+                # If we have all required credentials, try to validate the connection
+                if has_host and has_username and has_password:
+                    _LOGGER.info("Complete autoconfiguration found (host, username, password). Testing connection...")
+                    try:
+                        info = await validate_input(self.hass, self._existing_config)
+                        # Connection successful - create entry directly without showing form
+                        _LOGGER.info("Autoconfiguration successful! Creating integration entry automatically.")
+                        return self.async_create_entry(title=info["title"], data=self._existing_config)
+                    except CannotConnect:
+                        _LOGGER.warning("Autoconfiguration connection test failed: cannot_connect")
+                        errors["base"] = "cannot_connect"
+                    except InvalidAuth:
+                        _LOGGER.warning("Autoconfiguration connection test failed: invalid_auth")
+                        errors["base"] = "invalid_auth"
+                    except Exception as err:
+                        _LOGGER.warning("Autoconfiguration connection test failed: %s", err)
+                        errors["base"] = "unknown"
+                    # If validation failed, fall through to show form with pre-filled values
+                
+                # Pre-fill with existing config (either incomplete or validation failed)
                 default_password = self._existing_config.get(CONF_PASSWORD, "") if self._existing_config.get(CONF_PASSWORD) else ""
                 schema = vol.Schema({
                     vol.Required(CONF_HOST, default=self._existing_config.get(CONF_HOST, "192.168.178.1")): str,
@@ -567,12 +591,46 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
         self, user_input: Optional[Dict[str, Any]] = None
     ) -> FlowResult:
         """Manage the options."""
+        errors: Dict[str, str] = {}
+        
         if user_input is not None:
-            return self.async_create_entry(title="", data=user_input)
+            # If password is empty, keep the existing password
+            if not user_input.get(CONF_PASSWORD):
+                user_input[CONF_PASSWORD] = self.config_entry.data.get(CONF_PASSWORD, "")
+            
+            # Validate the new configuration
+            try:
+                info = await validate_input(self.hass, user_input)
+            except CannotConnect:
+                errors["base"] = "cannot_connect"
+            except InvalidAuth:
+                errors["base"] = "invalid_auth"
+            except Exception:
+                _LOGGER.exception("Unexpected exception")
+                errors["base"] = "unknown"
+            else:
+                # Update the config entry with new data
+                # Note: We update entry.data, not entry.options, as these are core config values
+                self.hass.config_entries.async_update_entry(
+                    self.config_entry,
+                    data=user_input,
+                )
+                # Reload the integration to apply the new configuration
+                await self.hass.config_entries.async_reload(self.config_entry.entry_id)
+                return self.async_create_entry(title="", data={})
+
+        # Pre-fill with current values
+        current_data = self.config_entry.data
+        schema = vol.Schema({
+            vol.Required(CONF_HOST, default=current_data.get(CONF_HOST, "192.168.178.1")): str,
+            vol.Required(CONF_USERNAME, default=current_data.get(CONF_USERNAME, "")): str,
+            vol.Required(CONF_PASSWORD, default=""): str,  # Don't show password for security
+        })
 
         return self.async_show_form(
             step_id="init",
-            data_schema=vol.Schema({}),
+            data_schema=schema,
+            errors=errors,
         )
 
 
