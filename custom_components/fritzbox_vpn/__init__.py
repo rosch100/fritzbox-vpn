@@ -34,9 +34,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     parent_device = device_registry.async_get_or_create(
         config_entry_id=entry.entry_id,
         identifiers={(DOMAIN, entry.entry_id)},
-        name=host,
+        name="FritzBox",
         manufacturer="AVM",
         model="FritzBox",
+        sw_version=host,  # Store IP address as software version for reference
         configuration_url=f"http://{host}",
     )
 
