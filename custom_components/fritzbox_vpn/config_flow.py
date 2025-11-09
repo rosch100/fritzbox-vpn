@@ -28,7 +28,11 @@ STEP_USER_DATA_SCHEMA = vol.Schema(
 
 
 async def validate_input(hass: HomeAssistant, data: Dict[str, Any]) -> Dict[str, Any]:
-    """Validate the user input allows us to connect."""
+    """Validate the user input allows us to connect to the FritzBox.
+    
+    Only validates the connection to the FritzBox itself, not the presence of VPN connections.
+    VPN connections are automatically discovered during integration setup.
+    """
     session = FritzBoxVPNSession(
         data[CONF_HOST],
         data[CONF_USERNAME],
@@ -36,13 +40,10 @@ async def validate_input(hass: HomeAssistant, data: Dict[str, Any]) -> Dict[str,
     )
 
     try:
-        # Try to get a session and fetch VPN connections
+        # Try to get a session to validate credentials and connection
+        # We don't check for VPN connections here - they will be discovered automatically
         await session.async_get_session()
-        connections = await session.async_get_vpn_connections()
         await session.async_close()
-
-        if not connections:
-            raise CannotConnect("No VPN connections found on FritzBox")
 
         return {"title": f"FritzBox VPN ({data[CONF_HOST]})"}
     except Exception as err:
