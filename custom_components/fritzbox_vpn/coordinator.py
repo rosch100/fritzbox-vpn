@@ -103,9 +103,27 @@ class FritzBoxVPNSession:
 
     async def async_toggle_vpn(self, connection_uid: str, enable: bool) -> bool:
         """Toggle a VPN connection on/off."""
+        # Get connection details to find the UID
+        connections = await self.async_get_vpn_connections()
+        if connection_uid not in connections:
+            _LOGGER.error(f"VPN connection {connection_uid} not found")
+            return False
+        
+        conn = connections[connection_uid]
+        vpn_uid = conn.get('uid')
+        if not vpn_uid:
+            _LOGGER.error(f"VPN connection {connection_uid} has no UID")
+            return False
+        
+        # Check current status
+        current_status = conn.get('active', False)
+        if current_status == enable:
+            _LOGGER.info(f"VPN {conn.get('name')} is already {'activated' if enable else 'deactivated'}")
+            return True
+        
         session, sid = await self.async_get_session()
 
-        api_url = f"http://{self.host}{API_VPN_CONNECTION.format(uid=connection_uid)}"
+        api_url = f"http://{self.host}{API_VPN_CONNECTION.format(uid=vpn_uid)}"
         headers = {
             'Content-Type': 'application/json',
             'Authorization': f'AVM-SID {sid}',
@@ -126,7 +144,23 @@ class FritzBoxVPNSession:
                 if response.status == 200:
                     # Wait a bit for the change to take effect
                     await asyncio.sleep(1.5)
-                    return True
+                    
+                    # Verify the status was actually changed
+                    new_connections = await self.async_get_vpn_connections()
+                    if connection_uid in new_connections:
+                        new_conn = new_connections[connection_uid]
+                        new_status = new_conn.get('active', False)
+                        if new_status == enable:
+                            _LOGGER.info(f"VPN {conn.get('name')} successfully {'activated' if enable else 'deactivated'}")
+                            return True
+                        else:
+                            _LOGGER.warning(
+                                f"VPN status change failed. Expected: {enable}, Got: {new_status}"
+                            )
+                            return False
+                    else:
+                        _LOGGER.error(f"Could not verify VPN status change - connection not found")
+                        return False
                 else:
                     error_text = await response.text()
                     _LOGGER.error(
@@ -134,7 +168,7 @@ class FritzBoxVPNSession:
                     )
                     return False
         except Exception as err:
-            _LOGGER.error(f"Error toggling VPN: {err}")
+            _LOGGER.error(f"Error toggling VPN: {err}", exc_info=True)
             return False
 
     async def async_close(self):
