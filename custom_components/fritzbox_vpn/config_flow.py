@@ -383,8 +383,31 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     else:
                         _LOGGER.warning("Domain '%s': No router entries found, using first entry (might be a repeater)", domain)
                     
-                    # Use the first available router entry (or first entry if no routers found)
-                    entry = entries_to_use[0]
+                    # Prefer entries that have credentials (username/password) in addition to host
+                    # This ensures we get a fully configured entry, not just one with an IP
+                    entries_with_creds = []
+                    for entry in entries_to_use:
+                        config_data = entry.data or {}
+                        options_data = entry.options or {}
+                        # Check if entry has username or password
+                        has_username = (
+                            config_data.get(CONF_USERNAME) or config_data.get("username") or config_data.get("user") or
+                            options_data.get(CONF_USERNAME) or options_data.get("username")
+                        )
+                        has_password = (
+                            config_data.get(CONF_PASSWORD) or config_data.get("password") or config_data.get("pass") or
+                            options_data.get(CONF_PASSWORD) or options_data.get("password")
+                        )
+                        if has_username or has_password:
+                            entries_with_creds.append(entry)
+                    
+                    # Use entry with credentials if available, otherwise use first router entry
+                    if entries_with_creds:
+                        entry = entries_with_creds[0]
+                        _LOGGER.info("Domain '%s': Found %d entry/entries with credentials, using first one", domain, len(entries_with_creds))
+                    else:
+                        entry = entries_to_use[0]
+                        _LOGGER.warning("Domain '%s': No entries with credentials found, using first router entry (credentials may be missing)", domain)
                     
                     _LOGGER.info("Found existing FritzBox integration '%s' with entry_id: %s", domain, entry.entry_id)
                     _LOGGER.info("Entry title: %s", entry.title)
