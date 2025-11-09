@@ -51,13 +51,18 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # VPN connection devices will be created automatically by the entities
     # They use via_device to link to the parent device
 
-    # Forward the setup to the switch platform
-    try:
-        await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
-        _LOGGER.info("Successfully set up all platforms")
-    except Exception as err:
-        _LOGGER.error("Failed to set up platforms: %s", err, exc_info=True)
-        return False
+    # Schedule platform setup to run after config flow completes
+    # This prevents showing the entity list immediately after auto-setup
+    async def _delayed_setup():
+        """Set up platforms after a short delay to avoid showing entity list after auto-setup."""
+        try:
+            await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+            _LOGGER.info("Successfully set up all platforms")
+        except Exception as err:
+            _LOGGER.error("Failed to set up platforms: %s", err, exc_info=True)
+
+    # Schedule setup to run after config flow completes
+    hass.async_create_task(_delayed_setup())
 
     return True
 
