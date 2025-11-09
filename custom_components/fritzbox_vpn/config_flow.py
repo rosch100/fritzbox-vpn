@@ -94,6 +94,12 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         _LOGGER.info("Autoconfiguration successful! Creating integration entry automatically.")
                         _LOGGER.debug("Saving config with keys: %s", list(self._existing_config.keys()))
                         _LOGGER.debug("Password present in config to save: %s", bool(self._existing_config.get(CONF_PASSWORD)))
+                        
+                        # Set unique_id to prevent duplicate entries
+                        host = self._existing_config.get(CONF_HOST)
+                        await self.async_set_unique_id(host)
+                        self._abort_if_unique_id_configured()
+                        
                         return self.async_create_entry(title=info["title"], data=self._existing_config)
                     except CannotConnect:
                         _LOGGER.warning("Autoconfiguration connection test failed: cannot_connect")
@@ -135,6 +141,11 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 _LOGGER.exception("Unexpected exception")
                 errors["base"] = "unknown"
             else:
+                # Set unique_id to prevent duplicate entries
+                host = user_input.get(CONF_HOST)
+                await self.async_set_unique_id(host)
+                self._abort_if_unique_id_configured()
+                
                 return self.async_create_entry(title=info["title"], data=user_input)
 
         return self.async_show_form(
@@ -236,6 +247,11 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             _LOGGER.exception("Unexpected exception")
             errors["base"] = "unknown"
         else:
+            # Set unique_id to prevent duplicate entries
+            host = user_input.get(CONF_HOST)
+            await self.async_set_unique_id(host)
+            self._abort_if_unique_id_configured()
+            
             return self.async_create_entry(title=info["title"], data=user_input)
         
         # Pre-fill password from existing config if available and not provided
