@@ -367,11 +367,11 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 # Check for existing FritzBox integration
                 # Get all entries first to see what we have
                 all_entries = list(self.hass.config_entries.async_entries(domain))
-                _LOGGER.debug("Domain '%s': Found %d total entries", domain, len(all_entries))
+                _LOGGER.info("Domain '%s': Found %d total entries", domain, len(all_entries))
                 
                 # Log all entries with their states
                 for entry in all_entries:
-                    _LOGGER.debug("  Entry '%s' (entry_id: %s) has state: %s", entry.title, entry.entry_id, entry.state)
+                    _LOGGER.info("  Entry '%s' (entry_id: %s) has state: %s", entry.title, entry.entry_id, entry.state)
                 
                 # Check for existing FritzBox integration
                 # Accept all states except FAILED_UNLOAD and SETUP_IN_PROGRESS
@@ -384,7 +384,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     )
                 ]
                 
-                _LOGGER.debug("Domain '%s': Found %d entries after filtering by state", domain, len(fritz_entries))
+                _LOGGER.info("Domain '%s': Found %d entries after filtering by state", domain, len(fritz_entries))
                 
                 if fritz_entries:
                     # Filter out repeaters - only use router entries
