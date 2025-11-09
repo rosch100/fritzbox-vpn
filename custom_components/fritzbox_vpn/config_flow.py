@@ -69,10 +69,13 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     ) -> FlowResult:
         """Handle the initial step."""
         errors: Dict[str, str] = {}
+        
+        _LOGGER.info("async_step_user called with user_input=%s", "provided" if user_input else "None (first call)")
 
         # Try to get config from existing FritzBox integration first
         # SSDP is only used as fallback if no existing integration is found
         if not user_input:
+            _LOGGER.info("No user_input provided, attempting autoconfiguration...")
             self._existing_config = await self._get_existing_fritz_config()
             if self._existing_config:
                 _LOGGER.info("Found existing FritzBox integration, using its configuration (SSDP will be skipped)")
@@ -373,22 +376,35 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         https://github.com/home-assistant/core/tree/dev/homeassistant/components/fritz
         """
         # First, let's check ALL available domains to see what's actually installed
-        _LOGGER.debug("Checking for existing FritzBox integrations...")
+        _LOGGER.info("Checking for existing FritzBox integrations...")
         all_domains = set()
+        fritz_related_entries = []
         for entry in self.hass.config_entries.async_entries():
             all_domains.add(entry.domain)
             # Log all FritzBox-related domains
             if "fritz" in entry.domain.lower() or "avm" in entry.domain.lower():
-                _LOGGER.info("Found potential FritzBox integration: domain='%s', title='%s', entry_id='%s'", 
-                           entry.domain, entry.title, entry.entry_id)
+                fritz_related_entries.append(entry)
+                _LOGGER.info("Found potential FritzBox integration: domain='%s', title='%s', entry_id='%s', state='%s'", 
+                           entry.domain, entry.title, entry.entry_id, entry.state)
         
-        _LOGGER.debug("All available domains: %s", sorted(all_domains))
+        _LOGGER.info("All available domains: %s", sorted(all_domains))
+        _LOGGER.info("Found %d FritzBox-related entries across all domains", len(fritz_related_entries))
+        
+        # If we already found FritzBox-related entries, prioritize checking those domains first
+        # This avoids checking domains that don't have any entries
+        found_domains = set(entry.domain for entry in fritz_related_entries)
         
         # Possible domain names for FritzBox integrations (order matters - check most common first)
         # Official integration uses "fritz", FritzBox Tools uses "fritzbox_tools"
         possible_domains = ["fritz", "fritzbox_tools", "fritzbox", "fritzbox_tools_plus"]
         
-        for domain in possible_domains:
+        # Reorder: check domains that have entries first
+        prioritized_domains = [d for d in possible_domains if d in found_domains]
+        prioritized_domains.extend([d for d in possible_domains if d not in found_domains])
+        
+        _LOGGER.info("Checking domains in order: %s (found entries in: %s)", prioritized_domains, list(found_domains))
+        
+        for domain in prioritized_domains:
             try:
                 # Check for existing FritzBox integration
                 # Get all entries first to see what we have
