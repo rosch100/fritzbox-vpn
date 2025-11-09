@@ -30,11 +30,11 @@
     "step": {
       "init": {
         "title": "FritzBox VPN Options",
-        "description": "Update your FritzBox connection details. Leave the password field empty to keep the current password.",
+        "description": "Update your FritzBox connection details. The password field is not displayed for security reasons. Leave it empty to keep the current password, or enter a new password to change it.",
         "data": {
           "host": "FritzBox IP Address",
           "username": "Username",
-          "password": "Password"
+          "password": "Password (leave empty to keep current password)"
         }
       }
     }

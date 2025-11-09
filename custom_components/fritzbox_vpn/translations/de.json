@@ -30,11 +30,11 @@
     "step": {
       "init": {
         "title": "FritzBox VPN Optionen",
-        "description": "Aktualisieren Sie die FritzBox-Verbindungsdaten. Lassen Sie das Passwort-Feld leer, um das aktuelle Passwort beizubehalten.",
+        "description": "Aktualisieren Sie die FritzBox-Verbindungsdaten. Das Passwort-Feld wird aus Sicherheitsgründen nicht angezeigt. Lassen Sie es leer, um das aktuelle Passwort beizubehalten, oder geben Sie ein neues Passwort ein, um es zu ändern.",
         "data": {
           "host": "FritzBox IP-Adresse",
           "username": "Benutzername",
-          "password": "Passwort"
+          "password": "Passwort (leer lassen, um aktuelles Passwort beizubehalten)"
         }
       }
     }
