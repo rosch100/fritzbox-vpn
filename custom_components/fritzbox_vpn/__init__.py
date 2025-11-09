@@ -30,13 +30,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     # Create parent device registry entry for the FritzBox
     device_registry = dr.async_get(hass)
+    host = entry.data.get('host', 'Unknown')
     device_registry.async_get_or_create(
         config_entry_id=entry.entry_id,
         identifiers={(DOMAIN, entry.entry_id)},
-        name=f"FritzBox VPN ({entry.data.get('host', 'Unknown')})",
+        name=host,
         manufacturer="AVM",
         model="FritzBox",
-        configuration_url=f"http://{entry.data.get('host', '')}",
+        configuration_url=f"http://{host}",
     )
 
     # Forward the setup to the switch platform

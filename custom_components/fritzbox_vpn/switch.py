@@ -60,9 +60,8 @@ class FritzBoxVPNSwitch(CoordinatorEntity, SwitchEntity):
             identifiers={(DOMAIN, entry.entry_id, connection_uid)},
             name=vpn_name,
             manufacturer="AVM",
-            model="FritzBox VPN",
+            model="WireGuard VPN",
             via_device=(DOMAIN, entry.entry_id),
-            configuration_url=f"http://{entry.data.get('host', '')}",
         )
 
     @property

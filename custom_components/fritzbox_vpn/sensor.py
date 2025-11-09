@@ -69,9 +69,8 @@ class FritzBoxVPNConnectedSensor(CoordinatorEntity, SensorEntity):
             identifiers={(DOMAIN, entry.entry_id, connection_uid)},
             name=vpn_name,
             manufacturer="AVM",
-            model="FritzBox VPN",
+            model="WireGuard VPN",
             via_device=(DOMAIN, entry.entry_id),
-            configuration_url=f"http://{entry.data.get('host', '')}",
         )
 
     @property
@@ -113,9 +112,8 @@ class FritzBoxVPNUIDSensor(CoordinatorEntity, SensorEntity):
             identifiers={(DOMAIN, entry.entry_id, connection_uid)},
             name=vpn_name,
             manufacturer="AVM",
-            model="FritzBox VPN",
+            model="WireGuard VPN",
             via_device=(DOMAIN, entry.entry_id),
-            configuration_url=f"http://{entry.data.get('host', '')}",
         )
 
     @property
@@ -155,9 +153,8 @@ class FritzBoxVPNVPNUIDSensor(CoordinatorEntity, SensorEntity):
             identifiers={(DOMAIN, entry.entry_id, connection_uid)},
             name=vpn_name,
             manufacturer="AVM",
-            model="FritzBox VPN",
+            model="WireGuard VPN",
             via_device=(DOMAIN, entry.entry_id),
-            configuration_url=f"http://{entry.data.get('host', '')}",
         )
 
     @property
