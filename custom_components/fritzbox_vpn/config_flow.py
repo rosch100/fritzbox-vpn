@@ -77,6 +77,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         if not user_input:
             _LOGGER.info("No user_input provided, attempting autoconfiguration...")
             self._existing_config = await self._get_existing_fritz_config()
+            _LOGGER.info("Autoconfiguration result: %s", "found config" if self._existing_config else "no config found")
             if self._existing_config:
                 _LOGGER.info("Found existing FritzBox integration, using its configuration (SSDP will be skipped)")
                 
@@ -433,16 +434,24 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 
                 # Check for existing FritzBox integration
                 # Accept all states except FAILED_UNLOAD and SETUP_IN_PROGRESS
+                # Note: We accept NOT_LOADED and SETUP_ERROR states as they may still have valid config
+                excluded_states = (
+                    config_entries.ConfigEntryState.FAILED_UNLOAD,
+                    config_entries.ConfigEntryState.SETUP_IN_PROGRESS,
+                )
                 fritz_entries = [
                     entry
                     for entry in all_entries
-                    if entry.state not in (
-                        config_entries.ConfigEntryState.FAILED_UNLOAD,
-                        config_entries.ConfigEntryState.SETUP_IN_PROGRESS,
-                    )
+                    if entry.state not in excluded_states
                 ]
                 
-                _LOGGER.info("Domain '%s': Found %d entries after filtering by state", domain, len(fritz_entries))
+                _LOGGER.info("Domain '%s': Found %d entries after filtering by state (excluded states: %s)", 
+                           domain, len(fritz_entries), [s.name for s in excluded_states])
+                if len(fritz_entries) < len(all_entries):
+                    excluded_entries = [e for e in all_entries if e.state in excluded_states]
+                    _LOGGER.info("Domain '%s': Excluded %d entries due to state: %s", 
+                               domain, len(excluded_entries), 
+                               [(e.title, e.state.name) for e in excluded_entries])
                 
                 if fritz_entries:
                     # Filter out repeaters - only use router entries
