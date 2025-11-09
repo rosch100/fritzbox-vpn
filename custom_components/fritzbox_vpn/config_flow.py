@@ -372,6 +372,10 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 # Log all entries with their states
                 for entry in all_entries:
                     _LOGGER.info("  Entry '%s' (entry_id: %s) has state: %s", entry.title, entry.entry_id, entry.state)
+                    # Special check for the entry we're looking for
+                    if entry.entry_id == "e2dc0c036ba0bf90ddd3bcc00d980b0a":
+                        _LOGGER.warning("  >>> FOUND TARGET ENTRY: '%s' (entry_id: %s) has state: %s", entry.title, entry.entry_id, entry.state)
+                        _LOGGER.warning("  >>> Config data keys: %s", list(entry.data.keys()) if entry.data else [])
                 
                 # Check for existing FritzBox integration
                 # Accept all states except FAILED_UNLOAD and SETUP_IN_PROGRESS
