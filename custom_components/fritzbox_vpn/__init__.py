@@ -37,7 +37,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         name="FritzBox",
         manufacturer="AVM",
         model="FritzBox",
-        sw_version=host,  # Store IP address as software version for reference
         configuration_url=f"http://{host}",
     )
 
