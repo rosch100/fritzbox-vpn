@@ -412,9 +412,9 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         options_data = entry.options or {}
                         
                         # Debug: Log what we're checking
-                        _LOGGER.debug("Checking entry '%s' (entry_id: %s) for credentials", entry.title, entry.entry_id)
-                        _LOGGER.debug("  Config data keys: %s", list(config_data.keys()))
-                        _LOGGER.debug("  Options data keys: %s", list(options_data.keys()))
+                        _LOGGER.info("Checking entry '%s' (entry_id: %s) for credentials", entry.title, entry.entry_id)
+                        _LOGGER.info("  Config data keys: %s", list(config_data.keys()))
+                        _LOGGER.info("  Options data keys: %s", list(options_data.keys()))
                         
                         # Check if entry has username or password
                         # Try all possible key names
