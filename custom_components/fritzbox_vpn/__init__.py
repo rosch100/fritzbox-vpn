@@ -52,27 +52,28 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # VPN connection devices will be created automatically by the entities
     # They use via_device to link to the parent device
 
-    # Don't create entities immediately to avoid showing them in the discovery dialog
-    # Instead, create them after a delay to ensure the dialog is closed
-    # This prevents the VPN list from appearing in the dialog after auto-setup
+    # Don't create entities immediately to avoid showing the "Geräte erstellt" dialog
+    # Instead, create them on the first coordinator update (after 30 seconds)
+    # This prevents the dialog from appearing after auto-setup
     _platforms_setup = False
     
-    async def _delayed_setup():
-        """Set up platforms after delay to avoid showing dialog."""
+    def _setup_platforms_on_update():
+        """Set up platforms on first coordinator update to avoid showing dialog."""
         nonlocal _platforms_setup
-        # Wait long enough to ensure config flow dialog is closed
-        # The dialog typically closes within 1-2 seconds, so 10 seconds should be safe
-        await asyncio.sleep(10)
         if not _platforms_setup:
             _platforms_setup = True
-            try:
-                await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
-                _LOGGER.info("Successfully set up all platforms (delayed)")
-            except Exception as err:
-                _LOGGER.error("Failed to set up platforms: %s", err, exc_info=True)
+            # Remove this listener to avoid setting up multiple times
+            coordinator.async_remove_listener(_setup_platforms_on_update)
+            async def _setup():
+                try:
+                    await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+                    _LOGGER.info("Successfully set up all platforms (on first update)")
+                except Exception as err:
+                    _LOGGER.error("Failed to set up platforms: %s", err, exc_info=True)
+            hass.async_create_task(_setup())
     
-    # Schedule setup to run after config flow completes
-    hass.async_create_task(_delayed_setup())
+    # Register listener to set up platforms on first coordinator update
+    coordinator.async_add_listener(_setup_platforms_on_update)
 
     return True
 
