@@ -218,7 +218,19 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             headers_str = " ".join(str(v) for v in discovery_info.ssdp_headers.values()).lower()
             combined += f" {headers_str}"
         
-        return any(indicator.lower() in combined for indicator in fritzbox_indicators)
+        # Check if it's a FritzBox device
+        is_fritzbox = any(indicator.lower() in combined for indicator in fritzbox_indicators)
+        
+        if not is_fritzbox:
+            return False
+        
+        # Prefer routers over repeaters - reject repeaters
+        # Repeaters typically have "Repeater" or "WLAN Repeater" in the server string
+        if "repeater" in combined:
+            _LOGGER.debug("Rejecting FritzBox Repeater device (preferring router)")
+            return False
+        
+        return True
 
     @staticmethod
     def _extract_host_from_ssdp(discovery_info: ssdp.SsdpServiceInfo) -> Optional[str]:
@@ -261,8 +273,8 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         - Official FritzBox integration (domain: "fritz")
         - FritzBox Tools integration (domain: "fritzbox" or "fritzbox_tools")
         """
-        # Possible domain names for FritzBox integrations
-        possible_domains = ["fritz", "fritzbox", "fritzbox_tools"]
+        # Possible domain names for FritzBox integrations (order matters - check most common first)
+        possible_domains = ["fritz", "fritzbox", "fritzbox_tools", "fritzbox_tools_plus"]
         
         for domain in possible_domains:
             try:
@@ -280,39 +292,56 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 if fritz_entries:
                     # Use the first available FritzBox entry
                     entry = fritz_entries[0]
-                    config_data = entry.data
                     
-                    _LOGGER.debug("Found existing FritzBox integration '%s' with entry_id: %s", domain, entry.entry_id)
+                    _LOGGER.info("Found existing FritzBox integration '%s' with entry_id: %s", domain, entry.entry_id)
+                    _LOGGER.debug("Entry title: %s", entry.title)
+                    _LOGGER.debug("Entry source: %s", getattr(entry, 'source', 'unknown'))
+                    
+                    # Try to get config from data first
+                    config_data = entry.data or {}
                     _LOGGER.debug("Config data keys: %s", list(config_data.keys()))
+                    _LOGGER.debug("Config data: %s", {k: v if k != 'password' else '***' for k, v in config_data.items()})
+                    
+                    # Also check options
+                    options_data = entry.options or {}
+                    _LOGGER.debug("Options data keys: %s", list(options_data.keys()))
                     
                     # Extract relevant config - try different possible key names
                     # Official integration uses: host, username, password
-                    # Some integrations might use: hosts (list), hostname, etc.
+                    # FritzBox Tools might use different keys
                     host = (
                         config_data.get(CONF_HOST) 
                         or config_data.get("host")
                         or (config_data.get("hosts", [None])[0] if isinstance(config_data.get("hosts"), list) and config_data.get("hosts") else None)
                         or config_data.get("hostname")
+                        or config_data.get("ip_address")
+                        or options_data.get(CONF_HOST)
+                        or options_data.get("host")
                     )
                     
                     username = (
                         config_data.get(CONF_USERNAME)
                         or config_data.get("username")
                         or config_data.get("user")
+                        or options_data.get(CONF_USERNAME)
+                        or options_data.get("username")
                     )
                     
                     password = (
                         config_data.get(CONF_PASSWORD)
                         or config_data.get("password")
                         or config_data.get("pass")
+                        or options_data.get(CONF_PASSWORD)
+                        or options_data.get("password")
                     )
                     
-                    # Also check options if data doesn't have the values
-                    if not host or not username or not password:
-                        options = entry.options or {}
-                        host = host or options.get(CONF_HOST) or options.get("host")
-                        username = username or options.get(CONF_USERNAME) or options.get("username")
-                        password = password or options.get(CONF_PASSWORD) or options.get("password")
+                    # For FritzBox Tools, credentials might be in a nested structure
+                    # Check if there's a "data" key with nested config
+                    if not host and "data" in config_data:
+                        nested_data = config_data.get("data", {})
+                        host = host or nested_data.get("host") or nested_data.get(CONF_HOST)
+                        username = username or nested_data.get("username") or nested_data.get(CONF_USERNAME)
+                        password = password or nested_data.get("password") or nested_data.get(CONF_PASSWORD)
                     
                     if host:
                         _LOGGER.info(
@@ -324,21 +353,21 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         )
                         return {
                             CONF_HOST: host,
-                            CONF_USERNAME: username,
-                            CONF_PASSWORD: password,
+                            CONF_USERNAME: username or "",
+                            CONF_PASSWORD: password or "",
                         }
                     else:
-                        _LOGGER.debug("Found FritzBox integration '%s' but could not extract host", domain)
+                        _LOGGER.warning("Found FritzBox integration '%s' but could not extract host. Config keys: %s", domain, list(config_data.keys()))
                         
             except KeyError:
                 # Domain doesn't exist, try next one
                 _LOGGER.debug("Domain '%s' not found, trying next", domain)
                 continue
             except Exception as err:
-                _LOGGER.debug("Error checking domain '%s': %s", domain, err)
+                _LOGGER.warning("Error checking domain '%s': %s", domain, err)
                 continue
         
-        _LOGGER.debug("No existing FritzBox integration found")
+        _LOGGER.info("No existing FritzBox integration found with usable configuration")
         return None
 
     @staticmethod
