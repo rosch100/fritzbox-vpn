@@ -12,7 +12,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.const import CONF_HOST, CONF_USERNAME, CONF_PASSWORD
 
-from .const import DEFAULT_UPDATE_INTERVAL, DEFAULT_TIMEOUT, API_LOGIN, API_DATA, API_VPN_CONNECTION
+from .const import DEFAULT_UPDATE_INTERVAL, CONF_UPDATE_INTERVAL, DEFAULT_TIMEOUT, API_LOGIN, API_DATA, API_VPN_CONNECTION
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -182,13 +182,20 @@ class FritzBoxVPNSession:
 class FritzBoxVPNCoordinator(DataUpdateCoordinator):
     """Coordinator for FritzBox VPN data."""
 
-    def __init__(self, hass: HomeAssistant, config: Dict[str, Any]):
+    def __init__(self, hass: HomeAssistant, config: Dict[str, Any], options: Optional[Dict[str, Any]] = None):
         """Initialize the coordinator."""
+        # Get update interval from options or config, fallback to default
+        update_interval_seconds = (
+            (options or {}).get(CONF_UPDATE_INTERVAL)
+            or config.get(CONF_UPDATE_INTERVAL)
+            or DEFAULT_UPDATE_INTERVAL
+        )
+        
         super().__init__(
             hass,
             _LOGGER,
             name="fritzbox_vpn",
-            update_interval=timedelta(seconds=DEFAULT_UPDATE_INTERVAL),
+            update_interval=timedelta(seconds=update_interval_seconds),
         )
         self.fritz_session = FritzBoxVPNSession(
             config[CONF_HOST],

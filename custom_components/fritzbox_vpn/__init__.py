@@ -21,7 +21,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up FritzBox VPN from a config entry."""
     _LOGGER.info("Setting up FritzBox VPN integration for host: %s", entry.data.get('host', 'Unknown'))
     
-    coordinator = FritzBoxVPNCoordinator(hass, entry.data)
+    coordinator = FritzBoxVPNCoordinator(hass, entry.data, entry.options)
 
     # Fetch initial data so we have data when the entities are added
     try:

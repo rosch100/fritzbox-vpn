@@ -8,12 +8,13 @@ Diese Integration ermöglicht die Steuerung von WireGuard VPN-Verbindungen auf e
 
 - ✅ Automatische Erkennung aller WireGuard VPN-Verbindungen
 - ✅ Ein-/Ausschalten von VPN-Verbindungen über Switch Entities
-- ✅ Automatische Status-Updates alle 30 Sekunden
+- ✅ Automatische Status-Updates (konfigurierbares Intervall, Standard: 30 Sekunden)
 - ✅ Einfache Konfiguration über die Home Assistant UI
 - ✅ Unterstützung mehrerer VPN-Verbindungen
 - ✅ **Automatische FritzBox-Erkennung via SSDP/UPnP**
 - ✅ **Automatische Konfiguration aus vorhandener FritzBox-Integration**
 - ✅ **Sichere Speicherung der Zugangsdaten** (verschlüsselt durch Home Assistant)
+- ✅ **Konfigurierbares Update-Intervall** (5-300 Sekunden)
 
 ## Installation
 
@@ -59,6 +60,18 @@ Diese Integration ermöglicht die Steuerung von WireGuard VPN-Verbindungen auf e
 
 Die Integration erkennt automatisch alle WireGuard VPN-Verbindungen auf Ihrer FritzBox und erstellt für jede eine Switch Entity.
 
+### Update-Intervall konfigurieren
+
+Sie können das Update-Intervall (wie oft die Integration den VPN-Status prüft) in den Integrations-Optionen konfigurieren:
+
+1. Gehen Sie zu **Einstellungen** > **Geräte & Dienste**
+2. Finden Sie Ihre **FritzBox VPN** Integration
+3. Klicken Sie auf **Konfigurieren**
+4. Passen Sie das **Update-Intervall** an (5-300 Sekunden, Standard: 30 Sekunden)
+5. Klicken Sie auf **Absenden**
+
+Das Update-Intervall bestimmt, wie häufig die Integration die FritzBox nach VPN-Status-Updates abfragt. Niedrigere Werte bieten häufigere Updates, können aber den Netzwerkverkehr und die FritzBox-Last erhöhen. Höhere Werte reduzieren den Netzwerkverkehr, können aber Status-Updates verzögern.
+
 ### Sicherheit
 
 Alle Zugangsdaten (Benutzername und Passwort) werden sicher von Home Assistant gespeichert:
@@ -72,6 +85,8 @@ Nach der Konfiguration finden Sie für jede VPN-Verbindung folgende Entitäten:
 
 ### Switch-Entität
 - **Entitäts-ID**: `switch.fritzbox_vpn_<connection_uid>_switch`
+- **Name**: Verwendet den VPN-Verbindungsnamen vom Gerät (via `has_entity_name`)
+- **Icon**: `mdi:vpn`
 - **Zweck**: VPN-Verbindungen ein- und ausschalten (Aktiviert/Deaktiviert)
 - **Status**: Zeigt an, ob die VPN aktiviert (ein) oder deaktiviert (aus) ist
 
@@ -79,6 +94,8 @@ Nach der Konfiguration finden Sie für jede VPN-Verbindung folgende Entitäten:
 
 1. **Connected Binary Sensor** (standardmäßig aktiviert)
    - **Entitäts-ID**: `binary_sensor.fritzbox_vpn_<connection_uid>_connected`
+   - **Name**: "Connected" (via `has_entity_name`)
+   - **Icon**: `mdi:connection`
    - **Zweck**: Zeigt an, ob die VPN-Verbindung aktiv verbunden ist
    - **Wert**: `on` wenn verbunden, `off` wenn nicht verbunden
    - **Device Class**: `connectivity`
@@ -87,6 +104,8 @@ Nach der Konfiguration finden Sie für jede VPN-Verbindung folgende Entitäten:
 
 1. **Status Sensor** (standardmäßig aktiviert)
    - **Entitäts-ID**: `sensor.fritzbox_vpn_<connection_uid>_status`
+   - **Name**: "Status" (via `has_entity_name`)
+   - **Icon**: `mdi:information`
    - **Zweck**: Zeigt den kombinierten VPN-Status als Text an
    - **Werte**: 
      - `connected` - VPN ist aktiviert und verbunden
@@ -96,13 +115,17 @@ Nach der Konfiguration finden Sie für jede VPN-Verbindung folgende Entitäten:
 
 2. **UID Sensor** (standardmäßig deaktiviert)
    - **Entitäts-ID**: `sensor.fritzbox_vpn_<connection_uid>_uid`
+   - **Name**: "UID" (via `has_entity_name`)
+   - **Icon**: `mdi:identifier`
    - **Zweck**: Zeigt die eindeutige Verbindungs-ID (Connection UID)
-   - **Wert**: Die Connection UID als Zeichenkette
+   - **Wert**: Die Connection UID als Zeichenkette (gleich wie `<connection_uid>`)
 
 3. **VPN UID Sensor** (standardmäßig deaktiviert)
    - **Entitäts-ID**: `sensor.fritzbox_vpn_<connection_uid>_vpn_uid`
+   - **Name**: "VPN UID" (via `has_entity_name`)
+   - **Icon**: `mdi:identifier`
    - **Zweck**: Zeigt die interne VPN UID der FritzBox
-   - **Wert**: Die interne VPN UID als Zeichenkette
+   - **Wert**: Die interne VPN UID als Zeichenkette (aus `conn.get('uid')`)
 
 Die Entitäts-IDs basieren auf der eindeutigen ID (UID) der VPN-Verbindung. Die Anzeigenamen zeigen den tatsächlichen Namen der VPN-Verbindung an.
 

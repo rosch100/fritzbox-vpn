@@ -6,6 +6,7 @@ DOMAIN = "fritzbox_vpn"
 CONF_HOST = "host"
 CONF_USERNAME = "username"
 CONF_PASSWORD = "password"
+CONF_UPDATE_INTERVAL = "update_interval"
 
 # Default values
 DEFAULT_UPDATE_INTERVAL = 30  # seconds

@@ -13,7 +13,7 @@ from homeassistant.data_entry_flow import FlowResult
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.const import CONF_HOST, CONF_USERNAME, CONF_PASSWORD
 
-from .const import DOMAIN
+from .const import DOMAIN, CONF_UPDATE_INTERVAL, DEFAULT_UPDATE_INTERVAL
 from .coordinator import FritzBoxVPNSession
 
 _LOGGER = logging.getLogger(__name__)
@@ -653,11 +653,21 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                 _LOGGER.exception("Unexpected exception")
                 errors["base"] = "unknown"
             else:
-                # Update the config entry with new data
-                # Note: We update entry.data, not entry.options, as these are core config values
+                # Separate core config (data) from options
+                config_data = {
+                    CONF_HOST: user_input[CONF_HOST],
+                    CONF_USERNAME: user_input[CONF_USERNAME],
+                    CONF_PASSWORD: user_input[CONF_PASSWORD],
+                }
+                options_data = {
+                    CONF_UPDATE_INTERVAL: user_input.get(CONF_UPDATE_INTERVAL, DEFAULT_UPDATE_INTERVAL),
+                }
+                
+                # Update the config entry with new data and options
                 self.hass.config_entries.async_update_entry(
                     self.config_entry,
-                    data=user_input,
+                    data=config_data,
+                    options=options_data,
                 )
                 # Reload the integration to apply the new configuration
                 await self.hass.config_entries.async_reload(self.config_entry.entry_id)
@@ -665,6 +675,8 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
 
         # Pre-fill with current values
         current_data = self.config_entry.data
+        current_options = self.config_entry.options or {}
+        
         # Pre-fill password from current config if available
         # Log for debugging (password masked)
         _LOGGER.debug("OptionsFlow: Current config_entry.data keys: %s", list(current_data.keys()))
@@ -676,10 +688,17 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
             # Also try alternative key names
             default_password = current_data.get("password", "")
         
+        # Get update interval from options or use default
+        default_update_interval = current_options.get(CONF_UPDATE_INTERVAL, DEFAULT_UPDATE_INTERVAL)
+        
         schema = vol.Schema({
             vol.Required(CONF_HOST, default=current_data.get(CONF_HOST, "192.168.178.1")): str,
             vol.Required(CONF_USERNAME, default=current_data.get(CONF_USERNAME, "")): str,
             vol.Required(CONF_PASSWORD, default=default_password): str,
+            vol.Required(CONF_UPDATE_INTERVAL, default=default_update_interval): vol.All(
+                vol.Coerce(int),
+                vol.Range(min=5, max=300)
+            ),
         })
 
         return self.async_show_form(

@@ -34,7 +34,8 @@
         "data": {
           "host": "FritzBox IP-Adresse",
           "username": "Benutzername",
-          "password": "Passwort (leer lassen, um aktuelles Passwort beizubehalten)"
+          "password": "Passwort (leer lassen, um aktuelles Passwort beizubehalten)",
+          "update_interval": "Update-Intervall (Sekunden, 5-300)"
         }
       }
     }
