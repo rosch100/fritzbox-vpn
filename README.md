@@ -68,15 +68,37 @@ All credentials (username and password) are securely stored by Home Assistant:
 
 ## Usage
 
-After configuration, you will find a Switch entity for each VPN connection:
-- **Entities**: `switch.fritzbox_vpn_<connection_uid>`
-  
-The entity ID is based on the unique ID (UID) of the VPN connection. The display name shows the actual name of the VPN connection.
+After configuration, you will find the following entities for each VPN connection:
 
-You can use these switches to:
-- Turn VPN connections on and off
-- Monitor the current status
-- Create automations
+### Switch Entity
+- **Entity ID**: `switch.fritzbox_vpn_<connection_uid>_switch`
+- **Purpose**: Turn VPN connections on and off
+- **Status**: Shows if the VPN is activated (on) or deactivated (off)
+
+### Sensor Entities
+
+1. **Connected Sensor** (enabled by default)
+   - **Entity ID**: `sensor.fritzbox_vpn_<connection_uid>_connected`
+   - **Purpose**: Shows if the VPN connection is actively connected
+   - **Value**: `true` if connected, `false` if not connected
+
+2. **UID Sensor** (disabled by default)
+   - **Entity ID**: `sensor.fritzbox_vpn_<connection_uid>_uid`
+   - **Purpose**: Shows the unique connection ID (Connection UID)
+   - **Value**: The connection UID string
+
+3. **VPN UID Sensor** (disabled by default)
+   - **Entity ID**: `sensor.fritzbox_vpn_<connection_uid>_vpn_uid`
+   - **Purpose**: Shows the internal VPN UID of the FritzBox
+   - **Value**: The internal VPN UID string
+
+The entity IDs are based on the unique ID (UID) of the VPN connection. The display names show the actual name of the VPN connection.
+
+You can use these entities to:
+- Turn VPN connections on and off (switch)
+- Monitor connection status (connected sensor)
+- Access technical identifiers (UID sensors, disabled by default)
+- Create automations based on connection status
 
 ### Status Attributes
 

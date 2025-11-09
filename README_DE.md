@@ -68,15 +68,37 @@ Alle Zugangsdaten (Benutzername und Passwort) werden sicher von Home Assistant g
 
 ## Verwendung
 
-Nach der Konfiguration finden Sie für jede VPN-Verbindung eine Switch Entity unter:
-- **Entitäten**: `switch.fritzbox_vpn_<connection_uid>`
-  
-Die Entity-ID basiert auf der eindeutigen ID (UID) der VPN-Verbindung. Der Anzeigename zeigt den tatsächlichen Namen der VPN-Verbindung an.
+Nach der Konfiguration finden Sie für jede VPN-Verbindung folgende Entitäten:
 
-Sie können diese Switches verwenden, um:
-- VPN-Verbindungen ein- und auszuschalten
-- Den aktuellen Status zu überwachen
-- Automatisierungen zu erstellen
+### Switch Entity
+- **Entity-ID**: `switch.fritzbox_vpn_<connection_uid>_switch`
+- **Zweck**: VPN-Verbindungen ein- und ausschalten
+- **Status**: Zeigt an, ob die VPN-Verbindung aktiviert (ein) oder deaktiviert (aus) ist
+
+### Sensor-Entitäten
+
+1. **Connected Sensor** (standardmäßig aktiviert)
+   - **Entity-ID**: `sensor.fritzbox_vpn_<connection_uid>_connected`
+   - **Zweck**: Zeigt an, ob die VPN-Verbindung aktiv verbunden ist
+   - **Wert**: `true` wenn verbunden, `false` wenn nicht verbunden
+
+2. **UID Sensor** (standardmäßig deaktiviert)
+   - **Entity-ID**: `sensor.fritzbox_vpn_<connection_uid>_uid`
+   - **Zweck**: Zeigt die eindeutige Verbindungs-ID (Connection UID)
+   - **Wert**: Die Verbindungs-UID als String
+
+3. **VPN UID Sensor** (standardmäßig deaktiviert)
+   - **Entity-ID**: `sensor.fritzbox_vpn_<connection_uid>_vpn_uid`
+   - **Zweck**: Zeigt die interne VPN-UID der FritzBox
+   - **Wert**: Die interne VPN-UID als String
+
+Die Entity-IDs basieren auf der eindeutigen ID (UID) der VPN-Verbindung. Der Anzeigename zeigt den tatsächlichen Namen der VPN-Verbindung an.
+
+Sie können diese Entitäten verwenden, um:
+- VPN-Verbindungen ein- und auszuschalten (Switch)
+- Den Verbindungsstatus zu überwachen (Connected Sensor)
+- Technische Identifikatoren abzurufen (UID Sensoren, standardmäßig deaktiviert)
+- Automatisierungen basierend auf dem Verbindungsstatus zu erstellen
 
 ### Status-Attribute
 
