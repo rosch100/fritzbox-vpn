@@ -40,19 +40,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         configuration_url=f"http://{host}",
     )
 
-    # Create VPN connection devices as child devices
-    # These will only appear under the FritzBox device, not in the main device list
-    if coordinator.data:
-        for connection_uid, connection_data in coordinator.data.items():
-            vpn_name = connection_data.get('name', 'Unknown')
-            device_registry.async_get_or_create(
-                config_entry_id=entry.entry_id,
-                identifiers={(DOMAIN, entry.entry_id, connection_uid)},
-                name=vpn_name,
-                manufacturer="AVM",
-                model="WireGuard VPN",
-                via_device_id=parent_device.id,
-            )
+    # VPN connection devices will be created automatically by the entities
+    # They use via_device to link to the parent device
 
     # Forward the setup to the switch platform
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
