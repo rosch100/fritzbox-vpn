@@ -1,5 +1,6 @@
 """The FritzBox VPN integration."""
 
+import asyncio
 import logging
 from typing import Any
 
@@ -54,7 +55,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # Schedule platform setup to run after config flow completes
     # This prevents showing the entity list immediately after auto-setup
     async def _delayed_setup():
-        """Set up platforms after a short delay to avoid showing entity list after auto-setup."""
+        """Set up platforms after a delay to avoid showing entity list after auto-setup."""
+        # Wait a moment to ensure config flow is fully completed
+        await asyncio.sleep(1)
         try:
             await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
             _LOGGER.info("Successfully set up all platforms")
