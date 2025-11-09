@@ -89,6 +89,8 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         info = await validate_input(self.hass, self._existing_config)
                         # Connection successful - create entry directly without showing form
                         _LOGGER.info("Autoconfiguration successful! Creating integration entry automatically.")
+                        _LOGGER.debug("Saving config with keys: %s", list(self._existing_config.keys()))
+                        _LOGGER.debug("Password present in config to save: %s", bool(self._existing_config.get(CONF_PASSWORD)))
                         return self.async_create_entry(title=info["title"], data=self._existing_config)
                     except CannotConnect:
                         _LOGGER.warning("Autoconfiguration connection test failed: cannot_connect")
@@ -622,7 +624,16 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
         # Pre-fill with current values
         current_data = self.config_entry.data
         # Pre-fill password from current config if available
-        default_password = current_data.get(CONF_PASSWORD, "") if current_data.get(CONF_PASSWORD) else ""
+        # Log for debugging (password masked)
+        _LOGGER.debug("OptionsFlow: Current config_entry.data keys: %s", list(current_data.keys()))
+        _LOGGER.debug("OptionsFlow: Has password in data: %s", bool(current_data.get(CONF_PASSWORD)))
+        
+        # Try to get password from data - it should be there if it was saved
+        default_password = current_data.get(CONF_PASSWORD, "")
+        if not default_password:
+            # Also try alternative key names
+            default_password = current_data.get("password", "")
+        
         schema = vol.Schema({
             vol.Required(CONF_HOST, default=current_data.get(CONF_HOST, "192.168.178.1")): str,
             vol.Required(CONF_USERNAME, default=current_data.get(CONF_USERNAME, "")): str,
