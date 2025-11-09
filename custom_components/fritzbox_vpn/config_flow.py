@@ -77,10 +77,12 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             if self._existing_config:
                 _LOGGER.info("Found existing FritzBox integration, using its configuration (SSDP will be skipped)")
                 # Pre-fill with existing config
+                # Pre-fill password from existing config if available
+                default_password = self._existing_config.get(CONF_PASSWORD, "") if self._existing_config.get(CONF_PASSWORD) else ""
                 schema = vol.Schema({
                     vol.Required(CONF_HOST, default=self._existing_config.get(CONF_HOST, "192.168.178.1")): str,
                     vol.Required(CONF_USERNAME, default=self._existing_config.get(CONF_USERNAME, "")): str,
-                    vol.Required(CONF_PASSWORD, default=""): str,  # Don't pre-fill password for security
+                    vol.Required(CONF_PASSWORD, default=default_password): str,
                 })
             else:
                 _LOGGER.debug("No existing FritzBox integration found, SSDP discovery will be used as fallback")
@@ -172,17 +174,20 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             if self._existing_config:
                 default_host = self._existing_config.get(CONF_HOST, self._discovered_host or "192.168.178.1")
                 default_username = self._existing_config.get(CONF_USERNAME, "")
-                _LOGGER.info("Using existing config for confirm step: host=%s, username=%s", default_host, default_username)
+                default_password = self._existing_config.get(CONF_PASSWORD, "") if self._existing_config.get(CONF_PASSWORD) else ""
+                _LOGGER.info("Using existing config for confirm step: host=%s, username=%s, password=%s", 
+                           default_host, default_username, "***" if default_password else "not set")
             else:
                 default_host = self._discovered_host or "192.168.178.1"
                 default_username = ""
+                default_password = ""
             
             return self.async_show_form(
                 step_id="confirm",
                 data_schema=vol.Schema({
                     vol.Required(CONF_HOST, default=default_host): str,
                     vol.Required(CONF_USERNAME, default=default_username): str,
-                    vol.Required(CONF_PASSWORD): str,
+                    vol.Required(CONF_PASSWORD, default=default_password): str,
                 }),
                 description_placeholders={"host": default_host},
             )
@@ -204,12 +209,19 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         else:
             return self.async_create_entry(title=info["title"], data=user_input)
         
+        # Pre-fill password from existing config if available and not provided
+        default_password = ""
+        if self._existing_config and self._existing_config.get(CONF_PASSWORD):
+            default_password = self._existing_config.get(CONF_PASSWORD)
+        elif user_input and user_input.get(CONF_PASSWORD):
+            default_password = user_input.get(CONF_PASSWORD)
+        
         return self.async_show_form(
             step_id="confirm",
             data_schema=vol.Schema({
                 vol.Required(CONF_HOST, default=user_input.get(CONF_HOST, self._discovered_host or "192.168.178.1")): str,
                 vol.Required(CONF_USERNAME, default=user_input.get(CONF_USERNAME, "")): str,
-                vol.Required(CONF_PASSWORD): str,
+                vol.Required(CONF_PASSWORD, default=default_password): str,
             }),
             errors=errors,
         )
