@@ -1,0 +1,24 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "FritzBox VPN Configuration",
+        "description": "Please enter your FritzBox connection details.",
+        "data": {
+          "host": "FritzBox IP Address",
+          "username": "Username",
+          "password": "Password"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Failed to connect to FritzBox. Please check the IP address and network connection.",
+      "invalid_auth": "Authentication failed. Please check username and password.",
+      "unknown": "An unexpected error occurred."
+    },
+    "abort": {
+      "already_configured": "This FritzBox is already configured."
+    }
+  }
+}
+

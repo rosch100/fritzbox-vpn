@@ -1,0 +1,67 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+*.egg
+.venv/
+venv/
+env/
+ENV/
+
+# Lokale Entwicklungsdateien und Skripte
+toggle_fritz_vpn.py
+dev_utils.py
+ha_client.py
+list_appletv_apps.py
+monitor_apple_tv.py
+deploy.sh
+
+# Test-Dateien
+test_*.py
+*_test.py
+
+# Konfigurationsdateien (lokal, enthalten möglicherweise Secrets)
+config.yaml
+ha_config.yaml
+automations_AppleTV.yaml
+shell_commands_AppleTV.yaml
+
+# Analyse- und Dokumentationsdateien (lokal)
+ANALYSE_HA_FRITZBOX_VPN.md
+FRITZBOX_TOOLS_QUELLEN.md
+CUSTOM_COMPONENT_ZUSAMMENFASSUNG.md
+REPOSITORY_STRUKTUR.md
+README_DEV.md
+README_HA_INTEGRATION.md
+INSTALLATION_HA.md
+CHANGELOG_HA.md
+KONFIGURATION_ABGESCHLOSSEN.md
+example_custom_component.py
+
+# Requirements (nicht für Custom Component benötigt)
+requirements.txt
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Secrets
+*.key
+*.pem
+secrets.yaml
+.env
+
+# Archiv-Verzeichnis (lokale Entwicklungsdateien)
+archive/

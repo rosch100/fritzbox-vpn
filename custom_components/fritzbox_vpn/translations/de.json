@@ -1,0 +1,24 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "FritzBox VPN Konfiguration",
+        "description": "Bitte geben Sie die Verbindungsdaten für Ihre FritzBox ein.",
+        "data": {
+          "host": "FritzBox IP-Adresse",
+          "username": "Benutzername",
+          "password": "Passwort"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Verbindung zur FritzBox fehlgeschlagen. Bitte überprüfen Sie die IP-Adresse und Netzwerkverbindung.",
+      "invalid_auth": "Authentifizierung fehlgeschlagen. Bitte überprüfen Sie Benutzername und Passwort.",
+      "unknown": "Ein unerwarteter Fehler ist aufgetreten."
+    },
+    "abort": {
+      "already_configured": "Diese FritzBox ist bereits konfiguriert."
+    }
+  }
+}
+
