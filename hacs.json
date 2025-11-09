@@ -3,7 +3,6 @@
   "render_readme": true,
   "domains": ["switch"],
   "iot_class": "Local Polling",
-  "homeassistant": "2023.1.0",
-  "logo": "https://raw.githubusercontent.com/rosch100/fritzbox-vpn/main/logo.png"
+  "homeassistant": "2023.1.0"
 }
 
