@@ -52,21 +52,25 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # VPN connection devices will be created automatically by the entities
     # They use via_device to link to the parent device
 
-    # Schedule platform setup to run after config flow completes
-    # This prevents showing the entity list immediately after auto-setup
-    # Use a longer delay to ensure the dialog is closed before entities are created
+    # Don't create entities immediately to avoid showing them in the discovery dialog
+    # Instead, create them after a delay to ensure the dialog is closed
+    # This prevents the VPN list from appearing in the dialog after auto-setup
+    _platforms_setup = False
+    
     async def _delayed_setup():
-        """Set up platforms after a delay to avoid showing entity list after auto-setup."""
-        # Wait longer to ensure config flow dialog is fully closed
-        # This prevents the VPN list from appearing in the discovery dialog
-        # The delay needs to be long enough for the user to close the dialog
-        await asyncio.sleep(5)
-        try:
-            await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
-            _LOGGER.info("Successfully set up all platforms")
-        except Exception as err:
-            _LOGGER.error("Failed to set up platforms: %s", err, exc_info=True)
-
+        """Set up platforms after delay to avoid showing dialog."""
+        nonlocal _platforms_setup
+        # Wait long enough to ensure config flow dialog is closed
+        # The dialog typically closes within 1-2 seconds, so 10 seconds should be safe
+        await asyncio.sleep(10)
+        if not _platforms_setup:
+            _platforms_setup = True
+            try:
+                await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+                _LOGGER.info("Successfully set up all platforms (delayed)")
+            except Exception as err:
+                _LOGGER.error("Failed to set up platforms: %s", err, exc_info=True)
+    
     # Schedule setup to run after config flow completes
     hass.async_create_task(_delayed_setup())
 
