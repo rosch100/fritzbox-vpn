@@ -1,94 +1,95 @@
-# FritzBox VPN Integration für Home Assistant
+# FritzBox VPN Integration for Home Assistant
 
-Diese Integration ermöglicht die Steuerung von WireGuard VPN-Verbindungen auf einer AVM FritzBox direkt über Home Assistant.
+[🇩🇪 Deutsch](README_DE.md) | [🇬🇧 English](README.md)
+
+This integration allows you to control WireGuard VPN connections on an AVM FritzBox directly through Home Assistant.
 
 ## Features
 
-- ✅ Automatische Erkennung aller WireGuard VPN-Verbindungen
-- ✅ Ein-/Ausschalten von VPN-Verbindungen über Switch Entities
-- ✅ Automatische Status-Updates alle 30 Sekunden
-- ✅ Einfache Konfiguration über die Home Assistant UI
-- ✅ Unterstützung mehrerer VPN-Verbindungen
+- ✅ Automatic detection of all WireGuard VPN connections
+- ✅ Turn VPN connections on/off via Switch entities
+- ✅ Automatic status updates every 30 seconds
+- ✅ Easy configuration through the Home Assistant UI
+- ✅ Support for multiple VPN connections
 
 ## Installation
 
-### Über HACS (empfohlen)
+### Via HACS (recommended)
 
-1. Öffnen Sie HACS in Home Assistant
-2. Gehen Sie zu **Integrations**
-3. Klicken Sie auf **Custom repositories**
-4. Fügen Sie dieses Repository hinzu:
+1. Open HACS in Home Assistant
+2. Go to **Integrations**
+3. Click on **Custom repositories**
+4. Add this repository:
    - Repository: `https://github.com/rosch100/fritzbox-vpn`
    - Category: **Integration**
-5. Suchen Sie nach **FritzBox VPN** und installieren Sie es
-6. Starten Sie Home Assistant neu
+5. Search for **FritzBox VPN** and install it
+6. Restart Home Assistant
 
-### Manuelle Installation
+### Manual Installation
 
-1. Kopieren Sie den `custom_components/fritzbox_vpn` Ordner in Ihr Home Assistant `custom_components` Verzeichnis
-2. Starten Sie Home Assistant neu
+1. Copy the `custom_components/fritzbox_vpn` folder to your Home Assistant `custom_components` directory
+2. Restart Home Assistant
 
-## Konfiguration
+## Configuration
 
-1. Gehen Sie zu **Einstellungen** > **Geräte & Dienste**
-2. Klicken Sie auf **Integration hinzufügen**
-3. Suchen Sie nach **FritzBox VPN**
-4. Geben Sie die folgenden Informationen ein:
-   - **FritzBox IP-Adresse**: z.B. `192.168.178.1`
-   - **Benutzername**: Ihr FritzBox Benutzername
-   - **Passwort**: Ihr FritzBox Passwort
-5. Klicken Sie auf **Absenden**
+1. Go to **Settings** > **Devices & Services**
+2. Click on **Add Integration**
+3. Search for **FritzBox VPN**
+4. Enter the following information:
+   - **FritzBox IP Address**: e.g. `192.168.178.1`
+   - **Username**: Your FritzBox username
+   - **Password**: Your FritzBox password
+5. Click **Submit**
 
-Die Integration erkennt automatisch alle WireGuard VPN-Verbindungen auf Ihrer FritzBox und erstellt für jede eine Switch Entity.
+The integration automatically detects all WireGuard VPN connections on your FritzBox and creates a Switch entity for each one.
 
-## Verwendung
+## Usage
 
-Nach der Konfiguration finden Sie für jede VPN-Verbindung eine Switch Entity unter:
-- **Entitäten**: `switch.fritzbox_vpn_<connection_uid>`
+After configuration, you will find a Switch entity for each VPN connection:
+- **Entities**: `switch.fritzbox_vpn_<connection_uid>`
   
-Die Entity-ID basiert auf der eindeutigen ID (UID) der VPN-Verbindung. Der Anzeigename zeigt den tatsächlichen Namen der VPN-Verbindung an.
+The entity ID is based on the unique ID (UID) of the VPN connection. The display name shows the actual name of the VPN connection.
 
-Sie können diese Switches verwenden, um:
-- VPN-Verbindungen ein- und auszuschalten
-- Den aktuellen Status zu überwachen
-- Automatisierungen zu erstellen
+You can use these switches to:
+- Turn VPN connections on and off
+- Monitor the current status
+- Create automations
 
-### Status-Attribute
+### Status Attributes
 
-Jede VPN-Switch-Entity bietet folgende Attribute:
+Each VPN switch entity provides the following attributes:
 
-- **name**: Der Name der VPN-Verbindung (wie auf der FritzBox konfiguriert)
-- **uid**: Die eindeutige Verbindungs-ID (Connection UID)
-- **vpn_uid**: Die interne VPN-UID der FritzBox
-- **active**: `true` wenn die VPN-Verbindung aktiviert ist, `false` wenn deaktiviert
-- **connected**: `true` wenn die VPN-Verbindung aktiv verbunden ist, `false` wenn nicht verbunden
-- **status**: Textuelle Statusbeschreibung:
-  - `"verbunden"` - VPN ist aktiviert und verbunden
-  - `"aktiviert (nicht verbunden)"` - VPN ist aktiviert, aber nicht verbunden
-  - `"deaktiviert"` - VPN ist deaktiviert
-  - `"unbekannt"` - Status konnte nicht ermittelt werden
+- **name**: The name of the VPN connection (as configured on the FritzBox)
+- **uid**: The unique connection ID (Connection UID)
+- **vpn_uid**: The internal VPN UID of the FritzBox
+- **active**: `true` if the VPN connection is activated, `false` if deactivated
+- **connected**: `true` if the VPN connection is actively connected, `false` if not connected
+- **status**: Textual status description:
+  - `"verbunden"` - VPN is activated and connected
+  - `"aktiviert (nicht verbunden)"` - VPN is activated but not connected
+  - `"deaktiviert"` - VPN is deactivated
+  - `"unbekannt"` - Status could not be determined
 
-## Automatisierungen
+## Automations
 
-Sie können die VPN-Switches in Automatisierungen verwenden, um VPN-Verbindungen basierend auf verschiedenen Bedingungen automatisch ein- und auszuschalten.
+You can use the VPN switches in automations to automatically turn VPN connections on and off based on various conditions.
 
-## Voraussetzungen
+## Requirements
 
-- AVM FritzBox mit WireGuard VPN-Unterstützung
-- FritzBox Firmware mit aktiviertem WireGuard
-- Benutzer mit entsprechenden Berechtigungen auf der FritzBox
+- AVM FritzBox with WireGuard VPN support
+- FritzBox firmware with WireGuard enabled
+- User with appropriate permissions on the FritzBox
 
-## Unterstützung
+## Support
 
-Bei Problemen oder Fragen:
-- Erstellen Sie ein Issue auf GitHub
-- Überprüfen Sie die Home Assistant Logs
+For problems or questions:
+- Create an issue on GitHub
+- Check the Home Assistant logs
 
 ## Logo
 
-Das Logo wird automatisch aus dem [Home Assistant Brands-Repository](https://github.com/home-assistant/brands) geladen, sobald es dort registriert ist. Das lokale Logo dient als Fallback.
+The logo is automatically loaded from the [Home Assistant Brands Repository](https://github.com/home-assistant/brands) once it is registered there. The local logo serves as a fallback.
 
-## Lizenz
+## License
 
 MIT License
-
