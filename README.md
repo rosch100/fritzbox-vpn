@@ -11,6 +11,9 @@ This integration allows you to control WireGuard VPN connections on an AVM Fritz
 - ✅ Automatic status updates every 30 seconds
 - ✅ Easy configuration through the Home Assistant UI
 - ✅ Support for multiple VPN connections
+- ✅ **Automatic FritzBox discovery via SSDP/UPnP**
+- ✅ **Automatic configuration from existing FritzBox integration**
+- ✅ **Secure credential storage** (encrypted by Home Assistant)
 
 ## Installation
 
@@ -32,6 +35,17 @@ This integration allows you to control WireGuard VPN connections on an AVM Fritz
 
 ## Configuration
 
+### Automatic Discovery (Recommended)
+
+1. Go to **Settings** > **Devices & Services**
+2. Click on **Add Integration**
+3. Search for **FritzBox VPN**
+4. If a FritzBox is found on your network, it will be automatically discovered
+5. The integration will try to use credentials from an existing FritzBox integration if available
+6. Enter your credentials if needed and click **Submit**
+
+### Manual Configuration
+
 1. Go to **Settings** > **Devices & Services**
 2. Click on **Add Integration**
 3. Search for **FritzBox VPN**
@@ -41,7 +55,16 @@ This integration allows you to control WireGuard VPN connections on an AVM Fritz
    - **Password**: Your FritzBox password
 5. Click **Submit**
 
+**Note**: If you already have the official FritzBox integration configured, the IP address and username will be automatically pre-filled. You only need to enter the password (or leave it empty if the same credentials are used).
+
 The integration automatically detects all WireGuard VPN connections on your FritzBox and creates a Switch entity for each one.
+
+### Security
+
+All credentials (username and password) are securely stored by Home Assistant:
+- Credentials are encrypted and stored in Home Assistant's secure storage
+- They are never exposed in logs or configuration files
+- Access is restricted to the integration itself
 
 ## Usage
 

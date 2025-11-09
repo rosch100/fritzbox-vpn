@@ -3,12 +3,16 @@
     "step": {
       "user": {
         "title": "FritzBox VPN Konfiguration",
-        "description": "Bitte geben Sie die Verbindungsdaten für Ihre FritzBox ein.",
+        "description": "Bitte geben Sie die Verbindungsdaten für Ihre FritzBox ein. Falls bereits eine FritzBox-Integration konfiguriert ist, werden die Daten automatisch übernommen.",
         "data": {
           "host": "FritzBox IP-Adresse",
           "username": "Benutzername",
           "password": "Passwort"
         }
+      },
+      "confirm": {
+        "title": "FritzBox VPN gefunden",
+        "description": "Eine FritzBox wurde automatisch gefunden: {host}. Bitte bestätigen Sie die Konfiguration."
       }
     },
     "error": {
@@ -17,7 +21,9 @@
       "unknown": "Ein unerwarteter Fehler ist aufgetreten."
     },
     "abort": {
-      "already_configured": "Diese FritzBox ist bereits konfiguriert."
+      "already_configured": "Diese FritzBox ist bereits konfiguriert.",
+      "not_fritzbox": "Das gefundene Gerät ist keine FritzBox.",
+      "no_host": "Die IP-Adresse konnte nicht ermittelt werden."
     }
   }
 }

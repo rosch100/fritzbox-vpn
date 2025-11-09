@@ -11,6 +11,9 @@ Diese Integration ermöglicht die Steuerung von WireGuard VPN-Verbindungen auf e
 - ✅ Automatische Status-Updates alle 30 Sekunden
 - ✅ Einfache Konfiguration über die Home Assistant UI
 - ✅ Unterstützung mehrerer VPN-Verbindungen
+- ✅ **Automatische FritzBox-Erkennung via SSDP/UPnP**
+- ✅ **Automatische Konfiguration aus vorhandener FritzBox-Integration**
+- ✅ **Sichere Speicherung der Zugangsdaten** (verschlüsselt durch Home Assistant)
 
 ## Installation
 
@@ -32,6 +35,17 @@ Diese Integration ermöglicht die Steuerung von WireGuard VPN-Verbindungen auf e
 
 ## Konfiguration
 
+### Automatische Erkennung (Empfohlen)
+
+1. Gehen Sie zu **Einstellungen** > **Geräte & Dienste**
+2. Klicken Sie auf **Integration hinzufügen**
+3. Suchen Sie nach **FritzBox VPN**
+4. Falls eine FritzBox im Netzwerk gefunden wird, wird sie automatisch erkannt
+5. Die Integration versucht, Zugangsdaten aus einer vorhandenen FritzBox-Integration zu verwenden, falls verfügbar
+6. Geben Sie bei Bedarf Ihre Zugangsdaten ein und klicken Sie auf **Absenden**
+
+### Manuelle Konfiguration
+
 1. Gehen Sie zu **Einstellungen** > **Geräte & Dienste**
 2. Klicken Sie auf **Integration hinzufügen**
 3. Suchen Sie nach **FritzBox VPN**
@@ -41,7 +55,16 @@ Diese Integration ermöglicht die Steuerung von WireGuard VPN-Verbindungen auf e
    - **Passwort**: Ihr FritzBox Passwort
 5. Klicken Sie auf **Absenden**
 
+**Hinweis**: Falls bereits die offizielle FritzBox-Integration konfiguriert ist, werden IP-Adresse und Benutzername automatisch vorausgefüllt. Sie müssen nur das Passwort eingeben (oder leer lassen, falls die gleichen Zugangsdaten verwendet werden).
+
 Die Integration erkennt automatisch alle WireGuard VPN-Verbindungen auf Ihrer FritzBox und erstellt für jede eine Switch Entity.
+
+### Sicherheit
+
+Alle Zugangsdaten (Benutzername und Passwort) werden sicher von Home Assistant gespeichert:
+- Zugangsdaten werden verschlüsselt im sicheren Speicher von Home Assistant gespeichert
+- Sie werden niemals in Logs oder Konfigurationsdateien exponiert
+- Der Zugriff ist auf die Integration selbst beschränkt
 
 ## Verwendung
 
