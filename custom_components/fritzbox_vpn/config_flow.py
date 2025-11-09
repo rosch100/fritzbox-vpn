@@ -389,17 +389,36 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     for entry in entries_to_use:
                         config_data = entry.data or {}
                         options_data = entry.options or {}
+                        
+                        # Debug: Log what we're checking
+                        _LOGGER.debug("Checking entry '%s' (entry_id: %s) for credentials", entry.title, entry.entry_id)
+                        _LOGGER.debug("  Config data keys: %s", list(config_data.keys()))
+                        _LOGGER.debug("  Options data keys: %s", list(options_data.keys()))
+                        
                         # Check if entry has username or password
+                        # Try all possible key names
                         has_username = (
-                            config_data.get(CONF_USERNAME) or config_data.get("username") or config_data.get("user") or
-                            options_data.get(CONF_USERNAME) or options_data.get("username")
+                            config_data.get(CONF_USERNAME) or 
+                            config_data.get("username") or 
+                            config_data.get("user") or
+                            options_data.get(CONF_USERNAME) or 
+                            options_data.get("username") or
+                            options_data.get("user")
                         )
                         has_password = (
-                            config_data.get(CONF_PASSWORD) or config_data.get("password") or config_data.get("pass") or
-                            options_data.get(CONF_PASSWORD) or options_data.get("password")
+                            config_data.get(CONF_PASSWORD) or 
+                            config_data.get("password") or 
+                            config_data.get("pass") or
+                            options_data.get(CONF_PASSWORD) or 
+                            options_data.get("password") or
+                            options_data.get("pass")
                         )
+                        
+                        _LOGGER.debug("  Has username: %s, Has password: %s", bool(has_username), bool(has_password))
+                        
                         if has_username or has_password:
                             entries_with_creds.append(entry)
+                            _LOGGER.info("  ✓ Entry '%s' has credentials", entry.title)
                     
                     # Use entry with credentials if available, otherwise use first router entry
                     if entries_with_creds:
