@@ -59,7 +59,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         """Set up platforms after a delay to avoid showing entity list after auto-setup."""
         # Wait longer to ensure config flow dialog is fully closed
         # This prevents the VPN list from appearing in the discovery dialog
-        await asyncio.sleep(3)
+        # The delay needs to be long enough for the user to close the dialog
+        await asyncio.sleep(5)
         try:
             await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
             _LOGGER.info("Successfully set up all platforms")
