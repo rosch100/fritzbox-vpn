@@ -4,6 +4,7 @@ import asyncio
 import hashlib
 import re
 import logging
+from datetime import timedelta
 from typing import Any, Dict, Optional
 from aiohttp import ClientSession, ClientTimeout
 
@@ -153,7 +154,7 @@ class FritzBoxVPNCoordinator(DataUpdateCoordinator):
             hass,
             _LOGGER,
             name="fritzbox_vpn",
-            update_interval=asyncio.timedelta(seconds=DEFAULT_UPDATE_INTERVAL),
+            update_interval=timedelta(seconds=DEFAULT_UPDATE_INTERVAL),
         )
         self.fritz_session = FritzBoxVPNSession(
             config[CONF_HOST],
