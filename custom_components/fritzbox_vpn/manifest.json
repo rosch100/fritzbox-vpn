@@ -1,7 +1,7 @@
 {
   "domain": "fritzbox_vpn",
   "name": "FritzBox VPN",
-  "version": "0.1.1",
+  "version": "0.1",
   "documentation": "https://github.com/rosch100/fritzbox-vpn",
   "issue_tracker": "https://github.com/rosch100/fritzbox-vpn/issues",
   "codeowners": ["@rosch100"],
@@ -10,6 +10,6 @@
   "requirements": ["aiohttp>=3.8.0"],
   "iot_class": "local_polling",
   "integration_type": "device",
-  "logo": "https://raw.githubusercontent.com/rosch100/fritzbox-vpn/main/logo.png"
+  "logo": "logo.png"
 }
 

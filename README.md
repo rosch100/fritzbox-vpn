@@ -18,7 +18,7 @@ Diese Integration ermöglicht die Steuerung von WireGuard VPN-Verbindungen auf e
 2. Gehen Sie zu **Integrations**
 3. Klicken Sie auf **Custom repositories**
 4. Fügen Sie dieses Repository hinzu:
-   - Repository: `https://github.com/yourusername/fritzbox-vpn`
+   - Repository: `https://github.com/rosch100/fritzbox-vpn`
    - Category: **Integration**
 5. Suchen Sie nach **FritzBox VPN** und installieren Sie es
 6. Starten Sie Home Assistant neu
