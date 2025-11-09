@@ -122,13 +122,18 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             return self.async_abort(reason="already_configured")
         
         # Check if it's a FritzBox device (and specifically a router, not a repeater)
+        # This check MUST happen before extracting host to avoid showing repeater IP
         if not self._is_fritzbox_device(discovery_info):
+            _LOGGER.info("SSDP discovery: Rejected device (not a FritzBox router)")
             return self.async_abort(reason="not_fritzbox")
         
         # Extract host from SSDP location
         host = self._extract_host_from_ssdp(discovery_info)
         if not host:
+            _LOGGER.warning("SSDP discovery: Could not extract host from discovery info")
             return self.async_abort(reason="no_host")
+        
+        _LOGGER.info("SSDP discovery: Found FritzBox router at %s", host)
         
         # Try to get a more stable unique ID from USN or use host as fallback
         # USN typically contains device identifier like: uuid:device-uuid::urn:schemas-upnp-org:device:InternetGatewayDevice:1
@@ -148,7 +153,10 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         self.context["title_placeholders"] = {"host": host}
         
         # Try to get config from existing FritzBox integration (should be None at this point)
+        # But check again in case it was added between the first check and now
         self._existing_config = await self._get_existing_fritz_config()
+        if self._existing_config:
+            _LOGGER.info("Existing FritzBox integration found during SSDP, using its config instead of discovered host")
         
         return await self.async_step_confirm()
 
@@ -159,9 +167,15 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         errors: Dict[str, str] = {}
         
         if user_input is None:
-            # Pre-fill with discovered host and existing config if available
-            default_host = self._discovered_host or "192.168.178.1"
-            default_username = self._existing_config.get(CONF_USERNAME, "") if self._existing_config else ""
+            # Pre-fill with existing config if available (has priority over discovered host)
+            # This ensures we use the router IP from existing integration, not the repeater
+            if self._existing_config:
+                default_host = self._existing_config.get(CONF_HOST, self._discovered_host or "192.168.178.1")
+                default_username = self._existing_config.get(CONF_USERNAME, "")
+                _LOGGER.info("Using existing config for confirm step: host=%s, username=%s", default_host, default_username)
+            else:
+                default_host = self._discovered_host or "192.168.178.1"
+                default_username = ""
             
             return self.async_show_form(
                 step_id="confirm",
