@@ -72,15 +72,27 @@ After configuration, you will find the following entities for each VPN connectio
 
 ### Switch Entity
 - **Entity ID**: `switch.fritzbox_vpn_<connection_uid>_switch`
-- **Purpose**: Turn VPN connections on and off
+- **Purpose**: Turn VPN connections on and off (Enabled/Disabled)
 - **Status**: Shows if the VPN is activated (on) or deactivated (off)
+
+### Binary Sensor Entity
+
+1. **Connected Binary Sensor** (enabled by default)
+   - **Entity ID**: `binary_sensor.fritzbox_vpn_<connection_uid>_connected`
+   - **Purpose**: Shows if the VPN connection is actively connected
+   - **Value**: `on` if connected, `off` if not connected
+   - **Device Class**: `connectivity`
 
 ### Sensor Entities
 
-1. **Connected Sensor** (enabled by default)
-   - **Entity ID**: `sensor.fritzbox_vpn_<connection_uid>_connected`
-   - **Purpose**: Shows if the VPN connection is actively connected
-   - **Value**: `true` if connected, `false` if not connected
+1. **Status Sensor** (enabled by default)
+   - **Entity ID**: `sensor.fritzbox_vpn_<connection_uid>_status`
+   - **Purpose**: Shows the combined VPN status as text
+   - **Values**: 
+     - `connected` - VPN is enabled and connected
+     - `enabled` - VPN is enabled but not connected
+     - `disabled` - VPN is disabled
+     - `unknown` - Status could not be determined
 
 2. **UID Sensor** (disabled by default)
    - **Entity ID**: `sensor.fritzbox_vpn_<connection_uid>_uid`
@@ -96,7 +108,8 @@ The entity IDs are based on the unique ID (UID) of the VPN connection. The displ
 
 You can use these entities to:
 - Turn VPN connections on and off (switch)
-- Monitor connection status (connected sensor)
+- Monitor connection status (connected binary sensor)
+- View detailed status information (status sensor)
 - Access technical identifiers (UID sensors, disabled by default)
 - Create automations based on connection status
 

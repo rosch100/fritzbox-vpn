@@ -45,10 +45,14 @@ Die Integration erkennt automatisch alle WireGuard VPN-Verbindungen auf Ihrer Fr
 
 ## Verwendung
 
-Nach der Konfiguration finden Sie für jede VPN-Verbindung eine Switch Entity unter:
-- **Entitäten**: `switch.fritzbox_vpn_<connection_uid>`
-  
-Die Entity-ID basiert auf der eindeutigen ID (UID) der VPN-Verbindung. Der Anzeigename zeigt den tatsächlichen Namen der VPN-Verbindung an.
+Nach der Konfiguration finden Sie für jede VPN-Verbindung folgende Entitäten:
+
+- **Switch**: `switch.fritzbox_vpn_<connection_uid>_switch` - Ein-/Ausschalten (Enabled/Disabled)
+- **Binary Sensor**: `binary_sensor.fritzbox_vpn_<connection_uid>_connected` - Verbindungsstatus (Connected/Disconnected)
+- **Status Sensor**: `sensor.fritzbox_vpn_<connection_uid>_status` - Kombinierter Status als Text (connected/enabled/disabled)
+- **UID Sensoren**: Standardmäßig deaktiviert für technische Identifikatoren
+
+Die Entity-IDs basieren auf der eindeutigen ID (UID) der VPN-Verbindung. Der Anzeigename zeigt den tatsächlichen Namen der VPN-Verbindung an.
 
 Sie können diese Switches verwenden, um:
 - VPN-Verbindungen ein- und auszuschalten

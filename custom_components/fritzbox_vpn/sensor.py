@@ -28,9 +28,9 @@ async def async_setup_entry(
     entities = []
     if coordinator.data:
         for connection_uid, connection_data in coordinator.data.items():
-            # Connected status sensor (enabled by default)
+            # Status sensor (enabled by default) - shows combined status as text
             entities.append(
-                FritzBoxVPNConnectedSensor(coordinator, entry, connection_uid, connection_data)
+                FritzBoxVPNStatusSensor(coordinator, entry, connection_uid, connection_data)
             )
             # UID sensor (disabled by default)
             entities.append(
@@ -44,8 +44,8 @@ async def async_setup_entry(
     async_add_entities(entities, update_before_add=True)
 
 
-class FritzBoxVPNConnectedSensor(CoordinatorEntity, SensorEntity):
-    """Sensor entity for VPN connection status."""
+class FritzBoxVPNStatusSensor(CoordinatorEntity, SensorEntity):
+    """Sensor entity for VPN connection status (textual)."""
 
     def __init__(
         self,
@@ -54,17 +54,16 @@ class FritzBoxVPNConnectedSensor(CoordinatorEntity, SensorEntity):
         connection_uid: str,
         connection_data: Dict[str, Any],
     ) -> None:
-        """Initialize the connected sensor."""
+        """Initialize the status sensor."""
         super().__init__(coordinator)
         self._entry = entry
         self._connection_uid = connection_uid
         self._connection_data = connection_data
         vpn_name = connection_data.get('name', 'Unknown')
-        self._attr_unique_id = f"fritzbox_vpn_{connection_uid}_connected"
-        self._attr_name = "Connected"
-        self._attr_icon = "mdi:connection"
+        self._attr_unique_id = f"fritzbox_vpn_{connection_uid}_status"
+        self._attr_name = "Status"
+        self._attr_icon = "mdi:information"
         self._attr_has_entity_name = True
-        self._attr_state_class = SensorStateClass.MEASUREMENT
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, entry.entry_id, connection_uid)},
             name=vpn_name,
@@ -74,11 +73,23 @@ class FritzBoxVPNConnectedSensor(CoordinatorEntity, SensorEntity):
         )
 
     @property
-    def native_value(self) -> bool:
-        """Return the connected status."""
+    def native_value(self) -> str:
+        """Return the status as text."""
         if self.coordinator.data and self._connection_uid in self.coordinator.data:
-            return self.coordinator.data[self._connection_uid].get('connected', False)
-        return False
+            conn = self.coordinator.data[self._connection_uid]
+            active = conn.get('active', False)
+            connected = conn.get('connected', False)
+            
+            # Determine status text based on active and connected states
+            if active and connected:
+                return "connected"
+            elif active and not connected:
+                return "enabled"
+            elif not active:
+                return "disabled"
+            else:
+                return "unknown"
+        return "unknown"
 
     @property
     def native_unit_of_measurement(self) -> str:

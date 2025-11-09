@@ -53,7 +53,7 @@ class FritzBoxVPNSwitch(CoordinatorEntity, SwitchEntity):
         self._connection_data = connection_data
         vpn_name = connection_data.get('name', 'Unknown')
         self._attr_unique_id = f"fritzbox_vpn_{connection_uid}_switch"
-        self._attr_name = "Switch"
+        self._attr_name = None  # Use device name
         self._attr_icon = "mdi:vpn"
         self._attr_has_entity_name = True
         self._attr_device_info = DeviceInfo(
