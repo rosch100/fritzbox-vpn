@@ -621,10 +621,12 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
 
         # Pre-fill with current values
         current_data = self.config_entry.data
+        # Pre-fill password from current config if available
+        default_password = current_data.get(CONF_PASSWORD, "") if current_data.get(CONF_PASSWORD) else ""
         schema = vol.Schema({
             vol.Required(CONF_HOST, default=current_data.get(CONF_HOST, "192.168.178.1")): str,
             vol.Required(CONF_USERNAME, default=current_data.get(CONF_USERNAME, "")): str,
-            vol.Required(CONF_PASSWORD, default=""): str,  # Don't show password for security
+            vol.Required(CONF_PASSWORD, default=default_password): str,
         })
 
         return self.async_show_form(
