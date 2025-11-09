@@ -36,29 +36,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         DATA_COORDINATOR: coordinator,
     }
 
-    # Create parent device registry entry for the FritzBox
-    device_registry = dr.async_get(hass)
-    host = entry.data.get('host', 'Unknown')
-    parent_device = device_registry.async_get_or_create(
-        config_entry_id=entry.entry_id,
-        identifiers={(DOMAIN, entry.entry_id)},
-        name="FritzBox",
-        manufacturer="AVM",
-        model="FritzBox",
-        configuration_url=f"http://{host}",
-    )
-    _LOGGER.info("Created parent device: %s (ID: %s)", parent_device.name, parent_device.id)
-
-    # VPN connection devices will be created automatically by the entities
-    # They use via_device to link to the parent device
-
-    # Don't create entities immediately to avoid showing the "Geräte erstellt" dialog
+    # Don't create devices or entities immediately to avoid showing the "Geräte erstellt" dialog
     # Instead, create them on the first coordinator update (after 30 seconds)
     # This prevents the dialog from appearing after auto-setup
     _platforms_setup = False
     
     def _setup_platforms_on_update():
-        """Set up platforms on first coordinator update to avoid showing dialog."""
+        """Set up platforms and devices on first coordinator update to avoid showing dialog."""
         nonlocal _platforms_setup
         if not _platforms_setup:
             _platforms_setup = True
@@ -66,6 +50,20 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             coordinator.async_remove_listener(_setup_platforms_on_update)
             async def _setup():
                 try:
+                    # Create parent device registry entry for the FritzBox
+                    device_registry = dr.async_get(hass)
+                    host = entry.data.get('host', 'Unknown')
+                    parent_device = device_registry.async_get_or_create(
+                        config_entry_id=entry.entry_id,
+                        identifiers={(DOMAIN, entry.entry_id)},
+                        name="FritzBox",
+                        manufacturer="AVM",
+                        model="FritzBox",
+                        configuration_url=f"http://{host}",
+                    )
+                    _LOGGER.info("Created parent device: %s (ID: %s)", parent_device.name, parent_device.id)
+                    
+                    # Now set up platforms (entities will create VPN devices automatically)
                     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
                     _LOGGER.info("Successfully set up all platforms (on first update)")
                 except Exception as err:
