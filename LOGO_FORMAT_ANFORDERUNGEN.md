@@ -48,6 +48,19 @@
    - Logo lokal in Home Assistant ablegen
    - Wird nur lokal angezeigt, nicht in HACS
 
+## Export aus Affinity Designer/Photo
+
+Siehe separate Anleitung: `AFFINITY_EXPORT_ANLEITUNG.md`
+
+### Kurzfassung:
+- **Format**: PNG
+- **Größe**: 256x256 Pixel
+- **Farbprofil**: sRGB IEC61966-2.1
+- **Farbtiefe**: 8 Bit
+- **Format**: RGBA (mit Alpha für Transparenz)
+- **Komprimierung**: PNG-32 (mit Alpha)
+- **Interlacing**: Aus
+
 ## Nächste Schritte
 
 1. ✅ Logo auf 256x256 Pixel angepasst
