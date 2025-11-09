@@ -249,21 +249,31 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             "fritz!wlanrepeater",
         ]
         
-        if any(indicator in combined for indicator in repeater_indicators):
-            _LOGGER.debug("Rejecting FritzBox Repeater device (only routers are accepted): %s", server)
+        # Check for repeater indicators (case-insensitive)
+        combined_lower = combined.lower()
+        if any(indicator.lower() in combined_lower for indicator in repeater_indicators):
+            _LOGGER.info("✗ Rejecting FritzBox Repeater device (only routers are accepted): %s", server)
             return False
         
         # Additional check: Only accept InternetGatewayDevice (routers)
         # Repeaters might use different device types
-        if "internetgatewaydevice" not in combined and "igd" not in combined:
+        has_igd = "internetgatewaydevice" in combined_lower or "igd" in combined_lower
+        
+        if not has_igd:
             _LOGGER.debug("Device does not appear to be a router (no InternetGatewayDevice): %s", st)
-            # Still accept if it's clearly a FritzBox router (has FRITZ!Box in server)
-            if "fritz!box" in combined and "repeater" not in combined:
-                _LOGGER.debug("Accepting as FritzBox router based on server string")
+            # Still accept if it's clearly a FritzBox router (has FRITZ!Box in server, no repeater)
+            if "fritz!box" in combined_lower and not any(ind.lower() in combined_lower for ind in repeater_indicators):
+                _LOGGER.info("✓ Accepting as FritzBox router based on server string (no IGD but FRITZ!Box): %s", server)
                 return True
+            _LOGGER.debug("Rejecting: No IGD and not clearly a router")
             return False
         
-        _LOGGER.debug("Accepting FritzBox router device: %s", server)
+        # Final check: Make absolutely sure it's not a repeater
+        if any(indicator.lower() in combined_lower for indicator in repeater_indicators):
+            _LOGGER.info("✗ Rejecting FritzBox Repeater device (final check): %s", server)
+            return False
+        
+        _LOGGER.info("✓ Accepting FritzBox router device: %s", server)
         return True
 
     @staticmethod
@@ -310,6 +320,18 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         Based on Home Assistant core integration patterns:
         https://github.com/home-assistant/core/tree/dev/homeassistant/components/fritz
         """
+        # First, let's check ALL available domains to see what's actually installed
+        _LOGGER.debug("Checking for existing FritzBox integrations...")
+        all_domains = set()
+        for entry in self.hass.config_entries.async_entries():
+            all_domains.add(entry.domain)
+            # Log all FritzBox-related domains
+            if "fritz" in entry.domain.lower() or "avm" in entry.domain.lower():
+                _LOGGER.info("Found potential FritzBox integration: domain='%s', title='%s', entry_id='%s'", 
+                           entry.domain, entry.title, entry.entry_id)
+        
+        _LOGGER.debug("All available domains: %s", sorted(all_domains))
+        
         # Possible domain names for FritzBox integrations (order matters - check most common first)
         # Official integration uses "fritz", FritzBox Tools uses "fritzbox_tools"
         possible_domains = ["fritz", "fritzbox_tools", "fritzbox", "fritzbox_tools_plus"]
@@ -327,22 +349,28 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     )
                 ]
                 
+                _LOGGER.debug("Domain '%s': Found %d entries", domain, len(fritz_entries))
+                
                 if fritz_entries:
                     # Use the first available FritzBox entry
                     entry = fritz_entries[0]
                     
                     _LOGGER.info("Found existing FritzBox integration '%s' with entry_id: %s", domain, entry.entry_id)
-                    _LOGGER.debug("Entry title: %s", entry.title)
-                    _LOGGER.debug("Entry source: %s", getattr(entry, 'source', 'unknown'))
+                    _LOGGER.info("Entry title: %s", entry.title)
+                    _LOGGER.info("Entry source: %s", getattr(entry, 'source', 'unknown'))
+                    _LOGGER.info("Entry unique_id: %s", getattr(entry, 'unique_id', 'unknown'))
                     
                     # Try to get config from data first
+                    # Home Assistant stores config in entry.data, options in entry.options
                     config_data = entry.data or {}
-                    _LOGGER.debug("Config data keys: %s", list(config_data.keys()))
-                    _LOGGER.debug("Config data (masked): %s", {k: v if k not in ['password', 'pass'] else '***' for k, v in config_data.items()})
+                    _LOGGER.info("Config data keys: %s", list(config_data.keys()))
+                    _LOGGER.info("Config data (masked): %s", {k: v if k not in ['password', 'pass'] else '***' for k, v in config_data.items()})
                     
                     # Also check options
                     options_data = entry.options or {}
-                    _LOGGER.debug("Options data keys: %s", list(options_data.keys()))
+                    _LOGGER.info("Options data keys: %s", list(options_data.keys()))
+                    if options_data:
+                        _LOGGER.info("Options data (masked): %s", {k: v if k not in ['password', 'pass'] else '***' for k, v in options_data.items()})
                     
                     # Extract relevant config - try different possible key names
                     # Official integration uses: host, username, password
@@ -383,7 +411,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     
                     if host:
                         _LOGGER.info(
-                            "Using config from existing FritzBox integration '%s': host=%s, username=%s, password=%s",
+                            "✓ Using config from existing FritzBox integration '%s': host=%s, username=%s, password=%s",
                             domain,
                             host,
                             username if username else "not found",
@@ -395,17 +423,28 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                             CONF_PASSWORD: password or "",
                         }
                     else:
-                        _LOGGER.warning("Found FritzBox integration '%s' but could not extract host. Config keys: %s", domain, list(config_data.keys()))
+                        _LOGGER.warning(
+                            "✗ Found FritzBox integration '%s' but could not extract host. "
+                            "Config keys: %s, Options keys: %s",
+                            domain, list(config_data.keys()), list(options_data.keys())
+                        )
+                        # Log full config for debugging (password masked)
+                        _LOGGER.warning("Full config_data: %s", {k: v if k not in ['password', 'pass'] else '***' for k, v in config_data.items()})
+                        if options_data:
+                            _LOGGER.warning("Full options_data: %s", {k: v if k not in ['password', 'pass'] else '***' for k, v in options_data.items()})
                         
             except KeyError:
                 # Domain doesn't exist, try next one
-                _LOGGER.debug("Domain '%s' not found, trying next", domain)
+                _LOGGER.debug("Domain '%s' not found (KeyError), trying next", domain)
                 continue
             except Exception as err:
                 _LOGGER.warning("Error checking domain '%s': %s", domain, err)
+                _LOGGER.exception("Full exception details:")
                 continue
         
-        _LOGGER.info("No existing FritzBox integration found with usable configuration")
+        _LOGGER.warning("✗ No existing FritzBox integration found with usable configuration")
+        _LOGGER.info("Searched domains: %s", possible_domains)
+        _LOGGER.info("Available domains in system: %s", sorted(all_domains))
         return None
 
     @staticmethod
