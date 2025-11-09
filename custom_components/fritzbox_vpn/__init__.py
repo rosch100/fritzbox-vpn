@@ -6,6 +6,7 @@ from typing import Any
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers import device_registry as dr
 
 from .const import DOMAIN, DATA_COORDINATOR
 from .coordinator import FritzBoxVPNCoordinator
@@ -26,6 +27,17 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     hass.data[DOMAIN][entry.entry_id] = {
         DATA_COORDINATOR: coordinator,
     }
+
+    # Create device registry entry
+    device_registry = dr.async_get(hass)
+    device_registry.async_get_or_create(
+        config_entry_id=entry.entry_id,
+        identifiers={(DOMAIN, entry.entry_id)},
+        name=f"FritzBox VPN ({entry.data.get('host', 'Unknown')})",
+        manufacturer="AVM",
+        model="FritzBox",
+        configuration_url=f"http://{entry.data.get('host', '')}",
+    )
 
     # Forward the setup to the switch platform
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)

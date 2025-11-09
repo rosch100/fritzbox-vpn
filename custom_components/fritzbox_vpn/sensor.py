@@ -6,6 +6,7 @@ from typing import Any, Dict
 from homeassistant.components.sensor import SensorEntity, SensorStateClass
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
@@ -29,15 +30,15 @@ async def async_setup_entry(
         for connection_uid, connection_data in coordinator.data.items():
             # Connected status sensor (enabled by default)
             entities.append(
-                FritzBoxVPNConnectedSensor(coordinator, connection_uid, connection_data)
+                FritzBoxVPNConnectedSensor(coordinator, entry, connection_uid, connection_data)
             )
             # UID sensor (disabled by default)
             entities.append(
-                FritzBoxVPNUIDSensor(coordinator, connection_uid, connection_data)
+                FritzBoxVPNUIDSensor(coordinator, entry, connection_uid, connection_data)
             )
             # VPN UID sensor (disabled by default)
             entities.append(
-                FritzBoxVPNVPNUIDSensor(coordinator, connection_uid, connection_data)
+                FritzBoxVPNVPNUIDSensor(coordinator, entry, connection_uid, connection_data)
             )
 
     async_add_entities(entities, update_before_add=True)
@@ -49,18 +50,27 @@ class FritzBoxVPNConnectedSensor(CoordinatorEntity, SensorEntity):
     def __init__(
         self,
         coordinator: FritzBoxVPNCoordinator,
+        entry: ConfigEntry,
         connection_uid: str,
         connection_data: Dict[str, Any],
     ) -> None:
         """Initialize the connected sensor."""
         super().__init__(coordinator)
+        self._entry = entry
         self._connection_uid = connection_uid
         self._connection_data = connection_data
         self._attr_unique_id = f"fritzbox_vpn_{connection_uid}_connected"
-        self._attr_name = f"FritzBox VPN {connection_data.get('name', 'Unknown')} Connected"
+        self._attr_name = f"{connection_data.get('name', 'Unknown')} Connected"
         self._attr_icon = "mdi:connection"
         self._attr_has_entity_name = True
         self._attr_state_class = SensorStateClass.MEASUREMENT
+        self._attr_device_info = DeviceInfo(
+            identifiers={(DOMAIN, entry.entry_id)},
+            name=f"FritzBox VPN ({entry.data.get('host', 'Unknown')})",
+            manufacturer="AVM",
+            model="FritzBox",
+            configuration_url=f"http://{entry.data.get('host', '')}",
+        )
 
     @property
     def native_value(self) -> bool:
@@ -83,17 +93,26 @@ class FritzBoxVPNUIDSensor(CoordinatorEntity, SensorEntity):
     def __init__(
         self,
         coordinator: FritzBoxVPNCoordinator,
+        entry: ConfigEntry,
         connection_uid: str,
         connection_data: Dict[str, Any],
     ) -> None:
         """Initialize the UID sensor."""
         super().__init__(coordinator)
+        self._entry = entry
         self._connection_uid = connection_uid
         self._connection_data = connection_data
         self._attr_unique_id = f"fritzbox_vpn_{connection_uid}_uid"
-        self._attr_name = f"FritzBox VPN {connection_data.get('name', 'Unknown')} UID"
+        self._attr_name = f"{connection_data.get('name', 'Unknown')} UID"
         self._attr_icon = "mdi:identifier"
         self._attr_has_entity_name = True
+        self._attr_device_info = DeviceInfo(
+            identifiers={(DOMAIN, entry.entry_id)},
+            name=f"FritzBox VPN ({entry.data.get('host', 'Unknown')})",
+            manufacturer="AVM",
+            model="FritzBox",
+            configuration_url=f"http://{entry.data.get('host', '')}",
+        )
 
     @property
     def native_value(self) -> str:
@@ -114,17 +133,26 @@ class FritzBoxVPNVPNUIDSensor(CoordinatorEntity, SensorEntity):
     def __init__(
         self,
         coordinator: FritzBoxVPNCoordinator,
+        entry: ConfigEntry,
         connection_uid: str,
         connection_data: Dict[str, Any],
     ) -> None:
         """Initialize the VPN UID sensor."""
         super().__init__(coordinator)
+        self._entry = entry
         self._connection_uid = connection_uid
         self._connection_data = connection_data
         self._attr_unique_id = f"fritzbox_vpn_{connection_uid}_vpn_uid"
-        self._attr_name = f"FritzBox VPN {connection_data.get('name', 'Unknown')} VPN UID"
+        self._attr_name = f"{connection_data.get('name', 'Unknown')} VPN UID"
         self._attr_icon = "mdi:identifier"
         self._attr_has_entity_name = True
+        self._attr_device_info = DeviceInfo(
+            identifiers={(DOMAIN, entry.entry_id)},
+            name=f"FritzBox VPN ({entry.data.get('host', 'Unknown')})",
+            manufacturer="AVM",
+            model="FritzBox",
+            configuration_url=f"http://{entry.data.get('host', '')}",
+        )
 
     @property
     def native_value(self) -> str:
