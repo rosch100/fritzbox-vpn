@@ -366,8 +366,25 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 _LOGGER.debug("Domain '%s': Found %d entries", domain, len(fritz_entries))
                 
                 if fritz_entries:
-                    # Use the first available FritzBox entry
-                    entry = fritz_entries[0]
+                    # Filter out repeaters - only use router entries
+                    # Repeaters typically have "Repeater" in the title
+                    router_entries = [
+                        entry
+                        for entry in fritz_entries
+                        if "repeater" not in entry.title.lower()
+                    ]
+                    
+                    # If we have router entries, use those; otherwise fall back to all entries
+                    entries_to_use = router_entries if router_entries else fritz_entries
+                    
+                    if router_entries:
+                        _LOGGER.info("Domain '%s': Filtered out %d repeater(s), using %d router entry/entries", 
+                                   domain, len(fritz_entries) - len(router_entries), len(router_entries))
+                    else:
+                        _LOGGER.warning("Domain '%s': No router entries found, using first entry (might be a repeater)", domain)
+                    
+                    # Use the first available router entry (or first entry if no routers found)
+                    entry = entries_to_use[0]
                     
                     _LOGGER.info("Found existing FritzBox integration '%s' with entry_id: %s", domain, entry.entry_id)
                     _LOGGER.info("Entry title: %s", entry.title)
