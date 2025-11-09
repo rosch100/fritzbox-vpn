@@ -70,11 +70,12 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         """Handle the initial step."""
         errors: Dict[str, str] = {}
 
-        # Try to get config from existing FritzBox integration
+        # Try to get config from existing FritzBox integration first
+        # SSDP is only used as fallback if no existing integration is found
         if not user_input:
             self._existing_config = await self._get_existing_fritz_config()
             if self._existing_config:
-                _LOGGER.info("Found existing FritzBox integration, using its configuration")
+                _LOGGER.info("Found existing FritzBox integration, using its configuration (SSDP will be skipped)")
                 # Pre-fill with existing config
                 schema = vol.Schema({
                     vol.Required(CONF_HOST, default=self._existing_config.get(CONF_HOST, "192.168.178.1")): str,
@@ -82,6 +83,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     vol.Required(CONF_PASSWORD, default=""): str,  # Don't pre-fill password for security
                 })
             else:
+                _LOGGER.debug("No existing FritzBox integration found, SSDP discovery will be used as fallback")
                 schema = STEP_USER_DATA_SCHEMA
         else:
             schema = STEP_USER_DATA_SCHEMA
@@ -109,10 +111,17 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         )
 
     async def async_step_ssdp(self, discovery_info: ssdp.SsdpServiceInfo) -> FlowResult:
-        """Handle SSDP discovery."""
+        """Handle SSDP discovery (fallback if no existing integration found)."""
         _LOGGER.debug("SSDP discovery: %s", discovery_info)
         
-        # Check if it's a FritzBox device
+        # First check if we already have an existing FritzBox integration
+        # SSDP is only used as fallback
+        existing_config = await self._get_existing_fritz_config()
+        if existing_config:
+            _LOGGER.info("Existing FritzBox integration found, aborting SSDP discovery")
+            return self.async_abort(reason="already_configured")
+        
+        # Check if it's a FritzBox device (and specifically a router, not a repeater)
         if not self._is_fritzbox_device(discovery_info):
             return self.async_abort(reason="not_fritzbox")
         
@@ -138,7 +147,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         self._discovered_host = host
         self.context["title_placeholders"] = {"host": host}
         
-        # Try to get config from existing FritzBox integration
+        # Try to get config from existing FritzBox integration (should be None at this point)
         self._existing_config = await self._get_existing_fritz_config()
         
         return await self.async_step_confirm()
@@ -193,7 +202,12 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     @staticmethod
     def _is_fritzbox_device(discovery_info: ssdp.SsdpServiceInfo) -> bool:
-        """Check if the discovered device is a FritzBox."""
+        """Check if the discovered device is a FritzBox router (not a repeater).
+        
+        This method specifically rejects repeaters and only accepts routers.
+        SSDP discovery is used as fallback, so we want to ensure we only find
+        the main router, not any repeaters in the network.
+        """
         # Check for FritzBox identifiers in SSDP
         st = discovery_info.ssdp_st or ""
         usn = discovery_info.ssdp_usn or ""
@@ -218,18 +232,38 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             headers_str = " ".join(str(v) for v in discovery_info.ssdp_headers.values()).lower()
             combined += f" {headers_str}"
         
-        # Check if it's a FritzBox device
+        # First check if it's a FritzBox device
         is_fritzbox = any(indicator.lower() in combined for indicator in fritzbox_indicators)
         
         if not is_fritzbox:
+            _LOGGER.debug("Device is not a FritzBox")
             return False
         
-        # Prefer routers over repeaters - reject repeaters
+        # IMPORTANT: Reject repeaters - only accept routers
         # Repeaters typically have "Repeater" or "WLAN Repeater" in the server string
-        if "repeater" in combined:
-            _LOGGER.debug("Rejecting FritzBox Repeater device (preferring router)")
+        # Also check for "fritz!wlan repeater" or similar patterns
+        repeater_indicators = [
+            "repeater",
+            "wlan repeater",
+            "fritz!wlan repeater",
+            "fritz!wlanrepeater",
+        ]
+        
+        if any(indicator in combined for indicator in repeater_indicators):
+            _LOGGER.debug("Rejecting FritzBox Repeater device (only routers are accepted): %s", server)
             return False
         
+        # Additional check: Only accept InternetGatewayDevice (routers)
+        # Repeaters might use different device types
+        if "internetgatewaydevice" not in combined and "igd" not in combined:
+            _LOGGER.debug("Device does not appear to be a router (no InternetGatewayDevice): %s", st)
+            # Still accept if it's clearly a FritzBox router (has FRITZ!Box in server)
+            if "fritz!box" in combined and "repeater" not in combined:
+                _LOGGER.debug("Accepting as FritzBox router based on server string")
+                return True
+            return False
+        
+        _LOGGER.debug("Accepting FritzBox router device: %s", server)
         return True
 
     @staticmethod
@@ -271,10 +305,14 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         
         Checks for:
         - Official FritzBox integration (domain: "fritz")
-        - FritzBox Tools integration (domain: "fritzbox" or "fritzbox_tools")
+        - FritzBox Tools integration (domain: "fritzbox_tools" or "fritzbox")
+        
+        Based on Home Assistant core integration patterns:
+        https://github.com/home-assistant/core/tree/dev/homeassistant/components/fritz
         """
         # Possible domain names for FritzBox integrations (order matters - check most common first)
-        possible_domains = ["fritz", "fritzbox", "fritzbox_tools", "fritzbox_tools_plus"]
+        # Official integration uses "fritz", FritzBox Tools uses "fritzbox_tools"
+        possible_domains = ["fritz", "fritzbox_tools", "fritzbox", "fritzbox_tools_plus"]
         
         for domain in possible_domains:
             try:
@@ -300,7 +338,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     # Try to get config from data first
                     config_data = entry.data or {}
                     _LOGGER.debug("Config data keys: %s", list(config_data.keys()))
-                    _LOGGER.debug("Config data: %s", {k: v if k != 'password' else '***' for k, v in config_data.items()})
+                    _LOGGER.debug("Config data (masked): %s", {k: v if k not in ['password', 'pass'] else '***' for k, v in config_data.items()})
                     
                     # Also check options
                     options_data = entry.options or {}
