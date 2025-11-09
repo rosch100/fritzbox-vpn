@@ -397,7 +397,10 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         
                         # Check if entry has username or password
                         # Try all possible key names
-                        has_username = (
+                        # Note: Home Assistant stores credentials directly in entry.data
+                        # Based on actual config entries, credentials are stored as:
+                        # {"host": "...", "username": "...", "password": "...", "port": ...}
+                        has_username = bool(
                             config_data.get(CONF_USERNAME) or 
                             config_data.get("username") or 
                             config_data.get("user") or
@@ -405,7 +408,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                             options_data.get("username") or
                             options_data.get("user")
                         )
-                        has_password = (
+                        has_password = bool(
                             config_data.get(CONF_PASSWORD) or 
                             config_data.get("password") or 
                             config_data.get("pass") or
@@ -414,11 +417,15 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                             options_data.get("pass")
                         )
                         
-                        _LOGGER.debug("  Has username: %s, Has password: %s", bool(has_username), bool(has_password))
+                        _LOGGER.debug("  Has username: %s, Has password: %s", has_username, has_password)
+                        if not has_username and not has_password:
+                            _LOGGER.debug("  Entry '%s' has no credentials (config keys: %s, options keys: %s)", 
+                                        entry.title, list(config_data.keys()), list(options_data.keys()))
                         
                         if has_username or has_password:
                             entries_with_creds.append(entry)
-                            _LOGGER.info("  ✓ Entry '%s' has credentials", entry.title)
+                            _LOGGER.info("  ✓ Entry '%s' has credentials (username: %s, password: %s)", 
+                                       entry.title, has_username, has_password)
                     
                     # Use entry with credentials if available, otherwise use first router entry
                     if entries_with_creds:
