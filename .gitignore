@@ -65,3 +65,7 @@ secrets.yaml
 
 # Archiv-Verzeichnis (lokale Entwicklungsdateien)
 archive/
+
+# Brands Repository (lokales Clone)
+brands/
+brands_repo_files/

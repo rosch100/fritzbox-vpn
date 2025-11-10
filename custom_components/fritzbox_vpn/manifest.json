@@ -9,7 +9,6 @@
   "dependencies": ["ssdp"],
   "requirements": ["aiohttp>=3.8.0"],
   "iot_class": "local_polling",
-  "integration_type": "device",
-  "logo": "logo.png"
+  "integration_type": "device"
 }
 
