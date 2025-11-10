@@ -74,3 +74,13 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     return unload_ok
 
+
+async def async_reload_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    """Reload config entry."""
+    _LOGGER.info("Reloading FritzBox VPN integration for host: %s", entry.data.get('host', 'Unknown'))
+    unload_ok = await async_unload_entry(hass, entry)
+    if unload_ok:
+        await async_setup_entry(hass, entry)
+    else:
+        _LOGGER.error("Failed to unload FritzBox VPN integration, cannot reload")
+
