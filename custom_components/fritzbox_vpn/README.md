@@ -2,7 +2,7 @@
 
 Diese Integration ermöglicht die Steuerung von WireGuard VPN-Verbindungen auf einer AVM FritzBox direkt über Home Assistant.
 
-**Hinweis**: Das Logo wird automatisch aus dem [Home Assistant Brands-Repository](https://github.com/home-assistant/brands) geladen, sobald es dort registriert ist. Das lokale Logo (`logo.png`) dient als Fallback.
+**Hinweis**: Das Logo wird lokal aus der Datei `logo.png` im Integration-Verzeichnis geladen. Das [Home Assistant Brands-Repository](https://github.com/home-assistant/brands) ist für offizielle Firmenlogos gedacht und wird von dieser Custom Integration nicht verwendet.
 
 ## Features
 
@@ -169,8 +169,8 @@ Bei Problemen oder Fragen:
 
 ## Logo
 
-Das Logo wird automatisch aus dem [Home Assistant Brands-Repository](https://github.com/home-assistant/brands) geladen, sobald es dort registriert ist. Das lokale Logo dient als Fallback.
+Das Logo wird lokal aus der Datei `logo.png` im Integration-Verzeichnis geladen. Das Logo wird über das `logo`-Feld in der `manifest.json` referenziert.
 
 ## Lizenz
 
-MIT License
+Dieses Projekt ist unter der [Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0) lizenziert, der gleichen Lizenz wie [Home Assistant](https://github.com/home-assistant/core/blob/dev/LICENSE.md), um Kompatibilität und Konsistenz mit dem Home Assistant Ökosystem sicherzustellen.

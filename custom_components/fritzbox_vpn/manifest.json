@@ -1,7 +1,7 @@
 {
   "domain": "fritzbox_vpn",
   "name": "FritzBox VPN",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "documentation": "https://github.com/rosch100/fritzbox-vpn",
   "issue_tracker": "https://github.com/rosch100/fritzbox-vpn/issues",
   "codeowners": ["@rosch100"],
