@@ -20,6 +20,8 @@ PLATFORMS: list[Platform] = [Platform.SWITCH, Platform.BINARY_SENSOR, Platform.S
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up FritzBox VPN from a config entry."""
     _LOGGER.info("Setting up FritzBox VPN integration for host: %s", entry.data.get('host', 'Unknown'))
+    _LOGGER.debug("Config entry data: %s", {k: v if k != 'password' else '***' for k, v in entry.data.items()})
+    _LOGGER.debug("Config entry options: %s", entry.options)
     
     coordinator = FritzBoxVPNCoordinator(hass, entry.data, entry.options)
 

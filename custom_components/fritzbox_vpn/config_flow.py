@@ -629,7 +629,8 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
 
     def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
         """Initialize options flow."""
-        self.config_entry = config_entry
+        super().__init__()
+        self._config_entry = config_entry
 
     async def async_step_init(
         self, user_input: Optional[Dict[str, Any]] = None
@@ -638,9 +639,15 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
         errors: Dict[str, str] = {}
         
         if user_input is not None:
+            # Get the current config entry to access its data
+            config_entry = self.hass.config_entries.async_get_entry(self._config_entry.entry_id)
+            if not config_entry:
+                errors["base"] = "config_entry_not_found"
+                return self.async_show_form(step_id="init", data_schema=vol.Schema({}), errors=errors)
+            
             # If password is empty, keep the existing password
             if not user_input.get(CONF_PASSWORD):
-                user_input[CONF_PASSWORD] = self.config_entry.data.get(CONF_PASSWORD, "")
+                user_input[CONF_PASSWORD] = config_entry.data.get(CONF_PASSWORD, "")
             
             # Validate the new configuration
             try:
@@ -690,19 +697,41 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                     CONF_UPDATE_INTERVAL: update_interval,
                 }
                 
+                _LOGGER.info("OptionsFlow: Updating config entry with data=%s, options=%s", 
+                            {k: v if k != CONF_PASSWORD else "***" for k, v in config_data.items()}, 
+                            options_data)
+                
                 # Update the config entry with new data and options
                 self.hass.config_entries.async_update_entry(
-                    self.config_entry,
+                    config_entry,
                     data=config_data,
                     options=options_data,
                 )
+                
+                # Verify the update was successful
+                updated_entry = self.hass.config_entries.async_get_entry(config_entry.entry_id)
+                if updated_entry:
+                    _LOGGER.info("OptionsFlow: Config entry updated. New options: %s", updated_entry.options)
+                    _LOGGER.info("OptionsFlow: Config entry data keys: %s", list(updated_entry.data.keys()))
+                else:
+                    _LOGGER.error("OptionsFlow: Failed to retrieve updated config entry!")
+                
+                # Return the options data so they are properly saved
                 # Reload the integration to apply the new configuration
-                await self.hass.config_entries.async_reload(self.config_entry.entry_id)
-                return self.async_create_entry(title="", data={})
+                _LOGGER.info("OptionsFlow: Reloading integration to apply new configuration...")
+                await self.hass.config_entries.async_reload(config_entry.entry_id)
+                _LOGGER.info("OptionsFlow: Integration reloaded successfully")
+                return self.async_create_entry(title="", data=options_data)
 
+        # Get the current config entry to access its data
+        config_entry = self.hass.config_entries.async_get_entry(self._config_entry.entry_id)
+        if not config_entry:
+            errors["base"] = "config_entry_not_found"
+            return self.async_show_form(step_id="init", data_schema=vol.Schema({}), errors=errors)
+        
         # Pre-fill with current values
-        current_data = self.config_entry.data
-        current_options = self.config_entry.options or {}
+        current_data = config_entry.data
+        current_options = config_entry.options or {}
         
         # Pre-fill password from current config if available
         # Log for debugging (password masked)
