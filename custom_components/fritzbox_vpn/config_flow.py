@@ -1,5 +1,6 @@
 """Config flow for FritzBox VPN integration."""
 
+import ipaddress
 import logging
 from typing import Any, Dict, Optional
 from urllib.parse import urlparse
@@ -18,9 +19,36 @@ from .coordinator import FritzBoxVPNSession
 
 _LOGGER = logging.getLogger(__name__)
 
+def validate_host(host: str) -> str:
+    """Validate host is a valid IP address or hostname."""
+    if not host or not isinstance(host, str):
+        raise vol.Invalid("Host must be a non-empty string")
+    
+    # Try IP address first
+    try:
+        ipaddress.ip_address(host)
+        return host
+    except ValueError:
+        pass
+    
+    # Check if it's a valid hostname
+    if len(host) > 253:
+        raise vol.Invalid("Hostname too long (max 253 characters)")
+    
+    # Basic hostname validation (alphanumeric, dots, hyphens)
+    if not all(c.isalnum() or c in ('.', '-') for c in host):
+        raise vol.Invalid("Invalid hostname format")
+    
+    # Must not start or end with dot or hyphen
+    if host.startswith('.') or host.endswith('.') or host.startswith('-') or host.endswith('-'):
+        raise vol.Invalid("Hostname cannot start or end with dot or hyphen")
+    
+    return host
+
+
 STEP_USER_DATA_SCHEMA = vol.Schema(
     {
-        vol.Required(CONF_HOST, default="192.168.178.1"): str,
+        vol.Required(CONF_HOST, default="192.168.178.1"): vol.All(str, validate_host),
         vol.Required(CONF_USERNAME): str,
         vol.Required(CONF_PASSWORD): str,
     }

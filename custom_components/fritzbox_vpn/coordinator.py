@@ -12,7 +12,16 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.const import CONF_HOST, CONF_USERNAME, CONF_PASSWORD
 
-from .const import DEFAULT_UPDATE_INTERVAL, CONF_UPDATE_INTERVAL, DEFAULT_TIMEOUT, API_LOGIN, API_DATA, API_VPN_CONNECTION
+from .const import (
+    DEFAULT_UPDATE_INTERVAL,
+    CONF_UPDATE_INTERVAL,
+    DEFAULT_TIMEOUT,
+    DEFAULT_PROTOCOL,
+    VERIFICATION_DELAY,
+    API_LOGIN,
+    API_DATA,
+    API_VPN_CONNECTION,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -20,30 +29,52 @@ _LOGGER = logging.getLogger(__name__)
 class FritzBoxVPNSession:
     """Session manager for FritzBox Web-UI API."""
 
-    def __init__(self, host: str, username: str, password: str):
+    def __init__(self, host: str, username: str, password: str, protocol: str = DEFAULT_PROTOCOL):
         """Initialize the session manager."""
         self.host = host
         self.username = username
         self.password = password
+        # Validate and set protocol (default to https, fallback to http if https fails)
+        self.protocol = protocol if protocol in ("http", "https") else DEFAULT_PROTOCOL
         self.session: Optional[ClientSession] = None
         self.sid: Optional[str] = None
 
     async def async_get_session(self) -> tuple[ClientSession, str]:
         """Get a session ID from the FritzBox."""
-        if self.session is None:
+        # Create new session if needed or if closed
+        if self.session is None or self.session.closed:
+            if self.session and not self.session.closed:
+                await self.session.close()
             self.session = ClientSession()
 
         # Get challenge
-        login_url = f"http://{self.host}{API_LOGIN}"
+        login_url = f"{self.protocol}://{self.host}{API_LOGIN}"
         try:
-            async with self.session.get(login_url) as response:
+            async with self.session.get(login_url, ssl=False) as response:
                 if response.status != 200:
-                    raise Exception(f"Failed to get login page: {response.status}")
+                    # If HTTPS fails, try HTTP as fallback (for older FritzBox models)
+                    if self.protocol == "https" and response.status in (400, 404, 502, 503):
+                        _LOGGER.warning(
+                            "HTTPS connection failed (status %d), falling back to HTTP. "
+                            "Consider using HTTP if your FritzBox doesn't support HTTPS.",
+                            response.status
+                        )
+                        self.protocol = "http"
+                        login_url = f"{self.protocol}://{self.host}{API_LOGIN}"
+                        async with self.session.get(login_url, ssl=False) as retry_response:
+                            if retry_response.status != 200:
+                                raise ConnectionError(
+                                    f"Failed to get login page: {retry_response.status}"
+                                )
+                            content = await retry_response.text()
+                    else:
+                        raise ConnectionError(f"Failed to get login page: {response.status}")
+                else:
+                    content = await response.text()
 
-                content = await response.text()
                 challenge_match = re.search(r'<Challenge>(.*?)</Challenge>', content)
                 if not challenge_match:
-                    raise Exception("Could not find challenge in login response")
+                    raise ValueError("Could not find challenge in login response")
 
                 challenge = challenge_match.group(1)
 
@@ -58,27 +89,30 @@ class FritzBoxVPNSession:
                 'username': self.username,
                 'response': login_response
             }
-            async with self.session.post(login_url, data=login_data) as response:
+            async with self.session.post(login_url, data=login_data, ssl=False) as response:
                 if response.status != 200:
-                    raise Exception(f"Login failed: {response.status}")
+                    raise ConnectionError(f"Login failed: {response.status}")
 
                 content = await response.text()
                 sid_match = re.search(r'<SID>(.*?)</SID>', content)
                 if not sid_match or sid_match.group(1) == '0000000000000000':
-                    raise Exception("Login failed: Invalid SID")
+                    raise ValueError("Login failed: Invalid SID")
 
                 self.sid = sid_match.group(1)
 
             return self.session, self.sid
-        except Exception as err:
-            _LOGGER.error(f"Error getting session: {err}")
+        except (ConnectionError, ValueError) as err:
+            _LOGGER.error("Error getting session: %s", err)
             raise
+        except Exception as err:
+            _LOGGER.exception("Unexpected error getting session")
+            raise ConnectionError(f"Unexpected error: {err}") from err
 
     async def async_get_vpn_connections(self) -> Dict[str, Any]:
         """Get list of WireGuard VPN connections."""
         session, sid = await self.async_get_session()
 
-        data_url = f"http://{self.host}{API_DATA}"
+        data_url = f"{self.protocol}://{self.host}{API_DATA}"
         params = {
             'sid': sid,
             'xhr': '1',
@@ -90,13 +124,20 @@ class FritzBoxVPNSession:
 
         timeout = ClientTimeout(total=DEFAULT_TIMEOUT)
         try:
-            async with session.post(data_url, data=params, timeout=timeout) as response:
+            async with session.post(data_url, data=params, timeout=timeout, ssl=False) as response:
                 if response.status == 200:
                     data = await response.json()
                     if 'data' in data and 'init' in data['data'] and 'boxConnections' in data['data']['init']:
                         return data['data']['init']['boxConnections']
+                else:
+                    _LOGGER.warning(
+                        "Failed to get VPN connections: HTTP %d", response.status
+                    )
+        except asyncio.TimeoutError as err:
+            _LOGGER.error("Timeout getting VPN connections: %s", err)
+            raise
         except Exception as err:
-            _LOGGER.error(f"Error getting VPN connections: {err}")
+            _LOGGER.error("Error getting VPN connections: %s", err)
             raise
 
         return {}
@@ -106,30 +147,35 @@ class FritzBoxVPNSession:
         # Get connection details to find the UID
         connections = await self.async_get_vpn_connections()
         if connection_uid not in connections:
-            _LOGGER.error(f"VPN connection {connection_uid} not found")
+            _LOGGER.error("VPN connection %s not found", connection_uid)
             return False
         
         conn = connections[connection_uid]
         vpn_uid = conn.get('uid')
         if not vpn_uid:
-            _LOGGER.error(f"VPN connection {connection_uid} has no UID")
+            _LOGGER.error("VPN connection %s has no UID", connection_uid)
             return False
         
         # Check current status
         current_status = conn.get('active', False)
         if current_status == enable:
-            _LOGGER.info(f"VPN {conn.get('name')} is already {'activated' if enable else 'deactivated'}")
+            vpn_name = conn.get('name', 'Unknown')
+            _LOGGER.info(
+                "VPN %s is already %s",
+                vpn_name,
+                "activated" if enable else "deactivated"
+            )
             return True
         
         session, sid = await self.async_get_session()
 
-        api_url = f"http://{self.host}{API_VPN_CONNECTION.format(uid=vpn_uid)}"
+        api_url = f"{self.protocol}://{self.host}{API_VPN_CONNECTION.format(uid=vpn_uid)}"
         headers = {
             'Content-Type': 'application/json',
             'Authorization': f'AVM-SID {sid}',
             'Accept': '*/*',
-            'Origin': f'http://{self.host}',
-            'Referer': f'http://{self.host}/'
+            'Origin': f'{self.protocol}://{self.host}',
+            'Referer': f'{self.protocol}://{self.host}/'
         }
         request_body = {'activated': '1' if enable else '0'}
 
@@ -139,36 +185,51 @@ class FritzBoxVPNSession:
                 api_url,
                 json=request_body,
                 headers=headers,
-                timeout=timeout
+                timeout=timeout,
+                ssl=False
             ) as response:
                 if response.status == 200:
                     # Wait a bit for the change to take effect
-                    await asyncio.sleep(1.5)
+                    await asyncio.sleep(VERIFICATION_DELAY)
                     
                     # Verify the status was actually changed
                     new_connections = await self.async_get_vpn_connections()
                     if connection_uid in new_connections:
                         new_conn = new_connections[connection_uid]
                         new_status = new_conn.get('active', False)
+                        vpn_name = conn.get('name', 'Unknown')
                         if new_status == enable:
-                            _LOGGER.info(f"VPN {conn.get('name')} successfully {'activated' if enable else 'deactivated'}")
+                            _LOGGER.info(
+                                "VPN %s successfully %s",
+                                vpn_name,
+                                "activated" if enable else "deactivated"
+                            )
                             return True
                         else:
                             _LOGGER.warning(
-                                f"VPN status change failed. Expected: {enable}, Got: {new_status}"
+                                "VPN status change failed. Expected: %s, Got: %s",
+                                enable,
+                                new_status
                             )
                             return False
                     else:
-                        _LOGGER.error(f"Could not verify VPN status change - connection not found")
+                        _LOGGER.error(
+                            "Could not verify VPN status change - connection not found"
+                        )
                         return False
                 else:
                     error_text = await response.text()
                     _LOGGER.error(
-                        f"Error toggling VPN: HTTP {response.status}, {error_text[:200]}"
+                        "Error toggling VPN: HTTP %d, %s",
+                        response.status,
+                        error_text[:200]
                     )
                     return False
+        except asyncio.TimeoutError as err:
+            _LOGGER.error("Timeout toggling VPN: %s", err)
+            return False
         except Exception as err:
-            _LOGGER.error(f"Error toggling VPN: {err}", exc_info=True)
+            _LOGGER.exception("Error toggling VPN")
             return False
 
     async def async_close(self):
@@ -227,8 +288,11 @@ class FritzBoxVPNCoordinator(DataUpdateCoordinator):
         try:
             connections = await self.fritz_session.async_get_vpn_connections()
             return connections
+        except (ConnectionError, asyncio.TimeoutError) as err:
+            raise UpdateFailed(f"Error fetching VPN data: {err}") from err
         except Exception as err:
-            raise UpdateFailed(f"Error fetching VPN data: {err}")
+            _LOGGER.exception("Unexpected error fetching VPN data")
+            raise UpdateFailed(f"Unexpected error fetching VPN data: {err}") from err
 
     async def toggle_vpn(self, connection_uid: str, enable: bool) -> bool:
         """Toggle a VPN connection."""

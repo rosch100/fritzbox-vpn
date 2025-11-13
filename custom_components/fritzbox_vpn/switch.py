@@ -107,7 +107,8 @@ class FritzBoxVPNSwitch(CoordinatorEntity, SwitchEntity):
 
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Turn on the VPN connection."""
-        _LOGGER.info(f"Turning on VPN connection: {self._attr_name}")
+        vpn_name = self._attr_name or "Unknown"
+        _LOGGER.info("Turning on VPN connection: %s", vpn_name)
         success = await self.coordinator.toggle_vpn(self._connection_uid, True)
         if success:
             # Force refresh to get updated status
@@ -115,18 +116,17 @@ class FritzBoxVPNSwitch(CoordinatorEntity, SwitchEntity):
             # Wait a moment for the data to be updated
             await asyncio.sleep(0.5)
             self.async_write_ha_state()
-            _LOGGER.info(f"Successfully turned on VPN connection: {self._attr_name}")
+            _LOGGER.info("Successfully turned on VPN connection: %s", vpn_name)
         else:
-            _LOGGER.error(
-                f"Failed to activate VPN connection {self._attr_name}"
-            )
+            _LOGGER.error("Failed to activate VPN connection: %s", vpn_name)
             # Still refresh to show current state
             await self.coordinator.async_request_refresh()
             self.async_write_ha_state()
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Turn off the VPN connection."""
-        _LOGGER.info(f"Turning off VPN connection: {self._attr_name}")
+        vpn_name = self._attr_name or "Unknown"
+        _LOGGER.info("Turning off VPN connection: %s", vpn_name)
         success = await self.coordinator.toggle_vpn(self._connection_uid, False)
         if success:
             # Force refresh to get updated status
@@ -134,11 +134,9 @@ class FritzBoxVPNSwitch(CoordinatorEntity, SwitchEntity):
             # Wait a moment for the data to be updated
             await asyncio.sleep(0.5)
             self.async_write_ha_state()
-            _LOGGER.info(f"Successfully turned off VPN connection: {self._attr_name}")
+            _LOGGER.info("Successfully turned off VPN connection: %s", vpn_name)
         else:
-            _LOGGER.error(
-                f"Failed to deactivate VPN connection {self._attr_name}"
-            )
+            _LOGGER.error("Failed to deactivate VPN connection: %s", vpn_name)
             # Still refresh to show current state
             await self.coordinator.async_request_refresh()
             self.async_write_ha_state()

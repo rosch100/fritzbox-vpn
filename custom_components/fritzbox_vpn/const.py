@@ -11,6 +11,8 @@ CONF_UPDATE_INTERVAL = "update_interval"
 # Default values
 DEFAULT_UPDATE_INTERVAL = 30  # seconds
 DEFAULT_TIMEOUT = 10  # seconds
+DEFAULT_PROTOCOL = "https"  # Use HTTPS by default for security
+VERIFICATION_DELAY = 1.5  # seconds - delay to wait for VPN status change to take effect
 
 # API endpoints
 API_LOGIN = "/login_sid.lua"
