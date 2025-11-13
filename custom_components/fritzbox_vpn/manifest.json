@@ -5,7 +5,6 @@
   "documentation": "https://github.com/rosch100/fritzbox-vpn",
   "issue_tracker": "https://github.com/rosch100/fritzbox-vpn/issues",
   "codeowners": ["@rosch100"],
-  "logo": "https://raw.githubusercontent.com/home-assistant/brands/master/custom_integrations/fritzbox_vpn/logo.png",
   "config_flow": true,
   "dependencies": ["ssdp"],
   "requirements": ["aiohttp>=3.8.0"],
