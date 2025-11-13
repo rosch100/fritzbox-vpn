@@ -185,11 +185,29 @@ class FritzBoxVPNCoordinator(DataUpdateCoordinator):
     def __init__(self, hass: HomeAssistant, config: Dict[str, Any], options: Optional[Dict[str, Any]] = None):
         """Initialize the coordinator."""
         # Get update interval from options or config, fallback to default
+        options_dict = options or {}
+        config_value = config.get(CONF_UPDATE_INTERVAL)
+        options_value = options_dict.get(CONF_UPDATE_INTERVAL)
+        
+        _LOGGER.debug("Coordinator init: options=%s, config[%s]=%s, options[%s]=%s", 
+                     options_dict, CONF_UPDATE_INTERVAL, config_value, CONF_UPDATE_INTERVAL, options_value)
+        
         update_interval_seconds = (
-            (options or {}).get(CONF_UPDATE_INTERVAL)
-            or config.get(CONF_UPDATE_INTERVAL)
+            options_value
+            or config_value
             or DEFAULT_UPDATE_INTERVAL
         )
+        
+        # Ensure it's an integer
+        if not isinstance(update_interval_seconds, int):
+            try:
+                update_interval_seconds = int(update_interval_seconds)
+            except (ValueError, TypeError):
+                _LOGGER.warning("Coordinator: Invalid update_interval value '%s', using default", 
+                               update_interval_seconds)
+                update_interval_seconds = DEFAULT_UPDATE_INTERVAL
+        
+        _LOGGER.info("Coordinator: Using update_interval=%d seconds", update_interval_seconds)
         
         super().__init__(
             hass,

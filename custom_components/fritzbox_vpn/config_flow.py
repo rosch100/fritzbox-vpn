@@ -659,8 +659,35 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                     CONF_USERNAME: user_input[CONF_USERNAME],
                     CONF_PASSWORD: user_input[CONF_PASSWORD],
                 }
+                # Ensure update interval is stored as integer
+                update_interval = user_input.get(CONF_UPDATE_INTERVAL, DEFAULT_UPDATE_INTERVAL)
+                _LOGGER.debug("OptionsFlow: Received update_interval from user_input: %s (type: %s)", 
+                             update_interval, type(update_interval).__name__)
+                
+                if isinstance(update_interval, str):
+                    try:
+                        update_interval = int(update_interval)
+                    except (ValueError, TypeError):
+                        _LOGGER.warning("OptionsFlow: Failed to convert update_interval '%s' to int, using default", 
+                                       update_interval)
+                        update_interval = DEFAULT_UPDATE_INTERVAL
+                elif not isinstance(update_interval, int):
+                    try:
+                        update_interval = int(update_interval) if update_interval else DEFAULT_UPDATE_INTERVAL
+                    except (ValueError, TypeError):
+                        _LOGGER.warning("OptionsFlow: Failed to convert update_interval '%s' to int, using default", 
+                                       update_interval)
+                        update_interval = DEFAULT_UPDATE_INTERVAL
+                
+                # Validate range
+                if update_interval < 5 or update_interval > 300:
+                    _LOGGER.warning("OptionsFlow: update_interval %d is out of range (5-300), using default", 
+                                   update_interval)
+                    update_interval = DEFAULT_UPDATE_INTERVAL
+                
+                _LOGGER.info("OptionsFlow: Saving update_interval: %d seconds", update_interval)
                 options_data = {
-                    CONF_UPDATE_INTERVAL: user_input.get(CONF_UPDATE_INTERVAL, DEFAULT_UPDATE_INTERVAL),
+                    CONF_UPDATE_INTERVAL: update_interval,
                 }
                 
                 # Update the config entry with new data and options
@@ -690,6 +717,14 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
         
         # Get update interval from options or use default
         default_update_interval = current_options.get(CONF_UPDATE_INTERVAL, DEFAULT_UPDATE_INTERVAL)
+        # Ensure default is an integer
+        if not isinstance(default_update_interval, int):
+            try:
+                default_update_interval = int(default_update_interval)
+            except (ValueError, TypeError):
+                default_update_interval = DEFAULT_UPDATE_INTERVAL
+        
+        _LOGGER.debug("OptionsFlow: Using default_update_interval=%d for schema", default_update_interval)
         
         schema = vol.Schema({
             vol.Required(CONF_HOST, default=current_data.get(CONF_HOST, "192.168.178.1")): str,
