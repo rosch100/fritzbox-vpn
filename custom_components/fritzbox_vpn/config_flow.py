@@ -717,11 +717,15 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                     _LOGGER.error("OptionsFlow: Failed to retrieve updated config entry!")
                 
                 # Return the options data so they are properly saved
+                # Note: async_create_entry must be called before reload to ensure options are saved
+                result = self.async_create_entry(title="", data=options_data)
+                
                 # Reload the integration to apply the new configuration
                 _LOGGER.info("OptionsFlow: Reloading integration to apply new configuration...")
                 await self.hass.config_entries.async_reload(config_entry.entry_id)
                 _LOGGER.info("OptionsFlow: Integration reloaded successfully")
-                return self.async_create_entry(title="", data=options_data)
+                
+                return result
 
         # Get the current config entry to access its data
         config_entry = self.hass.config_entries.async_get_entry(self._config_entry.entry_id)
