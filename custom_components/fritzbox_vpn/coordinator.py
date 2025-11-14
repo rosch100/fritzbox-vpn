@@ -327,11 +327,16 @@ class FritzBoxVPNCoordinator(DataUpdateCoordinator):
         
         title = "Fritz!Box VPN: Authentifizierungsfehler"
         
-        # Create link to configuration page if entry_id is available
+        # Create link to integrations page - user can find the integration there
+        # Using the integrations overview page as direct entry_id links may not work reliably
         config_link = ""
         if self.entry_id:
-            config_url = f"/config/integrations/integration/{self.entry_id}"
-            config_link = f"\n\n[**→ Zur Konfiguration öffnen**]({config_url})"
+            # Use the integrations overview page - user can find and configure the integration there
+            config_url = "/config/integrations"
+            config_link = (
+                f"\n\n**→ [Zur Konfiguration öffnen]({config_url})**\n\n"
+                f"*Gehen Sie zu Einstellungen > Geräte & Dienste und suchen Sie nach \"Fritz!Box VPN\"*"
+            )
         
         message = (
             f"Die Fritz!Box VPN Integration kann nicht auf die Fritz!Box zugreifen.\n\n"
@@ -355,7 +360,8 @@ class FritzBoxVPNCoordinator(DataUpdateCoordinator):
         self._auth_error_notified = True
         _LOGGER.warning(
             "Authentifizierungsfehler erkannt. Benachrichtigung wurde erstellt. "
-            "Bitte überprüfen Sie die Zugangsdaten in den Integrationseinstellungen."
+            "Bitte überprüfen Sie die Zugangsdaten in den Integrationseinstellungen. Entry ID: %s",
+            self.entry_id
         )
 
     async def _async_update_data(self) -> Dict[str, Any]:
