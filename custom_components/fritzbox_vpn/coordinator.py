@@ -245,7 +245,7 @@ class FritzBoxVPNSession:
 class FritzBoxVPNCoordinator(DataUpdateCoordinator):
     """Coordinator for FritzBox VPN data."""
 
-    def __init__(self, hass: HomeAssistant, config: Dict[str, Any], options: Optional[Dict[str, Any]] = None):
+    def __init__(self, hass: HomeAssistant, config: Dict[str, Any], options: Optional[Dict[str, Any]] = None, entry_id: Optional[str] = None):
         """Initialize the coordinator."""
         # Get update interval from options or config, fallback to default
         options_dict = options or {}
@@ -284,6 +284,7 @@ class FritzBoxVPNCoordinator(DataUpdateCoordinator):
             config[CONF_PASSWORD]
         )
         self.config = config
+        self.entry_id = entry_id
         self._auth_error_notified = False  # Flag to prevent duplicate notifications
 
     def _is_auth_error(self, error: Exception) -> bool:
@@ -325,6 +326,13 @@ class FritzBoxVPNCoordinator(DataUpdateCoordinator):
         notification_id = f"{DOMAIN}_auth_error_{self.config.get(CONF_HOST, 'unknown')}"
         
         title = "Fritz!Box VPN: Authentifizierungsfehler"
+        
+        # Create link to configuration page if entry_id is available
+        config_link = ""
+        if self.entry_id:
+            config_url = f"/config/integrations/integration/{self.entry_id}"
+            config_link = f"\n\n[**→ Zur Konfiguration öffnen**]({config_url})"
+        
         message = (
             f"Die Fritz!Box VPN Integration kann nicht auf die Fritz!Box zugreifen.\n\n"
             f"**Host:** {host}\n\n"
@@ -334,6 +342,7 @@ class FritzBoxVPNCoordinator(DataUpdateCoordinator):
             f"- Der Benutzername ist falsch\n"
             f"- Die Fritz!Box ist nicht erreichbar\n\n"
             f"Bitte überprüfen Sie die Konfiguration der Integration und aktualisieren Sie die Zugangsdaten falls nötig."
+            f"{config_link}"
         )
         
         persistent_notification.create(

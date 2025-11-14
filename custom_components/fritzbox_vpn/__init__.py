@@ -24,7 +24,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     _LOGGER.debug("Config entry data: %s", {k: v if k != 'password' else '***' for k, v in entry.data.items()})
     _LOGGER.debug("Config entry options: %s", entry.options)
     
-    coordinator = FritzBoxVPNCoordinator(hass, entry.data, entry.options)
+    coordinator = FritzBoxVPNCoordinator(hass, entry.data, entry.options, entry.entry_id)
 
     # Remove any existing authentication error notification (in case of reload)
     host = entry.data.get('host', 'unknown')
