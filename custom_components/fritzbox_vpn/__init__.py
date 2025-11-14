@@ -8,6 +8,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr
+from homeassistant.components import persistent_notification
 
 from .const import DOMAIN, DATA_COORDINATOR
 from .coordinator import FritzBoxVPNCoordinator
@@ -24,6 +25,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     _LOGGER.debug("Config entry options: %s", entry.options)
     
     coordinator = FritzBoxVPNCoordinator(hass, entry.data, entry.options)
+
+    # Remove any existing authentication error notification (in case of reload)
+    host = entry.data.get('host', 'unknown')
+    notification_id = f"{DOMAIN}_auth_error_{host}"
+    persistent_notification.dismiss(hass, notification_id)
 
     # Fetch initial data so we have data when the entities are added
     try:
@@ -72,6 +78,12 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     if unload_ok:
         coordinator: FritzBoxVPNCoordinator = hass.data[DOMAIN][entry.entry_id][DATA_COORDINATOR]
         await coordinator.fritz_session.async_close()
+        
+        # Remove authentication error notification if it exists
+        host = entry.data.get('host', 'unknown')
+        notification_id = f"{DOMAIN}_auth_error_{host}"
+        persistent_notification.dismiss(hass, notification_id)
+        
         hass.data[DOMAIN].pop(entry.entry_id)
 
     return unload_ok

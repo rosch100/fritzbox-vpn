@@ -11,8 +11,10 @@ from aiohttp import ClientSession, ClientTimeout
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.const import CONF_HOST, CONF_USERNAME, CONF_PASSWORD
+from homeassistant.components import persistent_notification
 
 from .const import (
+    DOMAIN,
     DEFAULT_UPDATE_INTERVAL,
     CONF_UPDATE_INTERVAL,
     DEFAULT_TIMEOUT,
@@ -282,19 +284,108 @@ class FritzBoxVPNCoordinator(DataUpdateCoordinator):
             config[CONF_PASSWORD]
         )
         self.config = config
+        self._auth_error_notified = False  # Flag to prevent duplicate notifications
+
+    def _is_auth_error(self, error: Exception) -> bool:
+        """Check if an error is an authentication error."""
+        error_str = str(error).lower()
+        error_type = type(error).__name__
+        
+        # Check for authentication-related error messages
+        auth_indicators = [
+            "login failed",
+            "invalid sid",
+            "authentication failed",
+            "invalid credentials",
+            "unauthorized",
+            "access denied",
+        ]
+        
+        # Check if error message contains authentication indicators
+        if any(indicator in error_str for indicator in auth_indicators):
+            return True
+        
+        # Check for ValueError with "Invalid SID" (from async_get_session)
+        if isinstance(error, ValueError) and "invalid sid" in error_str:
+            return True
+        
+        # Check for ConnectionError with "Login failed" (from async_get_session)
+        if isinstance(error, ConnectionError) and "login failed" in error_str:
+            return True
+        
+        return False
+
+    def _create_auth_error_notification(self, error: Exception) -> None:
+        """Create a persistent notification for authentication errors."""
+        if self._auth_error_notified:
+            # Already notified, don't create duplicate
+            return
+        
+        host = self.config.get(CONF_HOST, "Unknown")
+        notification_id = f"{DOMAIN}_auth_error_{self.config.get(CONF_HOST, 'unknown')}"
+        
+        title = "Fritz!Box VPN: Authentifizierungsfehler"
+        message = (
+            f"Die Fritz!Box VPN Integration kann nicht auf die Fritz!Box zugreifen.\n\n"
+            f"**Host:** {host}\n\n"
+            f"**Fehler:** {str(error)}\n\n"
+            f"**Mögliche Ursachen:**\n"
+            f"- Das Fritz!Box Passwort wurde geändert\n"
+            f"- Der Benutzername ist falsch\n"
+            f"- Die Fritz!Box ist nicht erreichbar\n\n"
+            f"Bitte überprüfen Sie die Konfiguration der Integration und aktualisieren Sie die Zugangsdaten falls nötig."
+        )
+        
+        persistent_notification.create(
+            self.hass,
+            message,
+            title=title,
+            notification_id=notification_id,
+        )
+        
+        self._auth_error_notified = True
+        _LOGGER.warning(
+            "Authentifizierungsfehler erkannt. Benachrichtigung wurde erstellt. "
+            "Bitte überprüfen Sie die Zugangsdaten in den Integrationseinstellungen."
+        )
 
     async def _async_update_data(self) -> Dict[str, Any]:
         """Fetch the latest VPN data."""
         try:
             connections = await self.fritz_session.async_get_vpn_connections()
+            # Reset notification flag on successful update
+            if self._auth_error_notified:
+                self._auth_error_notified = False
+                # Remove the notification if it exists
+                notification_id = f"{DOMAIN}_auth_error_{self.config.get(CONF_HOST, 'unknown')}"
+                persistent_notification.dismiss(self.hass, notification_id)
             return connections
-        except (ConnectionError, asyncio.TimeoutError) as err:
+        except (ConnectionError, ValueError) as err:
+            # Check if this is an authentication error
+            if self._is_auth_error(err):
+                self._create_auth_error_notification(err)
+            raise UpdateFailed(f"Error fetching VPN data: {err}") from err
+        except asyncio.TimeoutError as err:
             raise UpdateFailed(f"Error fetching VPN data: {err}") from err
         except Exception as err:
+            # Check if this is an authentication error (might be wrapped)
+            if self._is_auth_error(err):
+                self._create_auth_error_notification(err)
             _LOGGER.exception("Unexpected error fetching VPN data")
             raise UpdateFailed(f"Unexpected error fetching VPN data: {err}") from err
 
     async def toggle_vpn(self, connection_uid: str, enable: bool) -> bool:
         """Toggle a VPN connection."""
-        return await self.fritz_session.async_toggle_vpn(connection_uid, enable)
+        try:
+            return await self.fritz_session.async_toggle_vpn(connection_uid, enable)
+        except (ConnectionError, ValueError) as err:
+            # Check if this is an authentication error
+            if self._is_auth_error(err):
+                self._create_auth_error_notification(err)
+            raise
+        except Exception as err:
+            # Check if this is an authentication error (might be wrapped)
+            if self._is_auth_error(err):
+                self._create_auth_error_notification(err)
+            raise
 
