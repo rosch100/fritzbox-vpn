@@ -2,7 +2,7 @@
   "config": {
     "step": {
       "user": {
-        "title": "FritzBox VPN Konfiguration",
+        "title": "Fritz!Box VPN Konfiguration",
         "description": "Bitte geben Sie die Verbindungsdaten für Ihre FritzBox ein. Falls bereits eine FritzBox-Integration konfiguriert ist, werden die Daten automatisch übernommen.",
         "data": {
           "host": "FritzBox IP-Adresse",
@@ -11,7 +11,7 @@
         }
       },
       "confirm": {
-        "title": "FritzBox VPN gefunden",
+        "title": "Fritz!Box VPN gefunden",
         "description": "Eine FritzBox wurde automatisch gefunden: {host}. Bitte bestätigen Sie die Konfiguration."
       }
     },
@@ -29,7 +29,7 @@
   "options": {
     "step": {
       "init": {
-        "title": "FritzBox VPN Optionen",
+        "title": "Fritz!Box VPN Optionen",
         "description": "Aktualisieren Sie die FritzBox-Verbindungsdaten. Das Passwort-Feld wird aus Sicherheitsgründen nicht angezeigt. Lassen Sie es leer, um das aktuelle Passwort beizubehalten, oder geben Sie ein neues Passwort ein, um es zu ändern.",
         "data": {
           "host": "FritzBox IP-Adresse",

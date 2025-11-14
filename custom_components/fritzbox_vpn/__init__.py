@@ -44,9 +44,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     parent_device = device_registry.async_get_or_create(
         config_entry_id=entry.entry_id,
         identifiers={(DOMAIN, entry.entry_id)},
-        name="FritzBox",
+        name="Fritz!Box",
         manufacturer="AVM",
-        model="FritzBox",
+        model="Fritz!Box",
         configuration_url=f"https://{host}",
     )
     _LOGGER.info("Created parent device: %s (ID: %s)", parent_device.name, parent_device.id)

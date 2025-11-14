@@ -1,8 +1,8 @@
-# FritzBox VPN Integration für Home Assistant
+# Fritz!Box VPN für Home Assistant
 
 [🇩🇪 Deutsch](README_DE.md) | [🇬🇧 English](README.md)
 
-Diese Integration ermöglicht die Steuerung von WireGuard VPN-Verbindungen auf einer AVM FritzBox direkt über Home Assistant.
+Diese Integration ermöglicht die Steuerung von WireGuard VPN-Verbindungen auf einer AVM Fritz!Box direkt über Home Assistant.
 
 ## Features
 
@@ -10,9 +10,8 @@ Diese Integration ermöglicht die Steuerung von WireGuard VPN-Verbindungen auf e
 - Ein-/Ausschalten von VPN-Verbindungen über Switch Entities
 - Einfache Konfiguration über die Home Assistant UI
 - Unterstützung mehrerer VPN-Verbindungen
+- Automatische Konfiguration aus vorhandenen Fritz!Box Tools
 - Automatische FritzBox-Erkennung via SSDP/UPnP
-- Automatische Konfiguration aus vorhandener FritzBox-Integration
-- Sichere Speicherung der Zugangsdaten (verschlüsselt durch Home Assistant)
 - Konfigurierbares Update-Intervall (5-300 Sekunden)
 
 ## Installation
@@ -25,7 +24,7 @@ Diese Integration ermöglicht die Steuerung von WireGuard VPN-Verbindungen auf e
 4. Fügen Sie dieses Repository hinzu:
    - Repository: `https://github.com/rosch100/fritzbox-vpn`
    - Category: Integration
-5. Suchen Sie nach FritzBox VPN und installieren Sie es
+5. Suchen Sie nach Fritz!Box VPN und installieren Sie es
 6. Starten Sie Home Assistant neu
 
 ### Manuelle Installation
@@ -39,23 +38,19 @@ Diese Integration ermöglicht die Steuerung von WireGuard VPN-Verbindungen auf e
 
 1. Gehen Sie zu Einstellungen > Geräte & Dienste
 2. Klicken Sie auf Integration hinzufügen
-3. Suchen Sie nach FritzBox VPN
-4. Falls eine FritzBox im Netzwerk gefunden wird, wird sie automatisch erkannt
-5. Die Integration versucht, Zugangsdaten aus einer vorhandenen FritzBox-Integration zu verwenden, falls verfügbar
-6. Geben Sie bei Bedarf Ihre Zugangsdaten ein und klicken Sie auf Absenden
+3. Falls eine FritzBox im Netzwerk gefunden wird, wird sie automatisch erkannt
+4. Die Integration versucht, Zugangsdaten aus Fritz!Box Tools zu verwenden, falls verfügbar
+5. Geben Sie bei Bedarf Ihre Zugangsdaten ein und klicken Sie auf Absenden
 
 ### Manuelle Konfiguration
 
 1. Gehen Sie zu Einstellungen > Geräte & Dienste
 2. Klicken Sie auf Integration hinzufügen
-3. Suchen Sie nach FritzBox VPN
-4. Geben Sie die folgenden Informationen ein:
+3. Geben Sie die folgenden Informationen ein:
    - FritzBox IP-Adresse: z.B. `192.168.178.1`
    - Benutzername: Ihr FritzBox Benutzername
    - Passwort: Ihr FritzBox Passwort
-5. Klicken Sie auf Absenden
-
-**Hinweis**: Falls bereits die offizielle FritzBox-Integration konfiguriert ist, werden IP-Adresse und Benutzername automatisch vorausgefüllt. Sie müssen nur das Passwort eingeben (oder leer lassen, falls die gleichen Zugangsdaten verwendet werden).
+4. Klicken Sie auf Absenden
 
 Die Integration erkennt automatisch alle WireGuard VPN-Verbindungen auf Ihrer FritzBox und erstellt für jede eine Switch Entity.
 
@@ -64,7 +59,7 @@ Die Integration erkennt automatisch alle WireGuard VPN-Verbindungen auf Ihrer Fr
 Sie können das Update-Intervall (wie oft die Integration den VPN-Status prüft) in den Integrations-Optionen konfigurieren:
 
 1. Gehen Sie zu Einstellungen > Geräte & Dienste
-2. Finden Sie Ihre FritzBox VPN Integration
+2. Finden Sie Ihre Fritz!Box VPN Integration
 3. Klicken Sie auf Konfigurieren
 4. Passen Sie das Update-Intervall an (5-300 Sekunden, Standard: 30 Sekunden)
 5. Klicken Sie auf Absenden
@@ -82,30 +77,24 @@ Alle Zugangsdaten (Benutzername und Passwort) werden sicher von Home Assistant g
 
 Nach der Konfiguration finden Sie für jede VPN-Verbindung folgende Entitäten:
 
-### Switch-Entität
-- Entitäts-ID: `switch.fritzbox_vpn_<connection_uid>_switch`
-- Name: Verwendet den VPN-Verbindungsnamen vom Gerät (via `has_entity_name`)
-- Icon: `mdi:vpn`
+### Switch
 - Zweck: VPN-Verbindungen ein- und ausschalten (Aktiviert/Deaktiviert)
+- Entitäts-ID: `switch.fritzbox_vpn_<connection_uid>_switch`
+- Name: Verwendet den VPN-Verbindungsnamen vom Gerät
 - Status: Zeigt an, ob die VPN aktiviert (ein) oder deaktiviert (aus) ist
 
-### Binary Sensor-Entität
+### Binary Sensor
 
 1. Connected Binary Sensor
-   - Entitäts-ID: `binary_sensor.fritzbox_vpn_<connection_uid>_connected`
-   - Name: "Connected" (via `has_entity_name`)
-   - Icon: `mdi:connection`
    - Zweck: Zeigt an, ob die VPN-Verbindung aktiv verbunden ist
+   - Entitäts-ID: `binary_sensor.fritzbox_vpn_<connection_uid>_connected`
    - Wert: `on` wenn verbunden, `off` wenn nicht verbunden
-   - Device Class: `connectivity`
 
-### Sensor-Entitäten
+### Sensor
 
 1. Status Sensor
-   - Entitäts-ID: `sensor.fritzbox_vpn_<connection_uid>_status`
-   - Name: "Status" (via `has_entity_name`)
-   - Icon: `mdi:information`
    - Zweck: Zeigt den kombinierten VPN-Status als Text an
+   - Entitäts-ID: `sensor.fritzbox_vpn_<connection_uid>_status`
    - Werte: 
      - `connected` - VPN ist aktiviert und verbunden
      - `enabled` - VPN ist aktiviert, aber nicht verbunden
@@ -113,24 +102,20 @@ Nach der Konfiguration finden Sie für jede VPN-Verbindung folgende Entitäten:
      - `unknown` - Status konnte nicht ermittelt werden
 
 2. UID Sensor (standardmäßig deaktiviert)
-   - Entitäts-ID: `sensor.fritzbox_vpn_<connection_uid>_uid`
-   - Name: "UID" (via `has_entity_name`)
-   - Icon: `mdi:identifier`
    - Zweck: Zeigt die eindeutige Verbindungs-ID (Connection UID)
+   - Entitäts-ID: `sensor.fritzbox_vpn_<connection_uid>_uid`
    - Wert: Die Connection UID als Zeichenkette (gleich wie `<connection_uid>`)
 
 3. VPN UID Sensor (standardmäßig deaktiviert)
-   - Entitäts-ID: `sensor.fritzbox_vpn_<connection_uid>_vpn_uid`
-   - Name: "VPN UID" (via `has_entity_name`)
-   - Icon: `mdi:identifier`
    - Zweck: Zeigt die interne VPN UID der FritzBox
+   - Entitäts-ID: `sensor.fritzbox_vpn_<connection_uid>_vpn_uid`
    - Wert: Die interne VPN UID als Zeichenkette (aus `conn.get('uid')`)
 
 Sie können diese Entitäten verwenden, um:
-- VPN-Verbindungen ein- und auszuschalten (Switch)
-- Verbindungsstatus zu überwachen (Connected Binary Sensor)
-- Detaillierte Statusinformationen anzuzeigen (Status Sensor)
-- Technische Identifikatoren abzurufen (UID Sensoren, standardmäßig deaktiviert)
+- VPN-Verbindungen ein- und auszuschalten (switch)
+- Verbindungsstatus zu überwachen (connected binary sensor)
+- Detaillierte Statusinformationen anzuzeigen (status sensor)
+- Technische Identifikatoren abzurufen (UID sensors, disabled by default)
 - Automatisierungen basierend auf dem Verbindungsstatus zu erstellen
 
 ### Status-Attribute
@@ -148,10 +133,6 @@ Jede VPN-Switch-Entity bietet folgende Attribute:
   - `"inactive"` - VPN ist deaktiviert
   - `"unknown"` - Status konnte nicht ermittelt werden
 
-## Automatisierungen
-
-Sie können die VPN-Switches in Automatisierungen verwenden, um VPN-Verbindungen basierend auf verschiedenen Bedingungen automatisch ein- und auszuschalten.
-
 ## Voraussetzungen
 
 - AVM FritzBox mit WireGuard VPN-Unterstützung
@@ -163,6 +144,8 @@ Sie können die VPN-Switches in Automatisierungen verwenden, um VPN-Verbindungen
 Bei Problemen oder Fragen:
 - Erstellen Sie ein Issue auf GitHub
 - Überprüfen Sie die Home Assistant Logs
+
+
 
 ## Lizenz
 

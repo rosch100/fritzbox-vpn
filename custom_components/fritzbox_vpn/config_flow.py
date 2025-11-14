@@ -73,7 +73,7 @@ async def validate_input(hass: HomeAssistant, data: Dict[str, Any]) -> Dict[str,
         await session.async_get_session()
         await session.async_close()
 
-        return {"title": f"FritzBox VPN ({data[CONF_HOST]})"}
+        return {"title": f"Fritz!Box VPN ({data[CONF_HOST]})"}
     except Exception as err:
         _LOGGER.exception("Error validating input: %s", err)
         if "Login failed" in str(err) or "Invalid SID" in str(err):
@@ -108,7 +108,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             self._existing_config = await self._get_existing_fritz_config()
             _LOGGER.info("Autoconfiguration result: %s", "found config" if self._existing_config else "no config found")
             if self._existing_config:
-                _LOGGER.info("Found existing FritzBox integration, using its configuration (SSDP will be skipped)")
+                _LOGGER.info("Found existing FritzBox Tools, using its configuration (SSDP will be skipped)")
                 
                 # Check if we have complete configuration (host, username, password)
                 has_host = bool(self._existing_config.get(CONF_HOST))
@@ -150,7 +150,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     vol.Required(CONF_PASSWORD, default=default_password): str,
                 })
             else:
-                _LOGGER.debug("No existing FritzBox integration found, SSDP discovery will be used as fallback")
+                _LOGGER.debug("No existing FritzBox Tools found, SSDP discovery will be used as fallback")
                 schema = STEP_USER_DATA_SCHEMA
         else:
             schema = STEP_USER_DATA_SCHEMA
@@ -190,7 +190,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         # SSDP is only used as fallback
         existing_config = await self._get_existing_fritz_config()
         if existing_config:
-            _LOGGER.info("Existing FritzBox integration found, aborting SSDP discovery")
+            _LOGGER.info("Existing FritzBox Tools found, aborting SSDP discovery")
             return self.async_abort(reason="already_configured")
         
         # Check if it's a FritzBox device (and specifically a router, not a repeater)
@@ -228,7 +228,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         # But check again in case it was added between the first check and now
         self._existing_config = await self._get_existing_fritz_config()
         if self._existing_config:
-            _LOGGER.info("Existing FritzBox integration found during SSDP, using its config instead of discovered host")
+            _LOGGER.info("Existing FritzBox Tools found during SSDP, using its config instead of discovered host")
         
         return await self.async_step_confirm()
 
@@ -422,7 +422,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         https://github.com/home-assistant/core/tree/dev/homeassistant/components/fritz
         """
         # First, let's check ALL available domains to see what's actually installed
-        _LOGGER.info("Checking for existing FritzBox integrations...")
+        _LOGGER.info("Checking for existing FritzBox Tools...")
         all_domains = set()
         fritz_related_entries = []
         for entry in self.hass.config_entries.async_entries():
@@ -551,7 +551,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         entry = entries_to_use[0]
                         _LOGGER.warning("Domain '%s': No entries with credentials found, using first router entry (credentials may be missing)", domain)
                     
-                    _LOGGER.info("Found existing FritzBox integration '%s' with entry_id: %s", domain, entry.entry_id)
+                    _LOGGER.info("Found existing FritzBox Tools '%s' with entry_id: %s", domain, entry.entry_id)
                     _LOGGER.info("Entry title: %s", entry.title)
                     _LOGGER.info("Entry source: %s", getattr(entry, 'source', 'unknown'))
                     _LOGGER.info("Entry unique_id: %s", getattr(entry, 'unique_id', 'unknown'))
@@ -607,7 +607,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     
                     if host:
                         _LOGGER.info(
-                            "✓ Using config from existing FritzBox integration '%s': host=%s, username=%s, password=%s",
+                            "✓ Using config from existing FritzBox Tools '%s': host=%s, username=%s, password=%s",
                             domain,
                             host,
                             username if username else "not found",
@@ -638,7 +638,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 _LOGGER.exception("Full exception details:")
                 continue
         
-        _LOGGER.warning("✗ No existing FritzBox integration found with usable configuration")
+        _LOGGER.warning("✗ No existing FritzBox Tools found with usable configuration")
         _LOGGER.info("Searched domains: %s", possible_domains)
         _LOGGER.info("Available domains in system: %s", sorted(all_domains))
         return None

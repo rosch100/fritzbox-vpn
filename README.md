@@ -1,8 +1,8 @@
-# FritzBox VPN Integration for Home Assistant
+# Fritz!Box VPN for Home Assistant
 
 [🇩🇪 Deutsch](README_DE.md) | [🇬🇧 English](README.md)
 
-This integration allows you to control WireGuard VPN connections on an AVM FritzBox directly through Home Assistant.
+This integration allows you to control WireGuard VPN connections on an AVM Fritz!Box directly through Home Assistant.
 
 ## Features
 
@@ -10,9 +10,8 @@ This integration allows you to control WireGuard VPN connections on an AVM Fritz
 - Turn VPN connections on/off via Switch entities
 - Easy configuration through the Home Assistant UI
 - Support for multiple VPN connections
+- Automatic configuration from existing Fritz!Box Tools
 - Automatic FritzBox discovery via SSDP/UPnP
-- Automatic configuration from existing FritzBox integration
-- Secure credential storage (encrypted by Home Assistant)
 - Configurable update interval (5-300 seconds)
 
 ## Installation
@@ -39,23 +38,19 @@ This integration allows you to control WireGuard VPN connections on an AVM Fritz
 
 1. Go to Settings > Devices & Services
 2. Click on Add Integration
-3. Search for FritzBox VPN
-4. If a FritzBox is found on your network, it will be automatically discovered
-5. The integration will try to use credentials from an existing FritzBox integration if available
+3. If a FritzBox is found on your network, it will be automatically discovered
+4. The integration will try to use credentials from Fritz!Box Tools if available
 6. Enter your credentials if needed and click Submit
 
 ### Manual Configuration
 
 1. Go to Settings > Devices & Services
 2. Click on Add Integration
-3. Search for FritzBox VPN
-4. Enter the following information:
+3. Enter the following information:
    - FritzBox IP Address: e.g. `192.168.178.1`
    - Username: Your FritzBox username
    - Password: Your FritzBox password
-5. Click Submit
-
-**Note**: If you already have the official FritzBox integration configured, the IP address and username will be automatically pre-filled. You only need to enter the password (or leave it empty if the same credentials are used).
+4. Click Submit
 
 The integration automatically detects all WireGuard VPN connections on your FritzBox and creates a Switch entity for each one.
 
@@ -82,30 +77,24 @@ All credentials (username and password) are securely stored by Home Assistant:
 
 After configuration, you will find the following entities for each VPN connection:
 
-### Switch Entity
-- Entity ID: `switch.fritzbox_vpn_<connection_uid>_switch`
-- Name: Uses the VPN connection name from the device (via `has_entity_name`)
-- Icon: `mdi:vpn`
+### Switch
 - Purpose: Turn VPN connections on and off (Enabled/Disabled)
+- Entity ID: `switch.fritzbox_vpn_<connection_uid>_switch`
+- Name: Uses the VPN connection name from the device
 - Status: Shows if the VPN is activated (on) or deactivated (off)
 
-### Binary Sensor Entity
+### Binary Sensor
 
 1. Connected Binary Sensor
-   - Entity ID: `binary_sensor.fritzbox_vpn_<connection_uid>_connected`
-   - Name: "Connected" (via `has_entity_name`)
-   - Icon: `mdi:connection`
    - Purpose: Shows if the VPN connection is actively connected
+   - Entity ID: `binary_sensor.fritzbox_vpn_<connection_uid>_connected`
    - Value: `on` if connected, `off` if not connected
-   - Device Class: `connectivity`
 
-### Sensor Entities
+### Sensor
 
 1. Status Sensor
-   - Entity ID: `sensor.fritzbox_vpn_<connection_uid>_status`
-   - Name: "Status" (via `has_entity_name`)
-   - Icon: `mdi:information`
    - Purpose: Shows the combined VPN status as text
+   - Entity ID: `sensor.fritzbox_vpn_<connection_uid>_status`
    - Values: 
      - `connected` - VPN is enabled and connected
      - `enabled` - VPN is enabled but not connected
@@ -113,17 +102,13 @@ After configuration, you will find the following entities for each VPN connectio
      - `unknown` - Status could not be determined
 
 2. UID Sensor (disabled by default)
-   - Entity ID: `sensor.fritzbox_vpn_<connection_uid>_uid`
-   - Name: "UID" (via `has_entity_name`)
-   - Icon: `mdi:identifier`
    - Purpose: Shows the unique connection ID (Connection UID)
+   - Entity ID: `sensor.fritzbox_vpn_<connection_uid>_uid`
    - Value: The connection UID string (same as `<connection_uid>`)
 
 3. VPN UID Sensor (disabled by default)
-   - Entity ID: `sensor.fritzbox_vpn_<connection_uid>_vpn_uid`
-   - Name: "VPN UID" (via `has_entity_name`)
-   - Icon: `mdi:identifier`
    - Purpose: Shows the internal VPN UID of the FritzBox
+   - Entity ID: `sensor.fritzbox_vpn_<connection_uid>_vpn_uid`
    - Value: The internal VPN UID string (from `conn.get('uid')`)
 
 You can use these entities to:
@@ -147,10 +132,6 @@ Each VPN switch entity provides the following attributes:
   - `"active_not_connected"` - VPN is activated but not connected
   - `"inactive"` - VPN is deactivated
   - `"unknown"` - Status could not be determined
-
-## Automations
-
-You can use the VPN switches in automations to automatically turn VPN connections on and off based on various conditions.
 
 ## Requirements
 
