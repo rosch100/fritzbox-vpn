@@ -75,9 +75,17 @@ async def validate_input(hass: HomeAssistant, data: Dict[str, Any]) -> Dict[str,
 
         return {"title": f"Fritz!Box VPN ({data[CONF_HOST]})"}
     except Exception as err:
-        _LOGGER.exception("Error validating input: %s", err)
-        if "Login failed" in str(err) or "Invalid SID" in str(err):
+        error_msg = str(err)
+        if "Login failed" in error_msg or "Invalid SID" in error_msg:
+            _LOGGER.warning(
+                "Authentication failed. Invalid SID can be caused by: (1) Incorrect username or password, or "
+                "(2) TR-064 not being enabled. Please check credentials first, then verify TR-064 is enabled "
+                "at: Home Network > Network > Network settings > Access Settings in the Home Network. "
+                "Note: UPnP is only needed for automatic discovery, not for API access. "
+                "Error: %s", error_msg
+            )
             raise InvalidAuth from err
+        _LOGGER.exception("Error validating input: %s", err)
         if "Failed to get login page" in str(err):
             raise CannotConnect from err
         raise CannotConnect from err
@@ -167,9 +175,18 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 errors["base"] = "cannot_connect"
             except InvalidAuth:
                 errors["base"] = "invalid_auth"
-            except Exception:
-                _LOGGER.exception("Unexpected exception")
-                errors["base"] = "unknown"
+            except Exception as err:
+                error_msg = str(err)
+                _LOGGER.exception("Unexpected exception during validation: %s", error_msg)
+                # Try to extract more specific error information
+                if "Login failed" in error_msg or "Invalid SID" in error_msg:
+                    errors["base"] = "invalid_auth"
+                elif "Failed to get login page" in error_msg or "Connection" in error_msg:
+                    errors["base"] = "cannot_connect"
+                else:
+                    # For unknown errors, log the full error but still show a user-friendly message
+                    errors["base"] = "unknown"
+                    _LOGGER.error("Unknown error details: %s", error_msg)
             else:
                 # Set unique_id to prevent duplicate entries
                 host = user_input.get(CONF_HOST)
@@ -684,9 +701,18 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                 errors["base"] = "cannot_connect"
             except InvalidAuth:
                 errors["base"] = "invalid_auth"
-            except Exception:
-                _LOGGER.exception("Unexpected exception")
-                errors["base"] = "unknown"
+            except Exception as err:
+                error_msg = str(err)
+                _LOGGER.exception("Unexpected exception during validation: %s", error_msg)
+                # Try to extract more specific error information
+                if "Login failed" in error_msg or "Invalid SID" in error_msg:
+                    errors["base"] = "invalid_auth"
+                elif "Failed to get login page" in error_msg or "Connection" in error_msg:
+                    errors["base"] = "cannot_connect"
+                else:
+                    # For unknown errors, log the full error but still show a user-friendly message
+                    errors["base"] = "unknown"
+                    _LOGGER.error("Unknown error details: %s", error_msg)
             else:
                 # Separate core config (data) from options
                 config_data = {

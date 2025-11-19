@@ -98,7 +98,15 @@ class FritzBoxVPNSession:
                 content = await response.text()
                 sid_match = re.search(r'<SID>(.*?)</SID>', content)
                 if not sid_match or sid_match.group(1) == '0000000000000000':
-                    raise ValueError("Login failed: Invalid SID")
+                    raise ValueError(
+                        "Login failed: Invalid SID. This can be caused by: "
+                        "(1) Incorrect username or password, or "
+                        "(2) TR-064 not being enabled. "
+                        "Please check your credentials first, then verify that TR-064 (Permit access for apps) "
+                        "is enabled in the FritzBox under "
+                        "Home Network > Network > Network settings > Access Settings in the Home Network. "
+                        "Note: UPnP is only needed for automatic discovery via SSDP, not for API access."
+                    )
 
                 self.sid = sid_match.group(1)
 

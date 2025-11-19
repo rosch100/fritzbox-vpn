@@ -42,6 +42,8 @@ Diese Integration ermöglicht die Steuerung von WireGuard VPN-Verbindungen auf e
 4. Die Integration versucht, Zugangsdaten aus Fritz!Box Tools zu verwenden, falls verfügbar
 5. Geben Sie bei Bedarf Ihre Zugangsdaten ein und klicken Sie auf Absenden
 
+**Hinweis:** Für die automatische Erkennung sollte UPnP in Ihrer FritzBox aktiviert sein (empfohlen, aber nicht erforderlich). Wenn UPnP deaktiviert ist, können Sie die Integration weiterhin manuell konfigurieren. TR-064 ist immer für API-Zugriffe erforderlich (siehe Abschnitt Voraussetzungen).
+
 ### Manuelle Konfiguration
 
 1. Gehen Sie zu Einstellungen > Geräte & Dienste
@@ -51,6 +53,8 @@ Diese Integration ermöglicht die Steuerung von WireGuard VPN-Verbindungen auf e
    - Benutzername: Ihr FritzBox Benutzername
    - Passwort: Ihr FritzBox Passwort
 4. Klicken Sie auf Absenden
+
+**Wichtig:** Stellen Sie sicher, dass TR-064 in Ihrer FritzBox aktiviert ist (siehe Abschnitt Voraussetzungen oben). Falls Sie Authentifizierungsfehler erhalten, überprüfen Sie, ob TR-064 aktiviert ist.
 
 Die Integration erkennt automatisch alle WireGuard VPN-Verbindungen auf Ihrer FritzBox und erstellt für jede eine Switch Entity.
 
@@ -138,6 +142,23 @@ Jede VPN-Switch-Entity bietet folgende Attribute:
 - AVM FritzBox mit WireGuard VPN-Unterstützung
 - FritzBox Firmware mit aktiviertem WireGuard
 - Benutzer mit entsprechenden Berechtigungen auf der FritzBox
+- **TR-064 muss aktiviert sein** in den FritzBox-Einstellungen (erforderlich für API-Zugriff)
+- **UPnP empfohlen** für automatische Erkennung via SSDP (optional, aber empfohlen)
+
+### FritzBox-Einstellungen
+
+Vor der Konfiguration der Integration müssen Sie die erforderlichen Einstellungen in Ihrer FritzBox aktivieren:
+
+1. Öffnen Sie die FritzBox-Benutzeroberfläche
+2. Gehen Sie zu **Heimnetz** > **Netzwerk** > **Netzwerkeinstellungen**
+3. Klicken Sie auf **Zugriffseinstellungen im Heimnetz**
+4. Aktivieren Sie **TR-064 (Zugriff für Apps erlauben)** - **Erforderlich** für API-Zugriff
+5. Aktivieren Sie **UPnP (Statusinformationen über UPnP übertragen)** - **Empfohlen** für automatische Erkennung
+6. Klicken Sie auf **Übernehmen**
+
+**Hinweis:** 
+- **TR-064 ist erforderlich** - Die Integration funktioniert nicht ohne diese Einstellung
+- **UPnP ist empfohlen** - Ermöglicht die automatische Erkennung Ihrer FritzBox via SSDP. Wenn UPnP deaktiviert ist, können Sie die Integration weiterhin manuell konfigurieren, indem Sie die IP-Adresse eingeben
 
 ## Unterstützung
 

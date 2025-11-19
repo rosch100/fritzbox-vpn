@@ -17,8 +17,8 @@
     },
     "error": {
       "cannot_connect": "Verbindung zur FritzBox fehlgeschlagen. Bitte überprüfen Sie die IP-Adresse und Netzwerkverbindung.",
-      "invalid_auth": "Authentifizierung fehlgeschlagen. Bitte überprüfen Sie Benutzername und Passwort.",
-      "unknown": "Ein unerwarteter Fehler ist aufgetreten."
+      "invalid_auth": "Authentifizierung fehlgeschlagen. Bitte überprüfen Sie Benutzername und Passwort. Falls die Anmeldedaten korrekt sind, aktivieren Sie TR-064 (Zugriff für Apps erlauben) in der FritzBox unter Heimnetz > Netzwerk > Netzwerkeinstellungen > Zugriffseinstellungen im Heimnetz. Hinweis: UPnP wird nur für die automatische Erkennung benötigt, nicht für die API-Zugriffe.",
+      "unknown": "Ein unerwarteter Fehler ist aufgetreten. Bitte überprüfen Sie die Home Assistant Logs für Details. Stellen Sie sicher, dass TR-064 (Zugriff für Apps erlauben) in der FritzBox aktiviert ist."
     },
     "abort": {
       "already_configured": "Diese FritzBox ist bereits konfiguriert.",

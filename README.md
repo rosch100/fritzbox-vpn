@@ -24,7 +24,7 @@ This integration allows you to control WireGuard VPN connections on an AVM Fritz
 4. Add this repository:
    - Repository: `https://github.com/rosch100/fritzbox-vpn`
    - Category: Integration
-5. Search for FritzBox VPN and install it
+5. Search for Fritz!Box VPN and install it
 6. Restart Home Assistant
 
 ### Manual Installation
@@ -40,7 +40,9 @@ This integration allows you to control WireGuard VPN connections on an AVM Fritz
 2. Click on Add Integration
 3. If a FritzBox is found on your network, it will be automatically discovered
 4. The integration will try to use credentials from Fritz!Box Tools if available
-6. Enter your credentials if needed and click Submit
+5. Enter your credentials if needed and click Submit
+
+**Note:** For automatic discovery to work, UPnP should be enabled in your FritzBox (recommended, but not required). If UPnP is disabled, you can still configure the integration manually. TR-064 is always required for API access (see Requirements section).
 
 ### Manual Configuration
 
@@ -52,6 +54,8 @@ This integration allows you to control WireGuard VPN connections on an AVM Fritz
    - Password: Your FritzBox password
 4. Click Submit
 
+**Important:** Make sure TR-064 is enabled in your FritzBox (see Requirements section above). If you encounter authentication errors, check that TR-064 is enabled.
+
 The integration automatically detects all WireGuard VPN connections on your FritzBox and creates a Switch entity for each one.
 
 ### Update Interval Configuration
@@ -59,7 +63,7 @@ The integration automatically detects all WireGuard VPN connections on your Frit
 You can configure the update interval (how often the integration checks for VPN status changes) in the integration options:
 
 1. Go to Settings > Devices & Services
-2. Find your FritzBox VPN integration
+2. Find your Fritz!Box VPN integration
 3. Click on Configure
 4. Adjust the Update interval (5-300 seconds, default: 30 seconds)
 5. Click Submit
@@ -138,6 +142,23 @@ Each VPN switch entity provides the following attributes:
 - AVM FritzBox with WireGuard VPN support
 - FritzBox firmware with WireGuard enabled
 - User with appropriate permissions on the FritzBox
+- **TR-064 must be enabled** in the FritzBox settings (required for API access)
+- **UPnP recommended** for automatic discovery via SSDP (optional, but recommended)
+
+### FritzBox Settings
+
+Before configuring the integration, you need to enable the required settings in your FritzBox:
+
+1. Open the FritzBox web interface
+2. Go to **Home Network** > **Network** > **Network settings**
+3. Click on **Access Settings in the Home Network**
+4. Enable **TR-064 (Permit access for apps)** - **Required** for API access
+5. Enable **UPnP (Transmit status information over UPnP)** - **Recommended** for automatic discovery
+6. Click **Apply**
+
+**Note:** 
+- **TR-064 is required** - The integration cannot work without it
+- **UPnP is recommended** - Enables automatic discovery of your FritzBox via SSDP. If UPnP is disabled, you can still configure the integration manually by entering the IP address
 
 ## Support
 
