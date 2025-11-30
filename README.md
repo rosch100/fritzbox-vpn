@@ -168,7 +168,7 @@ For problems or questions:
 
 ## Buy me a coffee
 
-Gefällt dir diese Integration? Dann lade mich gerne auf einen Kaffee ein! ☕ Deine Unterstützung hilft mir dabei, weiter an coolen Features zu arbeiten.
+Like this integration? Feel free to buy me a coffee! ☕ Your support helps me continue working on cool features.
 
 [![Buy Me A Coffee](https://img.buymeacoffee.com/button-api/?text=Buy%20me%20a%20coffee&emoji=&slug=rosch100&button_colour=FFDD00&font_colour=000000&font_family=Cookie&outline_colour=000000&coffee_colour=ffffff)](https://buymeacoffee.com/rosch100)
 
