@@ -20,12 +20,8 @@ This integration allows you to control WireGuard VPN connections on an AVM Fritz
 
 1. Open HACS in Home Assistant
 2. Go to Integrations
-3. Click on Custom repositories
-4. Add this repository:
-   - Repository: `https://github.com/rosch100/fritzbox-vpn`
-   - Category: Integration
-5. Search for Fritz!Box VPN and install it
-6. Restart Home Assistant
+3. Search for "Fritz!Box VPN" and install it
+4. Restart Home Assistant
 
 ### Manual Installation
 
