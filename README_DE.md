@@ -16,8 +16,6 @@ Diese Integration ermöglicht die Steuerung von WireGuard VPN-Verbindungen auf e
 
 ## Installation
 
-### Über HACS (empfohlen)
-
 1. Öffnen Sie HACS in Home Assistant
 2. Gehen Sie zu Integrations
 3. Suchen Sie nach "Fritz!Box VPN" und installieren Sie es
