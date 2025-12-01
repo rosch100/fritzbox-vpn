@@ -1,6 +1,6 @@
 # Fritz!Box VPN for Home Assistant
 
-[🇩🇪 Deutsch](README_DE.md) | [🇬🇧 English](README.md)
+[🇩🇪 Deutsch](README.de.md) | [🇬🇧 English](README.md)
 
 This integration allows you to control WireGuard VPN connections on an AVM Fritz!Box directly through Home Assistant.
 
