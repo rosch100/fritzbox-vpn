@@ -23,11 +23,6 @@ Diese Integration ermöglicht die Steuerung von WireGuard VPN-Verbindungen auf e
 3. Suchen Sie nach "Fritz!Box VPN" und installieren Sie es
 4. Starten Sie Home Assistant neu
 
-### Manuelle Installation
-
-1. Kopieren Sie den `custom_components/fritzbox_vpn` Ordner in Ihr Home Assistant `custom_components` Verzeichnis
-2. Starten Sie Home Assistant neu
-
 ## Konfiguration
 
 ### Automatische Erkennung (Empfohlen)
