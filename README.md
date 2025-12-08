@@ -122,8 +122,8 @@ Each VPN switch entity provides the following attributes:
 - connected: `true` if the VPN connection is actively connected, `false` if not connected
 - status: Textual status description:
   - `"connected"` - VPN is activated and connected
-  - `"active_not_connected"` - VPN is activated but not connected
-  - `"inactive"` - VPN is deactivated
+  - `"enabled"` - VPN is activated but not connected
+  - `"disabled"` - VPN is deactivated
   - `"unknown"` - Status could not be determined
 
 ## Requirements
