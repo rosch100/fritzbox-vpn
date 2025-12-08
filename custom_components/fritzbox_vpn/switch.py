@@ -11,7 +11,7 @@ from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import DOMAIN, DATA_COORDINATOR
+from .const import DOMAIN, DATA_COORDINATOR, STATUS_UNKNOWN
 from .coordinator import FritzBoxVPNCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -85,15 +85,10 @@ class FritzBoxVPNSwitch(CoordinatorEntity, SwitchEntity):
             active = conn.get('active', False)
             connected = conn.get('connected', False)
             
-            # Determine status text based on active and connected states
-            if active and connected:
-                status = "connected"
-            elif active and not connected:
-                status = "active_not_connected"
-            elif not active:
-                status = "inactive"
-            else:
-                status = "unknown"
+            # Use centralized status logic
+            status = STATUS_UNKNOWN
+            if hasattr(self.coordinator, "get_vpn_status"):
+                status = self.coordinator.get_vpn_status(self._connection_uid)
             
             return {
                 'name': conn.get('name'),
@@ -113,15 +108,14 @@ class FritzBoxVPNSwitch(CoordinatorEntity, SwitchEntity):
         if success:
             # Force refresh to get updated status
             await self.coordinator.async_request_refresh()
-            # Wait a moment for the data to be updated
-            await asyncio.sleep(0.5)
-            self.async_write_ha_state()
+            # Wait a moment for the data to be updated (can be removed if coordinator handles it well, but keeping for safety)
+            # await asyncio.sleep(0.5) 
+            # Note: We rely on the coordinator update now
             _LOGGER.info("Successfully turned on VPN connection: %s", vpn_name)
         else:
             _LOGGER.error("Failed to activate VPN connection: %s", vpn_name)
             # Still refresh to show current state
             await self.coordinator.async_request_refresh()
-            self.async_write_ha_state()
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Turn off the VPN connection."""
@@ -131,13 +125,9 @@ class FritzBoxVPNSwitch(CoordinatorEntity, SwitchEntity):
         if success:
             # Force refresh to get updated status
             await self.coordinator.async_request_refresh()
-            # Wait a moment for the data to be updated
-            await asyncio.sleep(0.5)
-            self.async_write_ha_state()
+            # Note: We rely on the coordinator update now
             _LOGGER.info("Successfully turned off VPN connection: %s", vpn_name)
         else:
             _LOGGER.error("Failed to deactivate VPN connection: %s", vpn_name)
             # Still refresh to show current state
             await self.coordinator.async_request_refresh()
-            self.async_write_ha_state()
-

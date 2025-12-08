@@ -1,7 +1,6 @@
 {
   "name": "Fritz!Box VPN",
   "render_readme": true,
-  "homeassistant": "2023.1.0",
-  "supported_languages": ["en", "de"]
+  "homeassistant": "2023.1.0"
 }
 

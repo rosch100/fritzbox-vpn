@@ -23,3 +23,8 @@ API_VPN_CONNECTION = "/api/v0/generic/vpn/connection/{uid}"
 DATA_COORDINATOR = "coordinator"
 DATA_FRITZ_SESSION = "fritz_session"
 
+# Status constants
+STATUS_CONNECTED = "connected"
+STATUS_ENABLED = "enabled"
+STATUS_DISABLED = "disabled"
+STATUS_UNKNOWN = "unknown"

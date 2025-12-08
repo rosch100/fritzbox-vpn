@@ -4,6 +4,7 @@ import asyncio
 import hashlib
 import re
 import logging
+import xml.etree.ElementTree as ET
 from datetime import timedelta
 from typing import Any, Dict, Optional
 from aiohttp import ClientSession, ClientTimeout
@@ -12,6 +13,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.const import CONF_HOST, CONF_USERNAME, CONF_PASSWORD
 from homeassistant.components import persistent_notification
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .const import (
     DOMAIN,
@@ -23,6 +25,10 @@ from .const import (
     API_LOGIN,
     API_DATA,
     API_VPN_CONNECTION,
+    STATUS_CONNECTED,
+    STATUS_ENABLED,
+    STATUS_DISABLED,
+    STATUS_UNKNOWN,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -31,24 +37,20 @@ _LOGGER = logging.getLogger(__name__)
 class FritzBoxVPNSession:
     """Session manager for FritzBox Web-UI API."""
 
-    def __init__(self, host: str, username: str, password: str, protocol: str = DEFAULT_PROTOCOL):
+    def __init__(self, session: ClientSession, host: str, username: str, password: str, protocol: str = DEFAULT_PROTOCOL):
         """Initialize the session manager."""
+        self.session = session
         self.host = host
         self.username = username
         self.password = password
         # Validate and set protocol (default to https, fallback to http if https fails)
         self.protocol = protocol if protocol in ("http", "https") else DEFAULT_PROTOCOL
-        self.session: Optional[ClientSession] = None
         self.sid: Optional[str] = None
 
     async def async_get_session(self) -> tuple[ClientSession, str]:
         """Get a session ID from the FritzBox."""
-        # Create new session if needed or if closed
-        if self.session is None or self.session.closed:
-            if self.session and not self.session.closed:
-                await self.session.close()
-            self.session = ClientSession()
-
+        # Note: We use the shared self.session provided in __init__
+        
         # Get challenge
         login_url = f"{self.protocol}://{self.host}{API_LOGIN}"
         try:
@@ -74,11 +76,14 @@ class FritzBoxVPNSession:
                 else:
                     content = await response.text()
 
-                challenge_match = re.search(r'<Challenge>(.*?)</Challenge>', content)
-                if not challenge_match:
-                    raise ValueError("Could not find challenge in login response")
+                try:
+                    root = ET.fromstring(content)
+                    challenge = root.findtext('Challenge')
+                except ET.ParseError:
+                     raise ValueError("Could not parse login response XML")
 
-                challenge = challenge_match.group(1)
+                if not challenge:
+                    raise ValueError("Could not find challenge in login response")
 
             # Calculate response
             response_hash = hashlib.md5(
@@ -96,8 +101,14 @@ class FritzBoxVPNSession:
                     raise ConnectionError(f"Login failed: {response.status}")
 
                 content = await response.text()
-                sid_match = re.search(r'<SID>(.*?)</SID>', content)
-                if not sid_match or sid_match.group(1) == '0000000000000000':
+                
+                try:
+                    root = ET.fromstring(content)
+                    sid = root.findtext('SID')
+                except ET.ParseError:
+                    raise ValueError("Could not parse login response XML")
+
+                if not sid or sid == '0000000000000000':
                     raise ValueError(
                         "Login failed: Invalid SID. This can be caused by: "
                         "(1) Incorrect username or password, or "
@@ -108,7 +119,7 @@ class FritzBoxVPNSession:
                         "Note: UPnP is only needed for automatic discovery via SSDP, not for API access."
                     )
 
-                self.sid = sid_match.group(1)
+                self.sid = sid
 
             return self.session, self.sid
         except (ConnectionError, ValueError) as err:
@@ -127,7 +138,6 @@ class FritzBoxVPNSession:
             'sid': sid,
             'xhr': '1',
             'xhrId': 'all',
-            'lang': 'de',
             'page': 'shareWireguard',
             'no_sidrenew': ''
         }
@@ -244,10 +254,8 @@ class FritzBoxVPNSession:
 
     async def async_close(self):
         """Close the session."""
-        if self.session:
-            await self.session.close()
-            self.session = None
-            self.sid = None
+        # Only clear SID, do not close the shared session
+        self.sid = None
 
 
 class FritzBoxVPNCoordinator(DataUpdateCoordinator):
@@ -287,6 +295,7 @@ class FritzBoxVPNCoordinator(DataUpdateCoordinator):
             update_interval=timedelta(seconds=update_interval_seconds),
         )
         self.fritz_session = FritzBoxVPNSession(
+            async_get_clientsession(hass),
             config[CONF_HOST],
             config[CONF_USERNAME],
             config[CONF_PASSWORD]
@@ -294,6 +303,24 @@ class FritzBoxVPNCoordinator(DataUpdateCoordinator):
         self.config = config
         self.entry_id = entry_id
         self._auth_error_notified = False  # Flag to prevent duplicate notifications
+
+    def get_vpn_status(self, connection_uid: str) -> str:
+        """Get the textual status of a VPN connection."""
+        if not self.data or connection_uid not in self.data:
+            return STATUS_UNKNOWN
+            
+        conn = self.data[connection_uid]
+        active = conn.get('active', False)
+        connected = conn.get('connected', False)
+        
+        if active and connected:
+            return STATUS_CONNECTED
+        elif active and not connected:
+            return STATUS_ENABLED
+        elif not active:
+            return STATUS_DISABLED
+        else:
+            return STATUS_UNKNOWN
 
     def _is_auth_error(self, error: Exception) -> bool:
         """Check if an error is an authentication error."""
@@ -367,8 +394,8 @@ class FritzBoxVPNCoordinator(DataUpdateCoordinator):
         
         self._auth_error_notified = True
         _LOGGER.warning(
-            "Authentifizierungsfehler erkannt. Benachrichtigung wurde erstellt. "
-            "Bitte überprüfen Sie die Zugangsdaten in den Integrationseinstellungen. Entry ID: %s",
+            "Authentication error detected. Notification created. "
+            "Please check credentials in integration settings. Entry ID: %s",
             self.entry_id
         )
 
@@ -411,4 +438,3 @@ class FritzBoxVPNCoordinator(DataUpdateCoordinator):
             if self._is_auth_error(err):
                 self._create_auth_error_notification(err)
             raise
-

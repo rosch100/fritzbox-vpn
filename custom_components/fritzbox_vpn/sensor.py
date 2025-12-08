@@ -10,7 +10,7 @@ from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import DOMAIN, DATA_COORDINATOR
+from .const import DOMAIN, DATA_COORDINATOR, STATUS_UNKNOWN
 from .coordinator import FritzBoxVPNCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -79,21 +79,9 @@ class FritzBoxVPNStatusSensor(CoordinatorEntity, SensorEntity):
     @property
     def native_value(self) -> str:
         """Return the status as text."""
-        if self.coordinator.data and self._connection_uid in self.coordinator.data:
-            conn = self.coordinator.data[self._connection_uid]
-            active = conn.get('active', False)
-            connected = conn.get('connected', False)
-            
-            # Determine status text based on active and connected states
-            if active and connected:
-                return "connected"
-            elif active and not connected:
-                return "enabled"
-            elif not active:
-                return "disabled"
-            else:
-                return "unknown"
-        return "unknown"
+        if hasattr(self.coordinator, "get_vpn_status"):
+            return self.coordinator.get_vpn_status(self._connection_uid)
+        return STATUS_UNKNOWN
 
     @property
     def native_unit_of_measurement(self) -> str:
@@ -183,4 +171,3 @@ class FritzBoxVPNVPNUIDSensor(CoordinatorEntity, SensorEntity):
     def native_unit_of_measurement(self) -> str:
         """Return the unit of measurement."""
         return None
-

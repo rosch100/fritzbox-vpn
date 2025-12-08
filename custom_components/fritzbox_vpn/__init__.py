@@ -9,6 +9,7 @@ from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr
 from homeassistant.components import persistent_notification
+from homeassistant.exceptions import ConfigEntryNotReady
 
 from .const import DOMAIN, DATA_COORDINATOR
 from .coordinator import FritzBoxVPNCoordinator
@@ -36,8 +37,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         await coordinator.async_config_entry_first_refresh()
         _LOGGER.info("Initial data refresh successful. Found %d VPN connections", len(coordinator.data) if coordinator.data else 0)
     except Exception as err:
-        _LOGGER.error("Failed to fetch initial VPN data: %s", err, exc_info=True)
-        return False
+        if "Login failed" in str(err) or "Invalid SID" in str(err):
+            _LOGGER.error("Failed to fetch initial VPN data due to authentication error: %s", err)
+            return False
+        
+        _LOGGER.warning("Failed to fetch initial VPN data, retrying later: %s", err)
+        raise ConfigEntryNotReady(f"Timeout/Error connecting to FritzBox: {err}") from err
 
     hass.data.setdefault(DOMAIN, {})
     hass.data[DOMAIN][entry.entry_id] = {
@@ -97,4 +102,3 @@ async def async_reload_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
         await async_setup_entry(hass, entry)
     else:
         _LOGGER.error("Failed to unload FritzBox VPN integration, cannot reload")
-
