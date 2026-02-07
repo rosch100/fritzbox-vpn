@@ -8,12 +8,12 @@ from urllib.parse import urlparse
 import voluptuous as vol
 
 from homeassistant import config_entries
-from homeassistant.components import ssdp
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.data_entry_flow import FlowResult
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.const import CONF_HOST, CONF_USERNAME, CONF_PASSWORD
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.helpers.service_info.ssdp import SsdpServiceInfo
 
 from .const import DOMAIN, CONF_UPDATE_INTERVAL, DEFAULT_UPDATE_INTERVAL
 from .coordinator import FritzBoxVPNSession
@@ -201,7 +201,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             step_id="user", data_schema=schema, errors=errors
         )
 
-    async def async_step_ssdp(self, discovery_info: ssdp.SsdpServiceInfo) -> FlowResult:
+    async def async_step_ssdp(self, discovery_info: SsdpServiceInfo) -> FlowResult:
         """Handle SSDP discovery (fallback if no existing integration found)."""
         _LOGGER.debug("SSDP discovery: %s", discovery_info)
         
@@ -321,7 +321,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         )
 
     @staticmethod
-    def _is_fritzbox_device(discovery_info: ssdp.SsdpServiceInfo) -> bool:
+    def _is_fritzbox_device(discovery_info: SsdpServiceInfo) -> bool:
         """Check if the discovered device is a FritzBox router (not a repeater).
         
         This method specifically rejects repeaters and only accepts routers.
@@ -397,7 +397,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         return True
 
     @staticmethod
-    def _extract_host_from_ssdp(discovery_info: ssdp.SsdpServiceInfo) -> Optional[str]:
+    def _extract_host_from_ssdp(discovery_info: SsdpServiceInfo) -> Optional[str]:
         """Extract host IP from SSDP discovery info."""
         # Try to get host from location URL (primary method)
         if discovery_info.ssdp_location:
