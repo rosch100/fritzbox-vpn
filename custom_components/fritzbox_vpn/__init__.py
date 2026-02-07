@@ -1,15 +1,14 @@
 """The FritzBox VPN integration."""
 
-import asyncio
 import logging
 from typing import Any
 
+from homeassistant.components import persistent_notification
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers import device_registry as dr
-from homeassistant.components import persistent_notification
 from homeassistant.exceptions import ConfigEntryNotReady
+from homeassistant.helpers import device_registry as dr
 
 from .const import DOMAIN, DATA_COORDINATOR
 from .coordinator import FritzBoxVPNCoordinator

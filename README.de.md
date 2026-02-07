@@ -13,6 +13,7 @@ Diese Integration ermöglicht die Steuerung von WireGuard VPN-Verbindungen auf e
 - Automatische Konfiguration aus vorhandenen Fritz!Box Tools
 - Automatische FritzBox-Erkennung via SSDP/UPnP
 - Konfigurierbares Update-Intervall (5-300 Sekunden)
+- Session-Caching: nur ein Login pro Integrations-Load (kein Login bei jedem Poll), dadurch bleiben Router-Zugangs-Benachrichtigungen per E-Mail gering
 
 ## Installation
 
@@ -20,6 +21,18 @@ Diese Integration ermöglicht die Steuerung von WireGuard VPN-Verbindungen auf e
 2. Gehen Sie zu Integrations
 3. Suchen Sie nach "Fritz!Box VPN" und installieren Sie es
 4. Starten Sie Home Assistant neu
+
+### Beta-Version zum Testen
+
+Um eine Beta-Version zu installieren (z. B. zum Testen von Fixes vor der nächsten stabilen Version):
+
+1. In HACS die Karte der Integration **Fritz!Box VPN** öffnen.
+2. Auf **⋮** (drei Punkte) oben rechts klicken und **Erneut herunterladen** wählen.
+3. **Beta-Versionen anzeigen** aktivieren und kurz warten, bis die Liste aktualisiert ist.
+4. Gewünschte Beta-Version (z. B. `0.9.0b1`) auswählen und bestätigen.
+5. Home Assistant neu starten.
+
+Beta-Releases erscheinen als GitHub-Vorabversionen (Tags wie `v0.9.0b1`).
 
 ## Konfiguration
 
