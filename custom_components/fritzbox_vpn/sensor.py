@@ -1,9 +1,9 @@
 """Sensor platform for FritzBox VPN integration."""
 
 import logging
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
-from homeassistant.components.sensor import SensorEntity, SensorStateClass
+from homeassistant.components.sensor import SensorEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import DeviceInfo
@@ -84,8 +84,8 @@ class FritzBoxVPNStatusSensor(CoordinatorEntity, SensorEntity):
         return STATUS_UNKNOWN
 
     @property
-    def native_unit_of_measurement(self) -> str:
-        """Return the unit of measurement."""
+    def native_unit_of_measurement(self) -> Optional[str]:
+        """Return the unit of measurement (none for status text)."""
         return None
 
 
@@ -125,8 +125,8 @@ class FritzBoxVPNUIDSensor(CoordinatorEntity, SensorEntity):
         return self._connection_uid
 
     @property
-    def native_unit_of_measurement(self) -> str:
-        """Return the unit of measurement."""
+    def native_unit_of_measurement(self) -> Optional[str]:
+        """Return the unit of measurement (none for identifier)."""
         return None
 
 
@@ -168,6 +168,6 @@ class FritzBoxVPNVPNUIDSensor(CoordinatorEntity, SensorEntity):
         return ''
 
     @property
-    def native_unit_of_measurement(self) -> str:
-        """Return the unit of measurement."""
+    def native_unit_of_measurement(self) -> Optional[str]:
+        """Return the unit of measurement (none for VPN UID)."""
         return None

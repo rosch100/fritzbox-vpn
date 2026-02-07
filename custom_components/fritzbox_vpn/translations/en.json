@@ -18,7 +18,8 @@
     "error": {
       "cannot_connect": "Failed to connect to FritzBox. Please check the IP address and network connection.",
       "invalid_auth": "Authentication failed. Please check username and password. If credentials are correct, enable TR-064 (Permit access for apps) in the FritzBox under Home Network > Network > Network settings > Access Settings in the Home Network. Note: UPnP is only needed for automatic discovery, not for API access.",
-      "unknown": "An unexpected error occurred. Please check the Home Assistant logs for details. Make sure TR-064 (Permit access for apps) is enabled in the FritzBox."
+      "unknown": "An unexpected error occurred. Please check the Home Assistant logs for details. Make sure TR-064 (Permit access for apps) is enabled in the FritzBox.",
+      "config_entry_not_found": "Config entry not found. Please add the integration again."
     },
     "abort": {
       "already_configured": "This FritzBox is already configured.",
@@ -41,4 +42,3 @@
     }
   }
 }
-

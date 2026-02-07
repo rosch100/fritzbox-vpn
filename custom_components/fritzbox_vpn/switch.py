@@ -1,6 +1,5 @@
 """Switch platform for FritzBox VPN integration."""
 
-import asyncio
 import logging
 from typing import Any, Dict
 
@@ -102,7 +101,7 @@ class FritzBoxVPNSwitch(CoordinatorEntity, SwitchEntity):
 
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Turn on the VPN connection."""
-        vpn_name = self._attr_name or "Unknown"
+        vpn_name = self._connection_data.get("name", "Unknown")
         _LOGGER.info("Turning on VPN connection: %s", vpn_name)
         success = await self.coordinator.toggle_vpn(self._connection_uid, True)
         if success:
@@ -119,7 +118,7 @@ class FritzBoxVPNSwitch(CoordinatorEntity, SwitchEntity):
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Turn off the VPN connection."""
-        vpn_name = self._attr_name or "Unknown"
+        vpn_name = self._connection_data.get("name", "Unknown")
         _LOGGER.info("Turning off VPN connection: %s", vpn_name)
         success = await self.coordinator.toggle_vpn(self._connection_uid, False)
         if success:

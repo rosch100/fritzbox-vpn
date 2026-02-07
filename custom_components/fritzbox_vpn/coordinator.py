@@ -2,7 +2,6 @@
 
 import asyncio
 import hashlib
-import re
 import logging
 import xml.etree.ElementTree as ET
 from datetime import timedelta
@@ -80,7 +79,7 @@ class FritzBoxVPNSession:
                     root = ET.fromstring(content)
                     challenge = root.findtext('Challenge')
                 except ET.ParseError:
-                     raise ValueError("Could not parse login response XML")
+                    raise ValueError("Could not parse login response XML")
 
                 if not challenge:
                     raise ValueError("Could not find challenge in login response")
@@ -252,7 +251,7 @@ class FritzBoxVPNSession:
             _LOGGER.exception("Error toggling VPN")
             return False
 
-    async def async_close(self):
+    async def async_close(self) -> None:
         """Close the session."""
         # Only clear SID, do not close the shared session
         self.sid = None
