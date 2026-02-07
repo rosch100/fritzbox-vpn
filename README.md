@@ -13,6 +13,7 @@ This integration allows you to control WireGuard VPN connections on an AVM Fritz
 - Automatic configuration from existing Fritz!Box Tools
 - Automatic FritzBox discovery via SSDP/UPnP
 - Configurable update interval (5-300 seconds)
+- Session caching: only one login per integration load (no login on every poll), so router access notifications by email stay minimal
 
 ## Installation
 
@@ -20,6 +21,18 @@ This integration allows you to control WireGuard VPN connections on an AVM Fritz
 2. Go to Integrations
 3. Search for "Fritz!Box VPN" and install it
 4. Restart Home Assistant
+
+### Testing beta versions
+
+To install a beta release (e.g. for testing fixes before the next stable release):
+
+1. In HACS, open the **Fritz!Box VPN** integration card.
+2. Click the **⋮** (three dots) in the top right and choose **Redownload**.
+3. Enable **Show beta versions**, wait for the list to refresh.
+4. Select the desired beta version (e.g. `0.9.0b1`) and confirm.
+5. Restart Home Assistant.
+
+Beta releases are published as GitHub Pre-releases (tags like `v0.9.0b1`).
 
 ## Configuration
 

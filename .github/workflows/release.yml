@@ -1,0 +1,35 @@
+# Release- und Beta-Release-Workflow für HACS
+# - Tag v*.*.* (z. B. v0.9.0) → normales Release
+# - Tag v*.*.*b* oder v*.*.*-beta.* (z. B. v0.9.0b1) → Pre-Release (Beta)
+
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get tag version
+        id: tag
+        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          prerelease: ${{ contains(github.ref_name, 'b') || contains(github.ref_name, 'beta') }}
+          name: Release ${{ github.ref_name }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
