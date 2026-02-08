@@ -16,7 +16,13 @@ from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.service_info.ssdp import SsdpServiceInfo
 
-from .const import DOMAIN, CONF_UPDATE_INTERVAL, DEFAULT_UPDATE_INTERVAL
+from .const import (
+    DOMAIN,
+    CONF_UPDATE_INTERVAL,
+    DEFAULT_UPDATE_INTERVAL,
+    UPDATE_INTERVAL_MIN,
+    UPDATE_INTERVAL_MAX,
+)
 from .coordinator import FritzBoxVPNSession
 
 _LOGGER = logging.getLogger(__name__)
@@ -745,9 +751,11 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                         update_interval = DEFAULT_UPDATE_INTERVAL
                 
                 # Validate range
-                if update_interval < 5 or update_interval > 300:
-                    _LOGGER.warning("OptionsFlow: update_interval %d is out of range (5-300), using default", 
-                                   update_interval)
+                if update_interval < UPDATE_INTERVAL_MIN or update_interval > UPDATE_INTERVAL_MAX:
+                    _LOGGER.warning(
+                        "OptionsFlow: update_interval %d is out of range (%d-%d), using default",
+                        update_interval, UPDATE_INTERVAL_MIN, UPDATE_INTERVAL_MAX,
+                    )
                     update_interval = DEFAULT_UPDATE_INTERVAL
                 
                 _LOGGER.debug("OptionsFlow: Saving update_interval: %d seconds", update_interval)
@@ -823,7 +831,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
             vol.Required(CONF_PASSWORD, default=default_password): str,
             vol.Required(CONF_UPDATE_INTERVAL, default=default_update_interval): vol.All(
                 vol.Coerce(int),
-                vol.Range(min=5, max=300)
+                vol.Range(min=UPDATE_INTERVAL_MIN, max=UPDATE_INTERVAL_MAX)
             ),
         })
 

@@ -12,7 +12,7 @@ Diese Integration ermöglicht die Steuerung von WireGuard VPN-Verbindungen auf e
 - Unterstützung mehrerer VPN-Verbindungen
 - Automatische Konfiguration aus vorhandenen Fritz!Box Tools
 - Automatische FritzBox-Erkennung via SSDP/UPnP
-- Konfigurierbares Update-Intervall (5-300 Sekunden)
+- Konfigurierbares Update-Intervall (5 Sekunden bis 1 Stunde; Standard 30 s)
 - Session-Caching: nur ein Login pro Integrations-Load (kein Login bei jedem Poll), dadurch bleiben Router-Zugangs-Benachrichtigungen per E-Mail gering
 
 ## Installation
@@ -67,10 +67,12 @@ Sie können das Update-Intervall (wie oft die Integration den VPN-Status prüft)
 1. Gehen Sie zu Einstellungen > Geräte & Dienste
 2. Finden Sie Ihre Fritz!Box VPN Integration
 3. Klicken Sie auf Konfigurieren
-4. Passen Sie das Update-Intervall an (5-300 Sekunden, Standard: 30 Sekunden)
+4. Passen Sie das Update-Intervall an (5–3600 Sekunden, Standard: 30 Sekunden; maximal 1 Stunde).
 5. Klicken Sie auf Absenden
 
-Das Update-Intervall bestimmt, wie häufig die Integration die FritzBox nach VPN-Status-Updates abfragt. Niedrigere Werte bieten häufigere Updates, können aber den Netzwerkverkehr und die FritzBox-Last erhöhen. Höhere Werte reduzieren den Netzwerkverkehr, können aber Status-Updates verzögern.
+Das Update-Intervall legt fest, wie oft die Integration die FritzBox abfragt. Niedrigere Werte = häufigere Updates, höhere Werte (bis 3600 s = 1 h) reduzieren Reconnects und Last.
+
+**Reconnects und Last reduzieren:** Die Integration nutzt Session-Caching (ein Login pro Ladevorgang) und bei Abfragefehlern einen 5‑Minuten-Backoff vor dem nächsten Versuch. Für noch weniger Reconnects und FritzBox-Last das Update-Intervall auf 300 Sekunden (5 Min) oder höher setzen; Maximum ist 3600 (1 h).
 
 ### Sicherheit
 

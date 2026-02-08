@@ -22,6 +22,7 @@ from .const import (
     DEFAULT_TIMEOUT,
     DEFAULT_PROTOCOL,
     VERIFICATION_DELAY,
+    RETRY_AFTER_SECONDS,
     API_LOGIN,
     API_DATA,
     API_VPN_CONNECTION,
@@ -467,18 +468,28 @@ class FritzBoxVPNCoordinator(DataUpdateCoordinator):
                 persistent_notification.dismiss(self.hass, notification_id)
             return connections
         except (ConnectionError, ValueError) as err:
-            # Check if this is an authentication error
             if self._is_auth_error(err):
                 self._create_auth_error_notification(err)
-            raise UpdateFailed(f"Error fetching VPN data: {err}") from err
+                raise UpdateFailed(f"Error fetching VPN data: {err}") from err
+            # Transient error: backoff to avoid reconnect storm (next try in RETRY_AFTER_SECONDS)
+            raise UpdateFailed(
+                f"Error fetching VPN data: {err}",
+                retry_after=RETRY_AFTER_SECONDS,
+            ) from err
         except asyncio.TimeoutError as err:
-            raise UpdateFailed(f"Error fetching VPN data: {err}") from err
+            raise UpdateFailed(
+                f"Error fetching VPN data: {err}",
+                retry_after=RETRY_AFTER_SECONDS,
+            ) from err
         except Exception as err:
-            # Check if this is an authentication error (might be wrapped)
             if self._is_auth_error(err):
                 self._create_auth_error_notification(err)
+                raise UpdateFailed(f"Unexpected error fetching VPN data: {err}") from err
             _LOGGER.exception("Unexpected error fetching VPN data")
-            raise UpdateFailed(f"Unexpected error fetching VPN data: {err}") from err
+            raise UpdateFailed(
+                f"Unexpected error fetching VPN data: {err}",
+                retry_after=RETRY_AFTER_SECONDS,
+            ) from err
 
     async def toggle_vpn(self, connection_uid: str, enable: bool) -> bool:
         """Toggle a VPN connection."""

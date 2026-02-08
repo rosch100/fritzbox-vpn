@@ -12,7 +12,7 @@ This integration allows you to control WireGuard VPN connections on an AVM Fritz
 - Support for multiple VPN connections
 - Automatic configuration from existing Fritz!Box Tools
 - Automatic FritzBox discovery via SSDP/UPnP
-- Configurable update interval (5-300 seconds)
+- Configurable update interval (5 seconds to 1 hour; default 30 s)
 - Session caching: only one login per integration load (no login on every poll), so router access notifications by email stay minimal
 
 ## Installation
@@ -67,10 +67,12 @@ You can configure the update interval (how often the integration checks for VPN 
 1. Go to Settings > Devices & Services
 2. Find your Fritz!Box VPN integration
 3. Click on Configure
-4. Adjust the Update interval (5-300 seconds, default: 30 seconds)
+4. Adjust the Update interval (5–3600 seconds, default: 30 seconds; maximum 1 hour).
 5. Click Submit
 
-The update interval determines how frequently the integration polls the FritzBox for VPN status updates. Lower values provide more frequent updates but may increase network traffic and FritzBox load. Higher values reduce network traffic but may delay status updates.
+The update interval determines how frequently the integration polls the FritzBox for VPN status updates. Lower values give more frequent updates; higher values (e.g. 300–3600 s) reduce reconnects. You can set up to 1 hour (3600 s) for minimal load.
+
+**Reducing reconnects and load:** The integration uses session caching (one login per load) and, on fetch errors, a 5‑minute backoff before retrying. To further reduce reconnects and FritzBox load, set the update interval to 300 seconds (5 min) or higher; maximum is 3600 (1 h).
 
 ### Security
 
