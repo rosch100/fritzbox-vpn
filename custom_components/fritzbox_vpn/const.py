@@ -31,7 +31,7 @@ MODEL_FRITZBOX = "Fritz!Box"
 MODEL_WIREGUARD_VPN = "WireGuard VPN"
 DEFAULT_NAME_UNKNOWN = "Unknown"
 INTEGRATION_TITLE = "Fritz!Box VPN"
-# Fallback when translation is unavailable; normal title comes from config.notification.auth_error_title
+# Fallback when translation is unavailable; normal title from common.auth_error_notification_title (en.json/de.json)
 NOTIFICATION_TITLE_AUTH_ERROR = "Fritz!Box VPN: Authentifizierungsfehler"
 
 # Config flow error keys (must match translation keys in en.json / de.json)

@@ -1,8 +1,5 @@
 {
   "config": {
-    "notification": {
-      "auth_error_title": "Fritz!Box VPN: Authentifizierungsfehler"
-    },
     "step": {
       "user": {
         "title": "Fritz!Box VPN Konfiguration",
@@ -43,5 +40,8 @@
         }
       }
     }
+  },
+  "common": {
+    "auth_error_notification_title": "Fritz!Box VPN: Authentifizierungsfehler"
   }
 }

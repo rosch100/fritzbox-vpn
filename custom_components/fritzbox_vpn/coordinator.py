@@ -402,10 +402,10 @@ class FritzBoxVPNCoordinator(DataUpdateCoordinator):
         notification_id = auth_error_notification_id(host)
         try:
             trans = await async_get_translations(
-                self.hass, self.hass.config.language, "config", [DOMAIN]
+                self.hass, self.hass.config.language, "common", [DOMAIN]
             )
             title = trans.get(
-                "notification.auth_error_title", NOTIFICATION_TITLE_AUTH_ERROR
+                "auth_error_notification_title", NOTIFICATION_TITLE_AUTH_ERROR
             )
         except Exception:
             title = NOTIFICATION_TITLE_AUTH_ERROR
