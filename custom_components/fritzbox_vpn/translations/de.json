@@ -44,7 +44,7 @@
   "common": {
     "auth_error_notification_title": "Fritz!Box VPN: Authentifizierungsfehler",
     "auth_error_notification_message": "Die Fritz!Box VPN Integration kann nicht auf die Fritz!Box zugreifen.\n\n**Host:** {host}\n\n**Fehler:** {error}\n\n**Mögliche Ursachen:**\n- Das Fritz!Box Passwort wurde geändert\n- Der Benutzername ist falsch\n- Die Fritz!Box ist nicht erreichbar\n\nBitte überprüfen Sie die Konfiguration der Integration und aktualisieren Sie die Zugangsdaten falls nötig.{config_link}",
-    "auth_error_notification_config_link": "\n\n**→ [Zur Konfiguration öffnen]({url})**\n\n*{hint}*",
+    "auth_error_notification_config_link": "**→ [Zur Konfiguration öffnen]({url})**\n\n*{hint}*",
     "auth_error_notification_config_hint": "Gehen Sie zu Einstellungen > Geräte & Dienste und suchen Sie nach \"{title}\""
   }
 }

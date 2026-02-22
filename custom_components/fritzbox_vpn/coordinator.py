@@ -428,7 +428,9 @@ class FritzBoxVPNCoordinator(DataUpdateCoordinator):
                 )
                 if link_tpl and hint_tpl:
                     hint = hint_tpl.format(title=INTEGRATION_TITLE)
-                    config_link = link_tpl.format(url=CONFIG_URL_INTEGRATIONS, hint=hint)
+                    config_link = "\n\n" + link_tpl.format(
+                        url=CONFIG_URL_INTEGRATIONS, hint=hint
+                    )
             msg_tpl = trans.get("auth_error_notification_message", "")
             if msg_tpl:
                 message = msg_tpl.format(
