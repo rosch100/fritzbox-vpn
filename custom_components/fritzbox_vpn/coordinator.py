@@ -202,8 +202,20 @@ class FritzBoxVPNSession:
                 )
                 raise ValueError("Invalid SID (HTML response)") from err
             if 'data' in data and 'init' in data['data'] and 'boxConnections' in data['data']['init']:
-                return data['data']['init']['boxConnections']
-            # Response missing expected structure (e.g. login page or session expired)
+                box = data['data']['init']['boxConnections']
+                # Normalize to dict keyed by stable uid (API may return list or dict).
+                if isinstance(box, list):
+                    return {
+                        str(c['uid']): c
+                        for c in box
+                        if isinstance(c, dict) and c.get('uid') is not None
+                    }
+                if isinstance(box, dict):
+                    return {
+                        str(c['uid']): c
+                        for c in box.values()
+                        if isinstance(c, dict) and c.get('uid') is not None
+                    }
             return {}
 
     async def async_get_vpn_connections(self) -> Dict[str, Any]:
@@ -407,26 +419,60 @@ class FritzBoxVPNCoordinator(DataUpdateCoordinator):
             title = trans.get(
                 "auth_error_notification_title", NOTIFICATION_TITLE_AUTH_ERROR
             )
+            config_link = ""
+            if self.entry_id:
+                link_tpl = trans.get("auth_error_notification_config_link", "")
+                hint_tpl = trans.get(
+                    "auth_error_notification_config_hint",
+                    f'Go to Settings > Devices & Services and search for "{INTEGRATION_TITLE}"',
+                )
+                if link_tpl and hint_tpl:
+                    hint = hint_tpl.format(title=INTEGRATION_TITLE)
+                    config_link = "\n\n" + link_tpl.format(
+                        url=CONFIG_URL_INTEGRATIONS, hint=hint
+                    )
+            msg_tpl = trans.get("auth_error_notification_message", "")
+            if msg_tpl:
+                message = msg_tpl.format(
+                    host=host, error=str(error), config_link=config_link
+                )
+            else:
+                config_link_fb = ""
+                if self.entry_id:
+                    config_link_fb = (
+                        f"\n\n**→ [Zur Konfiguration öffnen]({CONFIG_URL_INTEGRATIONS})**\n\n"
+                        f"*Gehen Sie zu Einstellungen > Geräte & Dienste und suchen Sie nach \"{INTEGRATION_TITLE}\"*"
+                    )
+                message = (
+                    f"Die {NAME_FRITZBOX} VPN Integration kann nicht auf die {NAME_FRITZBOX} zugreifen.\n\n"
+                    f"**Host:** {host}\n\n"
+                    f"**Fehler:** {str(error)}\n\n"
+                    f"**Mögliche Ursachen:**\n"
+                    f"- Das {NAME_FRITZBOX} Passwort wurde geändert\n"
+                    f"- Der Benutzername ist falsch\n"
+                    f"- Die {NAME_FRITZBOX} ist nicht erreichbar\n\n"
+                    f"Bitte überprüfen Sie die Konfiguration der Integration und aktualisieren Sie die Zugangsdaten falls nötig."
+                    f"{config_link_fb}"
+                )
         except Exception:
             title = NOTIFICATION_TITLE_AUTH_ERROR
-
-        config_link = ""
-        if self.entry_id:
-            config_link = (
-                f"\n\n**→ [Zur Konfiguration öffnen]({CONFIG_URL_INTEGRATIONS})**\n\n"
-                f"*Gehen Sie zu Einstellungen > Geräte & Dienste und suchen Sie nach \"{INTEGRATION_TITLE}\"*"
+            config_link = ""
+            if self.entry_id:
+                config_link = (
+                    f"\n\n**→ [Zur Konfiguration öffnen]({CONFIG_URL_INTEGRATIONS})**\n\n"
+                    f"*Gehen Sie zu Einstellungen > Geräte & Dienste und suchen Sie nach \"{INTEGRATION_TITLE}\"*"
+                )
+            message = (
+                f"Die {NAME_FRITZBOX} VPN Integration kann nicht auf die {NAME_FRITZBOX} zugreifen.\n\n"
+                f"**Host:** {host}\n\n"
+                f"**Fehler:** {str(error)}\n\n"
+                f"**Mögliche Ursachen:**\n"
+                f"- Das {NAME_FRITZBOX} Passwort wurde geändert\n"
+                f"- Der Benutzername ist falsch\n"
+                f"- Die {NAME_FRITZBOX} ist nicht erreichbar\n\n"
+                f"Bitte überprüfen Sie die Konfiguration der Integration und aktualisieren Sie die Zugangsdaten falls nötig."
+                f"{config_link}"
             )
-        message = (
-            f"Die {NAME_FRITZBOX} VPN Integration kann nicht auf die {NAME_FRITZBOX} zugreifen.\n\n"
-            f"**Host:** {host}\n\n"
-            f"**Fehler:** {str(error)}\n\n"
-            f"**Mögliche Ursachen:**\n"
-            f"- Das {NAME_FRITZBOX} Passwort wurde geändert\n"
-            f"- Der Benutzername ist falsch\n"
-            f"- Die {NAME_FRITZBOX} ist nicht erreichbar\n\n"
-            f"Bitte überprüfen Sie die Konfiguration der Integration und aktualisieren Sie die Zugangsdaten falls nötig."
-            f"{config_link}"
-        )
 
         persistent_notification.create(
             self.hass,

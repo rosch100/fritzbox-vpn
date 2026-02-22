@@ -453,7 +453,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
             
             # If password is empty, keep the existing password
             if not user_input.get(CONF_PASSWORD):
-                user_input[CONF_PASSWORD] = config_entry.data.get(CONF_PASSWORD, "")
+                user_input[CONF_PASSWORD] = (config_entry.data or {}).get(CONF_PASSWORD, "")
             
             # Validate the new configuration
             try:
@@ -544,7 +544,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
             return self.async_show_form(step_id="init", data_schema=vol.Schema({}), errors=errors)
         
         # Pre-fill with current values
-        current_data = config_entry.data
+        current_data = config_entry.data or {}
         current_options = config_entry.options or {}
         
         # Pre-fill password from current config if available
@@ -569,10 +569,11 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
         
         _LOGGER.debug("OptionsFlow: Using default_update_interval=%d for schema", default_update_interval)
         
+        # CONF_HOST as str to avoid 500 on options form load (validated on submit).
         schema = vol.Schema({
-            vol.Required(CONF_HOST, default=current_data.get(CONF_HOST, DEFAULT_HOST)): vol.All(str, validate_host),
-            vol.Required(CONF_USERNAME, default=current_data.get(CONF_USERNAME, "")): str,
-            vol.Required(CONF_PASSWORD, default=default_password): str,
+            vol.Required(CONF_HOST, default=current_data.get(CONF_HOST) or DEFAULT_HOST): str,
+            vol.Required(CONF_USERNAME, default=current_data.get(CONF_USERNAME) or ""): str,
+            vol.Required(CONF_PASSWORD, default=default_password or ""): str,
             vol.Required(CONF_UPDATE_INTERVAL, default=default_update_interval): vol.All(
                 vol.Coerce(int),
                 vol.Range(min=UPDATE_INTERVAL_MIN, max=UPDATE_INTERVAL_MAX)
