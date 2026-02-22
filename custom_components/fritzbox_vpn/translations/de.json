@@ -40,5 +40,8 @@
         }
       }
     }
+  },
+  "common": {
+    "auth_error_notification_title": "Fritz!Box VPN: Authentifizierungsfehler"
   }
 }

@@ -10,7 +10,14 @@ from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import DOMAIN, DATA_COORDINATOR, STATUS_UNKNOWN
+from .const import (
+    DOMAIN,
+    DATA_COORDINATOR,
+    STATUS_UNKNOWN,
+    MANUFACTURER_AVM,
+    MODEL_WIREGUARD_VPN,
+    DEFAULT_NAME_UNKNOWN,
+)
 from .coordinator import FritzBoxVPNCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -29,7 +36,7 @@ async def async_setup_entry(
     if coordinator.data:
         _LOGGER.info("Found %d VPN connections, creating switch entities", len(coordinator.data))
         for connection_uid, connection_data in coordinator.data.items():
-            vpn_name = connection_data.get('name', 'Unknown')
+            vpn_name = connection_data.get("name", DEFAULT_NAME_UNKNOWN)
             _LOGGER.debug("Creating switch for VPN: %s (UID: %s)", vpn_name, connection_uid)
             entities.append(
                 FritzBoxVPNSwitch(coordinator, entry, connection_uid, connection_data)
@@ -56,7 +63,7 @@ class FritzBoxVPNSwitch(CoordinatorEntity, SwitchEntity):
         self._entry = entry
         self._connection_uid = connection_uid
         self._connection_data = connection_data
-        vpn_name = connection_data.get('name', 'Unknown')
+        vpn_name = connection_data.get("name", DEFAULT_NAME_UNKNOWN)
         self._attr_unique_id = f"fritzbox_vpn_{connection_uid}_switch"
         self._attr_name = None  # Use device name
         self._attr_icon = "mdi:vpn"
@@ -64,8 +71,8 @@ class FritzBoxVPNSwitch(CoordinatorEntity, SwitchEntity):
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, entry.entry_id, connection_uid)},
             name=vpn_name,
-            manufacturer="AVM",
-            model="WireGuard VPN",
+            manufacturer=MANUFACTURER_AVM,
+            model=MODEL_WIREGUARD_VPN,
             via_device=(DOMAIN, entry.entry_id),
         )
 
@@ -101,7 +108,7 @@ class FritzBoxVPNSwitch(CoordinatorEntity, SwitchEntity):
 
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Turn on the VPN connection."""
-        vpn_name = self._connection_data.get("name", "Unknown")
+        vpn_name = self._connection_data.get("name", DEFAULT_NAME_UNKNOWN)
         _LOGGER.info("Turning on VPN connection: %s", vpn_name)
         success = await self.coordinator.toggle_vpn(self._connection_uid, True)
         if success:
@@ -118,7 +125,7 @@ class FritzBoxVPNSwitch(CoordinatorEntity, SwitchEntity):
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Turn off the VPN connection."""
-        vpn_name = self._connection_data.get("name", "Unknown")
+        vpn_name = self._connection_data.get("name", DEFAULT_NAME_UNKNOWN)
         _LOGGER.info("Turning off VPN connection: %s", vpn_name)
         success = await self.coordinator.toggle_vpn(self._connection_uid, False)
         if success:
