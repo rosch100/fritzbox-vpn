@@ -378,16 +378,12 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         
         if not has_igd:
             _LOGGER.debug("Device does not appear to be a router (no InternetGatewayDevice): %s", st)
-            if "fritz!box" in combined and not is_repeater:
+            if "fritz!box" in combined:
                 _LOGGER.debug("Accepting as FritzBox router (no IGD but FRITZ!Box): %s", server)
                 return True
             _LOGGER.debug("Rejecting: No IGD and not clearly a router")
             return False
-        
-        if is_repeater:
-            _LOGGER.debug("Rejecting FritzBox Repeater device (final check): %s", server)
-            return False
-        
+
         _LOGGER.debug("Accepting FritzBox router device: %s", server)
         return True
 
