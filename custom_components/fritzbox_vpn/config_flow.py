@@ -543,7 +543,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
             errors["base"] = ERROR_KEY_CONFIG_ENTRY_NOT_FOUND
             return self.async_show_form(step_id="init", data_schema=vol.Schema({}), errors=errors)
         
-        # Pre-fill with current values (guard against None for old/corrupted entries)
+        # Pre-fill with current values
         current_data = config_entry.data or {}
         current_options = config_entry.options or {}
         
@@ -569,9 +569,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
         
         _LOGGER.debug("OptionsFlow: Using default_update_interval=%d for schema", default_update_interval)
         
-        # Use plain str for CONF_HOST: voluptuous_serialize cannot convert custom
-        # validators (validate_host), which would cause 500 when loading the form.
-        # Validation runs on submit via validate_input().
+        # CONF_HOST as str to avoid 500 on options form load (validated on submit).
         schema = vol.Schema({
             vol.Required(CONF_HOST, default=current_data.get(CONF_HOST) or DEFAULT_HOST): str,
             vol.Required(CONF_USERNAME, default=current_data.get(CONF_USERNAME) or ""): str,

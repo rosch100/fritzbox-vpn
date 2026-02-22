@@ -202,8 +202,20 @@ class FritzBoxVPNSession:
                 )
                 raise ValueError("Invalid SID (HTML response)") from err
             if 'data' in data and 'init' in data['data'] and 'boxConnections' in data['data']['init']:
-                return data['data']['init']['boxConnections']
-            # Response missing expected structure (e.g. login page or session expired)
+                box = data['data']['init']['boxConnections']
+                # Normalize to dict keyed by stable uid (API may return list or dict).
+                if isinstance(box, list):
+                    return {
+                        str(c['uid']): c
+                        for c in box
+                        if isinstance(c, dict) and c.get('uid') is not None
+                    }
+                if isinstance(box, dict):
+                    return {
+                        str(c['uid']): c
+                        for c in box.values()
+                        if isinstance(c, dict) and c.get('uid') is not None
+                    }
             return {}
 
     async def async_get_vpn_connections(self) -> Dict[str, Any]:
