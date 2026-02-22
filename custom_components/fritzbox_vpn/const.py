@@ -31,6 +31,7 @@ MODEL_FRITZBOX = "Fritz!Box"
 MODEL_WIREGUARD_VPN = "WireGuard VPN"
 DEFAULT_NAME_UNKNOWN = "Unknown"
 INTEGRATION_TITLE = "Fritz!Box VPN"
+# Fallback when translation is unavailable; normal title comes from config.notification.auth_error_title
 NOTIFICATION_TITLE_AUTH_ERROR = "Fritz!Box VPN: Authentifizierungsfehler"
 
 # Config flow error keys (must match translation keys in en.json / de.json)
@@ -69,7 +70,7 @@ FRITZBOX_SSDP_INDICATORS = (
 # Domains to check for existing Fritz/AVM integration
 FRITZ_INTEGRATION_DOMAINS = ("fritz", "fritzbox_tools", "fritzbox", "fritzbox_tools_plus")
 
-SENSITIVE_CONFIG_KEYS = ("password", "pass")
+SENSITIVE_CONFIG_KEYS = ("password", "pass", "username", "user")
 
 # Repeater detection (used in SSDP and config entry filtering; repeaters have no WireGuard)
 REPEATER_INDICATORS = (

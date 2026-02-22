@@ -14,6 +14,7 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 from homeassistant.const import CONF_HOST, CONF_USERNAME, CONF_PASSWORD
 from homeassistant.components import persistent_notification
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.helpers.translation import async_get_translations
 
 from .const import (
     DOMAIN,
@@ -392,16 +393,23 @@ class FritzBoxVPNCoordinator(DataUpdateCoordinator):
         """Check if an error is an authentication error."""
         return any(ind in str(error).lower() for ind in AUTH_INDICATORS)
 
-    def _create_auth_error_notification(self, error: Exception) -> None:
+    async def _create_auth_error_notification(self, error: Exception) -> None:
         """Create a persistent notification for authentication errors."""
         if self._auth_error_notified:
-            # Already notified, don't create duplicate
             return
 
         host = self.config.get(CONF_HOST, HOST_FALLBACK_UNKNOWN)
         notification_id = auth_error_notification_id(host)
+        try:
+            trans = await async_get_translations(
+                self.hass, self.hass.config.language, "config", [DOMAIN]
+            )
+            title = trans.get(
+                "notification.auth_error_title", NOTIFICATION_TITLE_AUTH_ERROR
+            )
+        except Exception:
+            title = NOTIFICATION_TITLE_AUTH_ERROR
 
-        # Create link to integrations page - user can find the integration there
         config_link = ""
         if self.entry_id:
             config_link = (
@@ -423,7 +431,7 @@ class FritzBoxVPNCoordinator(DataUpdateCoordinator):
         persistent_notification.create(
             self.hass,
             message,
-            title=NOTIFICATION_TITLE_AUTH_ERROR,
+            title=title,
             notification_id=notification_id,
         )
         
@@ -447,7 +455,7 @@ class FritzBoxVPNCoordinator(DataUpdateCoordinator):
             return connections
         except (ConnectionError, ValueError) as err:
             if self._is_auth_error(err):
-                self._create_auth_error_notification(err)
+                await self._create_auth_error_notification(err)
                 raise UpdateFailed(f"Error fetching VPN data: {err}") from err
             # Transient error: backoff to avoid reconnect storm (next try in RETRY_AFTER_SECONDS)
             raise UpdateFailed(
@@ -461,7 +469,7 @@ class FritzBoxVPNCoordinator(DataUpdateCoordinator):
             ) from err
         except Exception as err:
             if self._is_auth_error(err):
-                self._create_auth_error_notification(err)
+                await self._create_auth_error_notification(err)
                 raise UpdateFailed(f"Unexpected error fetching VPN data: {err}") from err
             _LOGGER.exception("Unexpected error fetching VPN data")
             raise UpdateFailed(
@@ -474,12 +482,10 @@ class FritzBoxVPNCoordinator(DataUpdateCoordinator):
         try:
             return await self.fritz_session.async_toggle_vpn(connection_uid, enable)
         except (ConnectionError, ValueError) as err:
-            # Check if this is an authentication error
             if self._is_auth_error(err):
-                self._create_auth_error_notification(err)
+                await self._create_auth_error_notification(err)
             raise
         except Exception as err:
-            # Check if this is an authentication error (might be wrapped)
             if self._is_auth_error(err):
-                self._create_auth_error_notification(err)
+                await self._create_auth_error_notification(err)
             raise

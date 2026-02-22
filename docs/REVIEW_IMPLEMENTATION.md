@@ -91,9 +91,9 @@ Stand nach sechster Prüfung: SSOT für SSDP-Indikatoren (FRITZBOX_SSDP_INDICATO
 | Error-Keys (Config Flow) | **Eine** Quelle `ERROR_KEY_UNKNOWN`, `ERROR_KEY_CANNOT_CONNECT`, `ERROR_KEY_INVALID_AUTH`, `ERROR_KEY_CONFIG_ENTRY_NOT_FOUND`; keine String-Literale mehr für Fehlerschlüssel. |
 | Host-Fallback / Parent-Device | **Eine** Quelle `HOST_FALLBACK_UNKNOWN`, `NAME_FRITZBOX`, `MODEL_FRITZBOX`; __init__ und coordinator nutzen sie. |
 | Entry-Titel / Notification-Titel | **Eine** Quelle `INTEGRATION_TITLE`, `NOTIFICATION_TITLE_AUTH_ERROR`; config_flow und coordinator nutzen sie; Auth-Message nutzt `NAME_FRITZBOX`. |
-| _is_auth_error | Redundante isinstance-Checks (ValueError/ConnectionError), obwohl AUTH_INDICATORS bereits „invalid sid“/„login failed“ enthält | **Eine** Prüfung: `any(ind in str(error).lower() for ind in AUTH_INDICATORS)`. |
+| _is_auth_error | Redundante isinstance-Checks (ValueError/ConnectionError), obwohl AUTH_INDICATORS bereits „invalid sid“/„login failed“ enthält \| **Eine** Prüfung: `any(ind in str(error).lower() for ind in AUTH_INDICATORS)`. |
 | Schema-Bau (Host/User/Pass) | Weiterhin mehrfach ähnliche Schemata; Kontext (Defaults, Optionen) unterschiedlich – akzeptabel. |
-| Log-Maskierung (Config/Options) | Dict-Comprehension `{k: v if k not in ['password','pass'] else '***'}` mehrfach in config_flow | **Eine** Funktion: `mask_config_for_log(data)` in `const.py`; alle Debug-Logs nutzen sie. |
+| Log-Maskierung (Config/Options) | Dict-Comprehension `{k: v if k not in ['password','pass'] else '***'}` mehrfach in config_flow \| **Eine** Funktion: `mask_config_for_log(data)` in `const.py`; alle Debug-Logs nutzen sie. |
 
 **Ergebnis:** Weniger Duplikation bei Fehlermapping, Repeater/Auth, Notification-ID, Default-Host, Geräte-Labels, Error-Keys, Host-Fallback, Entry-/Notification-Titel, Log-Maskierung; _is_auth_error ohne Redundanz; CRAP verbessert.
 

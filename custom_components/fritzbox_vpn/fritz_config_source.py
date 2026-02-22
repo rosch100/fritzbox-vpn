@@ -160,6 +160,7 @@ async def get_existing_fritz_config(hass: HomeAssistant) -> Optional[Dict[str, A
                 or config_data.get("user")
                 or options_data.get(CONF_USERNAME)
                 or options_data.get("username")
+                or options_data.get("user")
             )
             password = (
                 config_data.get(CONF_PASSWORD)
@@ -177,7 +178,7 @@ async def get_existing_fritz_config(hass: HomeAssistant) -> Optional[Dict[str, A
             if host:
                 _LOGGER.debug(
                     "Using config from existing FritzBox Tools '%s': host=%s, username=%s, password=%s",
-                    domain, host, username if username else "not found", "***" if password else "not found",
+                    domain, host, "***" if username else "not found", "***" if password else "not found",
                 )
                 return {
                     CONF_HOST: host,
