@@ -569,8 +569,11 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
         
         _LOGGER.debug("OptionsFlow: Using default_update_interval=%d for schema", default_update_interval)
         
+        # Use plain str for CONF_HOST: voluptuous_serialize cannot convert custom
+        # validators (validate_host), which would cause 500 when loading the form.
+        # Validation runs on submit via validate_input().
         schema = vol.Schema({
-            vol.Required(CONF_HOST, default=current_data.get(CONF_HOST) or DEFAULT_HOST): vol.All(str, validate_host),
+            vol.Required(CONF_HOST, default=current_data.get(CONF_HOST) or DEFAULT_HOST): str,
             vol.Required(CONF_USERNAME, default=current_data.get(CONF_USERNAME) or ""): str,
             vol.Required(CONF_PASSWORD, default=default_password or ""): str,
             vol.Required(CONF_UPDATE_INTERVAL, default=default_update_interval): vol.All(
