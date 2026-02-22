@@ -19,13 +19,35 @@ from homeassistant.helpers.service_info.ssdp import SsdpServiceInfo
 from .const import (
     DOMAIN,
     CONF_UPDATE_INTERVAL,
+    DEFAULT_HOST,
     DEFAULT_UPDATE_INTERVAL,
+    INTEGRATION_TITLE,
     UPDATE_INTERVAL_MIN,
     UPDATE_INTERVAL_MAX,
+    REPEATER_INDICATORS,
+    FRITZBOX_SSDP_INDICATORS,
+    ERROR_INDICATOR_AUTH,
+    ERROR_INDICATOR_CONNECT,
+    ERROR_KEY_UNKNOWN,
+    ERROR_KEY_CANNOT_CONNECT,
+    ERROR_KEY_INVALID_AUTH,
+    ERROR_KEY_CONFIG_ENTRY_NOT_FOUND,
+    mask_config_for_log,
 )
 from .coordinator import FritzBoxVPNSession
+from .fritz_config_source import get_existing_fritz_config
 
 _LOGGER = logging.getLogger(__name__)
+
+
+def _validation_error_to_error_key(error_msg: str) -> str:
+    """Map validation exception message to config flow error key."""
+    msg_lower = error_msg.lower()
+    if any(ind in msg_lower for ind in ERROR_INDICATOR_AUTH):
+        return ERROR_KEY_INVALID_AUTH
+    if any(ind in msg_lower for ind in ERROR_INDICATOR_CONNECT):
+        return ERROR_KEY_CANNOT_CONNECT
+    return ERROR_KEY_UNKNOWN
 
 
 def validate_host(host: str) -> str:
@@ -57,7 +79,7 @@ def validate_host(host: str) -> str:
 
 STEP_USER_DATA_SCHEMA = vol.Schema(
     {
-        vol.Required(CONF_HOST, default="192.168.178.1"): vol.All(str, validate_host),
+        vol.Required(CONF_HOST, default=DEFAULT_HOST): vol.All(str, validate_host),
         vol.Required(CONF_USERNAME): str,
         vol.Required(CONF_PASSWORD): str,
     }
@@ -83,10 +105,10 @@ async def validate_input(hass: HomeAssistant, data: Dict[str, Any]) -> Dict[str,
         await session.async_get_session()
         await session.async_close()
 
-        return {"title": f"Fritz!Box VPN ({data[CONF_HOST]})"}
+        return {"title": f"{INTEGRATION_TITLE} ({data[CONF_HOST]})"}
     except Exception as err:
         error_msg = str(err)
-        if "Login failed" in error_msg or "Invalid SID" in error_msg:
+        if any(ind in error_msg.lower() for ind in ERROR_INDICATOR_AUTH):
             _LOGGER.warning(
                 "Authentication failed. Invalid SID can be caused by: (1) Incorrect username or password, or "
                 "(2) TR-064 not being enabled. Please check credentials first, then verify TR-064 is enabled "
@@ -96,7 +118,7 @@ async def validate_input(hass: HomeAssistant, data: Dict[str, Any]) -> Dict[str,
             )
             raise InvalidAuth from err
         _LOGGER.exception("Error validating input: %s", err)
-        if "Failed to get login page" in str(err):
+        if any(ind in error_msg.lower() for ind in ERROR_INDICATOR_CONNECT):
             raise CannotConnect from err
         raise CannotConnect from err
 
@@ -123,7 +145,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         # SSDP is only used as fallback if no existing integration is found
         if not user_input:
             _LOGGER.debug("No user_input provided, attempting autoconfiguration...")
-            self._existing_config = await self._get_existing_fritz_config()
+            self._existing_config = await get_existing_fritz_config(self.hass)
             _LOGGER.debug("Autoconfiguration result: %s", "found config" if self._existing_config else "no config found")
             if self._existing_config:
                 _LOGGER.debug("Found existing FritzBox Tools, using its configuration (SSDP will be skipped)")
@@ -150,20 +172,20 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         
                         return self.async_create_entry(title=info["title"], data=self._existing_config)
                     except CannotConnect:
-                        _LOGGER.warning("Autoconfiguration connection test failed: cannot_connect")
-                        errors["base"] = "cannot_connect"
+                        _LOGGER.warning("Autoconfiguration connection test failed: %s", ERROR_KEY_CANNOT_CONNECT)
+                        errors["base"] = ERROR_KEY_CANNOT_CONNECT
                     except InvalidAuth:
-                        _LOGGER.warning("Autoconfiguration connection test failed: invalid_auth")
-                        errors["base"] = "invalid_auth"
+                        _LOGGER.warning("Autoconfiguration connection test failed: %s", ERROR_KEY_INVALID_AUTH)
+                        errors["base"] = ERROR_KEY_INVALID_AUTH
                     except Exception as err:
                         _LOGGER.warning("Autoconfiguration connection test failed: %s", err)
-                        errors["base"] = "unknown"
+                        errors["base"] = ERROR_KEY_UNKNOWN
                     # If validation failed, fall through to show form with pre-filled values
                 
                 # Pre-fill with existing config (either incomplete or validation failed)
                 default_password = self._existing_config.get(CONF_PASSWORD, "") if self._existing_config.get(CONF_PASSWORD) else ""
                 schema = vol.Schema({
-                    vol.Required(CONF_HOST, default=self._existing_config.get(CONF_HOST, "192.168.178.1")): vol.All(str, validate_host),
+                    vol.Required(CONF_HOST, default=self._existing_config.get(CONF_HOST, DEFAULT_HOST)): vol.All(str, validate_host),
                     vol.Required(CONF_USERNAME, default=self._existing_config.get(CONF_USERNAME, "")): str,
                     vol.Required(CONF_PASSWORD, default=default_password): str,
                 })
@@ -182,20 +204,14 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             try:
                 info = await validate_input(self.hass, user_input)
             except CannotConnect:
-                errors["base"] = "cannot_connect"
+                errors["base"] = ERROR_KEY_CANNOT_CONNECT
             except InvalidAuth:
-                errors["base"] = "invalid_auth"
+                errors["base"] = ERROR_KEY_INVALID_AUTH
             except Exception as err:
                 error_msg = str(err)
                 _LOGGER.exception("Unexpected exception during validation: %s", error_msg)
-                # Try to extract more specific error information
-                if "Login failed" in error_msg or "Invalid SID" in error_msg:
-                    errors["base"] = "invalid_auth"
-                elif "Failed to get login page" in error_msg or "Connection" in error_msg:
-                    errors["base"] = "cannot_connect"
-                else:
-                    # For unknown errors, log the full error but still show a user-friendly message
-                    errors["base"] = "unknown"
+                errors["base"] = _validation_error_to_error_key(error_msg)
+                if errors["base"] == ERROR_KEY_UNKNOWN:
                     _LOGGER.error("Unknown error details: %s", error_msg)
             else:
                 # Set unique_id to prevent duplicate entries
@@ -215,7 +231,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         
         # First check if we already have an existing FritzBox integration
         # SSDP is only used as fallback
-        existing_config = await self._get_existing_fritz_config()
+        existing_config = await get_existing_fritz_config(self.hass)
         if existing_config:
             _LOGGER.debug("Existing FritzBox Tools found, aborting SSDP discovery")
             return self.async_abort(reason="already_configured")
@@ -253,7 +269,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         
         # Try to get config from existing FritzBox integration (should be None at this point)
         # But check again in case it was added between the first check and now
-        self._existing_config = await self._get_existing_fritz_config()
+        self._existing_config = await get_existing_fritz_config(self.hass)
         if self._existing_config:
             _LOGGER.debug("Existing FritzBox Tools found during SSDP, using its config instead of discovered host")
         
@@ -269,13 +285,13 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             # Pre-fill with existing config if available (has priority over discovered host)
             # This ensures we use the router IP from existing integration, not the repeater
             if self._existing_config:
-                default_host = self._existing_config.get(CONF_HOST, self._discovered_host or "192.168.178.1")
+                default_host = self._existing_config.get(CONF_HOST, self._discovered_host or DEFAULT_HOST)
                 default_username = self._existing_config.get(CONF_USERNAME, "")
                 default_password = self._existing_config.get(CONF_PASSWORD, "") if self._existing_config.get(CONF_PASSWORD) else ""
                 _LOGGER.debug("Using existing config for confirm step: host=%s, username=%s, password=%s",
                              default_host, default_username, "***" if default_password else "not set")
             else:
-                default_host = self._discovered_host or "192.168.178.1"
+                default_host = self._discovered_host or DEFAULT_HOST
                 default_username = ""
                 default_password = ""
             
@@ -297,12 +313,12 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         try:
             info = await validate_input(self.hass, user_input)
         except CannotConnect:
-            errors["base"] = "cannot_connect"
+            errors["base"] = ERROR_KEY_CANNOT_CONNECT
         except InvalidAuth:
-            errors["base"] = "invalid_auth"
-        except Exception:
+            errors["base"] = ERROR_KEY_INVALID_AUTH
+        except Exception as err:
             _LOGGER.exception("Unexpected exception")
-            errors["base"] = "unknown"
+            errors["base"] = _validation_error_to_error_key(str(err))
         else:
             # Set unique_id to prevent duplicate entries
             host = user_input.get(CONF_HOST)
@@ -321,7 +337,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         return self.async_show_form(
             step_id="confirm",
             data_schema=vol.Schema({
-                vol.Required(CONF_HOST, default=user_input.get(CONF_HOST, self._discovered_host or "192.168.178.1")): vol.All(str, validate_host),
+                vol.Required(CONF_HOST, default=user_input.get(CONF_HOST, self._discovered_host or DEFAULT_HOST)): vol.All(str, validate_host),
                 vol.Required(CONF_USERNAME, default=user_input.get(CONF_USERNAME, "")): str,
                 vol.Required(CONF_PASSWORD, default=default_password): str,
             }),
@@ -342,62 +358,33 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         server = discovery_info.ssdp_server or ""
         location = discovery_info.ssdp_location or ""
         
-        # FritzBox devices typically have these identifiers
-        fritzbox_indicators = [
-            "fritz.box",
-            "fritzbox",
-            "fritz!box",
-            "avm",
-            "FRITZ!Box",
-            "FRITZ",
-        ]
-        
-        # Check in all SSDP fields
         combined = f"{st} {usn} {server} {location}".lower()
-        
-        # Also check in headers if available
         if hasattr(discovery_info, "ssdp_headers") and discovery_info.ssdp_headers:
             headers_str = " ".join(str(v) for v in discovery_info.ssdp_headers.values()).lower()
             combined += f" {headers_str}"
-        
-        # First check if it's a FritzBox device
-        is_fritzbox = any(indicator.lower() in combined for indicator in fritzbox_indicators)
+        is_fritzbox = any(ind in combined for ind in FRITZBOX_SSDP_INDICATORS)
         
         if not is_fritzbox:
             _LOGGER.debug("Device is not a FritzBox")
             return False
         
-        # IMPORTANT: Reject repeaters - only accept routers
-        # Repeaters typically have "Repeater" or "WLAN Repeater" in the server string
-        # Also check for "fritz!wlan repeater" or similar patterns
-        repeater_indicators = [
-            "repeater",
-            "wlan repeater",
-            "fritz!wlan repeater",
-            "fritz!wlanrepeater",
-        ]
-        
-        # Check for repeater indicators (case-insensitive)
-        combined_lower = combined.lower()
-        if any(indicator.lower() in combined_lower for indicator in repeater_indicators):
+        is_repeater = any(ind in combined for ind in REPEATER_INDICATORS)
+        if is_repeater:
             _LOGGER.debug("Rejecting FritzBox Repeater device (only routers accepted): %s", server)
             return False
         
         # Additional check: Only accept InternetGatewayDevice (routers)
-        # Repeaters might use different device types
-        has_igd = "internetgatewaydevice" in combined_lower or "igd" in combined_lower
+        has_igd = "internetgatewaydevice" in combined or "igd" in combined
         
         if not has_igd:
             _LOGGER.debug("Device does not appear to be a router (no InternetGatewayDevice): %s", st)
-            # Still accept if it's clearly a FritzBox router (has FRITZ!Box in server, no repeater)
-            if "fritz!box" in combined_lower and not any(ind.lower() in combined_lower for ind in repeater_indicators):
+            if "fritz!box" in combined and not is_repeater:
                 _LOGGER.debug("Accepting as FritzBox router (no IGD but FRITZ!Box): %s", server)
                 return True
             _LOGGER.debug("Rejecting: No IGD and not clearly a router")
             return False
         
-        # Final check: Make absolutely sure it's not a repeater
-        if any(indicator.lower() in combined_lower for indicator in repeater_indicators):
+        if is_repeater:
             _LOGGER.debug("Rejecting FritzBox Repeater device (final check): %s", server)
             return False
         
@@ -438,238 +425,6 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         _LOGGER.warning("Could not extract host from SSDP discovery info")
         return None
 
-    async def _get_existing_fritz_config(self) -> Optional[Dict[str, Any]]:
-        """Get configuration from existing FritzBox integration if available.
-        
-        Checks for:
-        - Official FritzBox integration (domain: "fritz")
-        - FritzBox Tools integration (domain: "fritzbox_tools" or "fritzbox")
-        
-        Based on Home Assistant core integration patterns:
-        https://github.com/home-assistant/core/tree/dev/homeassistant/components/fritz
-        """
-        # First, let's check ALL available domains to see what's actually installed
-        _LOGGER.debug("Checking for existing FritzBox Tools...")
-        all_domains = set()
-        fritz_related_entries = []
-        for entry in self.hass.config_entries.async_entries():
-            all_domains.add(entry.domain)
-            # Log all FritzBox-related domains
-            if "fritz" in entry.domain.lower() or "avm" in entry.domain.lower():
-                fritz_related_entries.append(entry)
-                _LOGGER.debug("Found potential FritzBox integration: domain='%s', title='%s', entry_id='%s', state='%s'",
-                             entry.domain, entry.title, entry.entry_id, entry.state)
-        
-        _LOGGER.debug("All available domains: %s", sorted(all_domains))
-        _LOGGER.debug("Found %d FritzBox-related entries across all domains", len(fritz_related_entries))
-        
-        # If we already found FritzBox-related entries, prioritize checking those domains first
-        # This avoids checking domains that don't have any entries
-        found_domains = set(entry.domain for entry in fritz_related_entries)
-        
-        # Possible domain names for FritzBox integrations (order matters - check most common first)
-        # Official integration uses "fritz", FritzBox Tools uses "fritzbox_tools"
-        possible_domains = ["fritz", "fritzbox_tools", "fritzbox", "fritzbox_tools_plus"]
-        
-        # Reorder: check domains that have entries first
-        prioritized_domains = [d for d in possible_domains if d in found_domains]
-        prioritized_domains.extend([d for d in possible_domains if d not in found_domains])
-        
-        _LOGGER.debug("Checking domains in order: %s (found entries in: %s)", prioritized_domains, list(found_domains))
-        
-        for domain in prioritized_domains:
-            try:
-                # Check for existing FritzBox integration
-                # Get all entries first to see what we have
-                all_entries = list(self.hass.config_entries.async_entries(domain))
-                _LOGGER.debug("Domain '%s': Found %d total entries", domain, len(all_entries))
-                
-                # Log all entries with their states
-                for entry in all_entries:
-                    _LOGGER.debug("  Entry '%s' (entry_id: %s) has state: %s", entry.title, entry.entry_id, entry.state)
-                
-                # Check for existing FritzBox integration
-                # Accept all states except FAILED_UNLOAD and SETUP_IN_PROGRESS
-                # Note: We accept NOT_LOADED and SETUP_ERROR states as they may still have valid config
-                excluded_states = (
-                    config_entries.ConfigEntryState.FAILED_UNLOAD,
-                    config_entries.ConfigEntryState.SETUP_IN_PROGRESS,
-                )
-                fritz_entries = [
-                    entry
-                    for entry in all_entries
-                    if entry.state not in excluded_states
-                ]
-                
-                _LOGGER.debug("Domain '%s': Found %d entries after filtering by state (excluded states: %s)",
-                             domain, len(fritz_entries), [s.name for s in excluded_states])
-                if len(fritz_entries) < len(all_entries):
-                    excluded_entries = [e for e in all_entries if e.state in excluded_states]
-                    _LOGGER.debug("Domain '%s': Excluded %d entries due to state: %s",
-                                 domain, len(excluded_entries),
-                                 [(e.title, e.state.name) for e in excluded_entries])
-                
-                if fritz_entries:
-                    # Filter out repeaters - only use router entries
-                    # Repeaters typically have "Repeater" in the title
-                    router_entries = [
-                        entry
-                        for entry in fritz_entries
-                        if "repeater" not in entry.title.lower()
-                    ]
-                    
-                    # If we have router entries, use those; otherwise fall back to all entries
-                    entries_to_use = router_entries if router_entries else fritz_entries
-                    
-                    if router_entries:
-                        _LOGGER.debug("Domain '%s': Filtered out %d repeater(s), using %d router entry/entries",
-                                     domain, len(fritz_entries) - len(router_entries), len(router_entries))
-                    else:
-                        _LOGGER.debug("Domain '%s': No router entries found, using first entry (might be a repeater)", domain)
-                    
-                    # Prefer entries that have credentials (username/password) in addition to host
-                    # This ensures we get a fully configured entry, not just one with an IP
-                    entries_with_creds = []
-                    for entry in entries_to_use:
-                        config_data = entry.data or {}
-                        options_data = entry.options or {}
-                        
-                        _LOGGER.debug("Checking entry '%s' (entry_id: %s) for credentials", entry.title, entry.entry_id)
-                        _LOGGER.debug("  Config data keys: %s", list(config_data.keys()))
-                        _LOGGER.debug("  Options data keys: %s", list(options_data.keys()))
-                        
-                        # Check if entry has username or password
-                        # Try all possible key names
-                        # Note: Home Assistant stores credentials directly in entry.data
-                        # Based on actual config entries, credentials are stored as:
-                        # {"host": "...", "username": "...", "password": "...", "port": ...}
-                        has_username = bool(
-                            config_data.get(CONF_USERNAME) or 
-                            config_data.get("username") or 
-                            config_data.get("user") or
-                            options_data.get(CONF_USERNAME) or 
-                            options_data.get("username") or
-                            options_data.get("user")
-                        )
-                        has_password = bool(
-                            config_data.get(CONF_PASSWORD) or 
-                            config_data.get("password") or 
-                            config_data.get("pass") or
-                            options_data.get(CONF_PASSWORD) or 
-                            options_data.get("password") or
-                            options_data.get("pass")
-                        )
-                        
-                        _LOGGER.debug("  Has username: %s, Has password: %s", has_username, has_password)
-                        if not has_username and not has_password:
-                            _LOGGER.debug("  Entry '%s' has no credentials (config keys: %s, options keys: %s)", 
-                                        entry.title, list(config_data.keys()), list(options_data.keys()))
-                        
-                        if has_username or has_password:
-                            entries_with_creds.append(entry)
-                            _LOGGER.debug("  Entry '%s' has credentials (username: %s, password: %s)",
-                                         entry.title, has_username, has_password)
-                    
-                    # Use entry with credentials if available, otherwise use first router entry
-                    if entries_with_creds:
-                        entry = entries_with_creds[0]
-                        _LOGGER.debug("Domain '%s': Found %d entry/entries with credentials, using first one", domain, len(entries_with_creds))
-                    else:
-                        entry = entries_to_use[0]
-                        _LOGGER.debug("Domain '%s': No entries with credentials found, using first router entry", domain)
-                    
-                    _LOGGER.debug("Found existing FritzBox Tools '%s' with entry_id: %s", domain, entry.entry_id)
-                    _LOGGER.debug("Entry title: %s", entry.title)
-                    _LOGGER.debug("Entry source: %s", getattr(entry, 'source', 'unknown'))
-                    _LOGGER.debug("Entry unique_id: %s", getattr(entry, 'unique_id', 'unknown'))
-                    
-                    # Try to get config from data first
-                    # Home Assistant stores config in entry.data, options in entry.options
-                    config_data = entry.data or {}
-                    _LOGGER.debug("Config data keys: %s", list(config_data.keys()))
-                    _LOGGER.debug("Config data (masked): %s", {k: v if k not in ['password', 'pass'] else '***' for k, v in config_data.items()})
-                    
-                    # Also check options
-                    options_data = entry.options or {}
-                    _LOGGER.debug("Options data keys: %s", list(options_data.keys()))
-                    if options_data:
-                        _LOGGER.debug("Options data (masked): %s", {k: v if k not in ['password', 'pass'] else '***' for k, v in options_data.items()})
-                    
-                    # Extract relevant config - try different possible key names
-                    # Official integration uses: host, username, password
-                    # FritzBox Tools might use different keys
-                    host = (
-                        config_data.get(CONF_HOST) 
-                        or config_data.get("host")
-                        or (config_data.get("hosts", [None])[0] if isinstance(config_data.get("hosts"), list) and config_data.get("hosts") else None)
-                        or config_data.get("hostname")
-                        or config_data.get("ip_address")
-                        or options_data.get(CONF_HOST)
-                        or options_data.get("host")
-                    )
-                    
-                    username = (
-                        config_data.get(CONF_USERNAME)
-                        or config_data.get("username")
-                        or config_data.get("user")
-                        or options_data.get(CONF_USERNAME)
-                        or options_data.get("username")
-                    )
-                    
-                    password = (
-                        config_data.get(CONF_PASSWORD)
-                        or config_data.get("password")
-                        or config_data.get("pass")
-                        or options_data.get(CONF_PASSWORD)
-                        or options_data.get("password")
-                    )
-                    
-                    # For FritzBox Tools, credentials might be in a nested structure
-                    # Check if there's a "data" key with nested config
-                    if not host and "data" in config_data:
-                        nested_data = config_data.get("data", {})
-                        host = host or nested_data.get("host") or nested_data.get(CONF_HOST)
-                        username = username or nested_data.get("username") or nested_data.get(CONF_USERNAME)
-                        password = password or nested_data.get("password") or nested_data.get(CONF_PASSWORD)
-                    
-                    if host:
-                        _LOGGER.debug(
-                            "Using config from existing FritzBox Tools '%s': host=%s, username=%s, password=%s",
-                            domain,
-                            host,
-                            username if username else "not found",
-                            "***" if password else "not found"
-                        )
-                        return {
-                            CONF_HOST: host,
-                            CONF_USERNAME: username or "",
-                            CONF_PASSWORD: password or "",
-                        }
-                    else:
-                        _LOGGER.warning(
-                            "✗ Found FritzBox integration '%s' but could not extract host. "
-                            "Config keys: %s, Options keys: %s",
-                            domain, list(config_data.keys()), list(options_data.keys())
-                        )
-                        # Log full config for debugging (password masked) - only in debug mode
-                        _LOGGER.debug("Full config_data: %s", {k: v if k not in ['password', 'pass'] else '***' for k, v in config_data.items()})
-                        if options_data:
-                            _LOGGER.debug("Full options_data: %s", {k: v if k not in ['password', 'pass'] else '***' for k, v in options_data.items()})
-                        
-            except KeyError:
-                # Domain doesn't exist, try next one
-                _LOGGER.debug("Domain '%s' not found (KeyError), trying next", domain)
-                continue
-            except Exception as err:
-                _LOGGER.warning("Error checking domain '%s': %s", domain, err)
-                _LOGGER.exception("Full exception details:")
-                continue
-        
-        _LOGGER.warning("No existing FritzBox Tools found with usable configuration")
-        _LOGGER.debug("Searched domains: %s", possible_domains)
-        _LOGGER.debug("Available domains in system: %s", sorted(all_domains))
-        return None
-
     @staticmethod
     @callback
     def async_get_options_flow(
@@ -697,7 +452,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
             # Get the current config entry to access its data
             config_entry = self.hass.config_entries.async_get_entry(self._config_entry.entry_id)
             if not config_entry:
-                errors["base"] = "config_entry_not_found"
+                errors["base"] = ERROR_KEY_CONFIG_ENTRY_NOT_FOUND
                 return self.async_show_form(step_id="init", data_schema=vol.Schema({}), errors=errors)
             
             # If password is empty, keep the existing password
@@ -708,20 +463,14 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
             try:
                 info = await validate_input(self.hass, user_input)
             except CannotConnect:
-                errors["base"] = "cannot_connect"
+                errors["base"] = ERROR_KEY_CANNOT_CONNECT
             except InvalidAuth:
-                errors["base"] = "invalid_auth"
+                errors["base"] = ERROR_KEY_INVALID_AUTH
             except Exception as err:
                 error_msg = str(err)
                 _LOGGER.exception("Unexpected exception during validation: %s", error_msg)
-                # Try to extract more specific error information
-                if "Login failed" in error_msg or "Invalid SID" in error_msg:
-                    errors["base"] = "invalid_auth"
-                elif "Failed to get login page" in error_msg or "Connection" in error_msg:
-                    errors["base"] = "cannot_connect"
-                else:
-                    # For unknown errors, log the full error but still show a user-friendly message
-                    errors["base"] = "unknown"
+                errors["base"] = _validation_error_to_error_key(error_msg)
+                if errors["base"] == ERROR_KEY_UNKNOWN:
                     _LOGGER.error("Unknown error details: %s", error_msg)
             else:
                 # Separate core config (data) from options
@@ -763,9 +512,8 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                     CONF_UPDATE_INTERVAL: update_interval,
                 }
                 
-                _LOGGER.debug("OptionsFlow: Updating config entry with data=%s, options=%s", 
-                            {k: v if k != CONF_PASSWORD else "***" for k, v in config_data.items()}, 
-                            options_data)
+                _LOGGER.debug("OptionsFlow: Updating config entry with data=%s, options=%s",
+                             mask_config_for_log(config_data), options_data)
                 
                 # Update the config entry with new data and options
                 self.hass.config_entries.async_update_entry(
@@ -796,7 +544,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
         # Get the current config entry to access its data
         config_entry = self.hass.config_entries.async_get_entry(self._config_entry.entry_id)
         if not config_entry:
-            errors["base"] = "config_entry_not_found"
+            errors["base"] = ERROR_KEY_CONFIG_ENTRY_NOT_FOUND
             return self.async_show_form(step_id="init", data_schema=vol.Schema({}), errors=errors)
         
         # Pre-fill with current values
@@ -826,7 +574,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
         _LOGGER.debug("OptionsFlow: Using default_update_interval=%d for schema", default_update_interval)
         
         schema = vol.Schema({
-            vol.Required(CONF_HOST, default=current_data.get(CONF_HOST, "192.168.178.1")): vol.All(str, validate_host),
+            vol.Required(CONF_HOST, default=current_data.get(CONF_HOST, DEFAULT_HOST)): vol.All(str, validate_host),
             vol.Required(CONF_USERNAME, default=current_data.get(CONF_USERNAME, "")): str,
             vol.Required(CONF_PASSWORD, default=default_password): str,
             vol.Required(CONF_UPDATE_INTERVAL, default=default_update_interval): vol.All(

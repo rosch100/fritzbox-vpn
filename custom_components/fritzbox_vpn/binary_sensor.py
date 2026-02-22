@@ -10,7 +10,13 @@ from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import DOMAIN, DATA_COORDINATOR
+from .const import (
+    DOMAIN,
+    DATA_COORDINATOR,
+    MANUFACTURER_AVM,
+    MODEL_WIREGUARD_VPN,
+    DEFAULT_NAME_UNKNOWN,
+)
 from .coordinator import FritzBoxVPNCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -55,7 +61,7 @@ class FritzBoxVPNConnectedBinarySensor(CoordinatorEntity, BinarySensorEntity):
         self._entry = entry
         self._connection_uid = connection_uid
         self._connection_data = connection_data
-        vpn_name = connection_data.get('name', 'Unknown')
+        vpn_name = connection_data.get("name", DEFAULT_NAME_UNKNOWN)
         self._attr_unique_id = f"fritzbox_vpn_{connection_uid}_connected"
         self._attr_name = "Connected"
         self._attr_icon = "mdi:connection"
@@ -64,8 +70,8 @@ class FritzBoxVPNConnectedBinarySensor(CoordinatorEntity, BinarySensorEntity):
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, entry.entry_id, connection_uid)},
             name=vpn_name,
-            manufacturer="AVM",
-            model="WireGuard VPN",
+            manufacturer=MANUFACTURER_AVM,
+            model=MODEL_WIREGUARD_VPN,
             via_device=(DOMAIN, entry.entry_id),
         )
 

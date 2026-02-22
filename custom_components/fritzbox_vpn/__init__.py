@@ -5,12 +5,23 @@ from typing import Any
 
 from homeassistant.components import persistent_notification
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import Platform
+from homeassistant.const import CONF_HOST, CONF_PASSWORD, Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryNotReady
 from homeassistant.helpers import device_registry as dr
 
-from .const import DOMAIN, DATA_COORDINATOR
+from .const import (
+    DATA_COORDINATOR,
+    DEFAULT_NAME_UNKNOWN,
+    DOMAIN,
+    ERROR_INDICATOR_AUTH,
+    HOST_FALLBACK_UNKNOWN,
+    MANUFACTURER_AVM,
+    MODEL_FRITZBOX,
+    NAME_FRITZBOX,
+    auth_error_notification_id,
+    mask_config_for_log,
+)
 from .coordinator import FritzBoxVPNCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -20,28 +31,28 @@ PLATFORMS: list[Platform] = [Platform.SWITCH, Platform.BINARY_SENSOR, Platform.S
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up FritzBox VPN from a config entry."""
-    _LOGGER.info("Setting up FritzBox VPN integration for host: %s", entry.data.get('host', 'Unknown'))
-    _LOGGER.debug("Config entry data: %s", {k: v if k != 'password' else '***' for k, v in entry.data.items()})
-    _LOGGER.debug("Config entry options: %s", entry.options)
+    _LOGGER.info("Setting up FritzBox VPN integration for host: %s", entry.data.get(CONF_HOST, DEFAULT_NAME_UNKNOWN))
+    _LOGGER.debug("Config entry data: %s", mask_config_for_log(entry.data))
+    _LOGGER.debug("Config entry options: %s", mask_config_for_log(entry.options or {}))
     
     coordinator = FritzBoxVPNCoordinator(hass, entry.data, entry.options, entry.entry_id)
 
     # Remove any existing authentication error notification (in case of reload)
-    host = entry.data.get('host', 'unknown')
-    notification_id = f"{DOMAIN}_auth_error_{host}"
-    persistent_notification.dismiss(hass, notification_id)
+    host = entry.data.get(CONF_HOST, HOST_FALLBACK_UNKNOWN)
+    persistent_notification.dismiss(hass, auth_error_notification_id(host))
 
     # Fetch initial data so we have data when the entities are added
     try:
         await coordinator.async_config_entry_first_refresh()
         _LOGGER.info("Initial data refresh successful. Found %d VPN connections", len(coordinator.data) if coordinator.data else 0)
     except Exception as err:
-        if "Login failed" in str(err) or "Invalid SID" in str(err):
+        err_lower = str(err).lower()
+        if any(ind in err_lower for ind in ERROR_INDICATOR_AUTH):
             _LOGGER.error("Failed to fetch initial VPN data due to authentication error: %s", err)
             return False
         
         _LOGGER.warning("Failed to fetch initial VPN data, retrying later: %s", err)
-        raise ConfigEntryNotReady(f"Timeout/Error connecting to FritzBox: {err}") from err
+        raise ConfigEntryNotReady(f"Timeout/Error connecting to {NAME_FRITZBOX}: {err}") from err
 
     hass.data.setdefault(DOMAIN, {})
     hass.data[DOMAIN][entry.entry_id] = {
@@ -50,14 +61,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     # Create parent device registry entry for the FritzBox
     device_registry = dr.async_get(hass)
-    host = entry.data.get('host', 'Unknown')
+    host_for_url = entry.data.get(CONF_HOST, HOST_FALLBACK_UNKNOWN)
     parent_device = device_registry.async_get_or_create(
         config_entry_id=entry.entry_id,
         identifiers={(DOMAIN, entry.entry_id)},
-        name="Fritz!Box",
-        manufacturer="AVM",
-        model="Fritz!Box",
-        configuration_url=f"https://{host}",
+        name=NAME_FRITZBOX,
+        manufacturer=MANUFACTURER_AVM,
+        model=MODEL_FRITZBOX,
+        configuration_url=f"https://{host_for_url}",
     )
     _LOGGER.info("Created parent device: %s (ID: %s)", parent_device.name, parent_device.id)
 
@@ -84,10 +95,9 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         await coordinator.fritz_session.async_close()
         
         # Remove authentication error notification if it exists
-        host = entry.data.get('host', 'unknown')
-        notification_id = f"{DOMAIN}_auth_error_{host}"
-        persistent_notification.dismiss(hass, notification_id)
-        
+        host = entry.data.get(CONF_HOST, HOST_FALLBACK_UNKNOWN)
+        persistent_notification.dismiss(hass, auth_error_notification_id(host))
+
         hass.data[DOMAIN].pop(entry.entry_id)
 
     return unload_ok
@@ -95,7 +105,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
 async def async_reload_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
     """Reload config entry."""
-    _LOGGER.info("Reloading FritzBox VPN integration for host: %s", entry.data.get('host', 'Unknown'))
+    _LOGGER.info("Reloading FritzBox VPN integration for host: %s", entry.data.get(CONF_HOST, DEFAULT_NAME_UNKNOWN))
     unload_ok = await async_unload_entry(hass, entry)
     if unload_ok:
         await async_setup_entry(hass, entry)

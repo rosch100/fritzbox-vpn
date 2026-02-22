@@ -30,6 +30,15 @@ from .const import (
     STATUS_ENABLED,
     STATUS_DISABLED,
     STATUS_UNKNOWN,
+    AUTH_INDICATORS,
+    DEFAULT_NAME_UNKNOWN,
+    HOST_FALLBACK_UNKNOWN,
+    INTEGRATION_TITLE,
+    NAME_FRITZBOX,
+    NOTIFICATION_TITLE_AUTH_ERROR,
+    CONFIG_URL_INTEGRATIONS,
+    auth_error_notification_id,
+    mask_config_for_log,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -65,8 +74,8 @@ class FritzBoxVPNSession:
                         if self.protocol == "https" and response.status in (400, 404, 502, 503):
                             _LOGGER.warning(
                                 "HTTPS connection failed (status %d), falling back to HTTP. "
-                                "Consider using HTTP if your FritzBox doesn't support HTTPS.",
-                                response.status
+                                "Consider using HTTP if your %s doesn't support HTTPS.",
+                                response.status, NAME_FRITZBOX,
                             )
                             self.protocol = "http"
                             login_url = f"{self.protocol}://{self.host}{API_LOGIN}"
@@ -137,7 +146,7 @@ class FritzBoxVPNSession:
                             "(1) Incorrect username or password, or "
                             "(2) TR-064 not being enabled. "
                             "Please check your credentials first, then verify that TR-064 (Permit access for apps) "
-                            "is enabled in the FritzBox under "
+                            f"is enabled in the {NAME_FRITZBOX} under "
                             "Home Network > Network > Network settings > Access Settings in the Home Network. "
                             "Note: UPnP is only needed for automatic discovery via SSDP, not for API access."
                         )
@@ -147,7 +156,7 @@ class FritzBoxVPNSession:
                 return self.session, self.sid
 
             # Only reached if content was None (no response from get)
-            raise ConnectionError("No response from Fritz!Box login page")
+            raise ConnectionError(f"No response from {NAME_FRITZBOX} login page")
         except (ConnectionError, ValueError) as err:
             _LOGGER.error("Error getting session: %s", err)
             raise
@@ -229,7 +238,7 @@ class FritzBoxVPNSession:
         # Check current status
         current_status = conn.get('active', False)
         if current_status == enable:
-            vpn_name = conn.get('name', 'Unknown')
+            vpn_name = conn.get("name", DEFAULT_NAME_UNKNOWN)
             _LOGGER.info(
                 "VPN %s is already %s",
                 vpn_name,
@@ -267,7 +276,7 @@ class FritzBoxVPNSession:
                     if connection_uid in new_connections:
                         new_conn = new_connections[connection_uid]
                         new_status = new_conn.get('active', False)
-                        vpn_name = conn.get('name', 'Unknown')
+                        vpn_name = conn.get("name", DEFAULT_NAME_UNKNOWN)
                         if new_status == enable:
                             _LOGGER.info(
                                 "VPN %s successfully %s",
@@ -325,8 +334,8 @@ class FritzBoxVPNCoordinator(DataUpdateCoordinator):
         config_value = config.get(CONF_UPDATE_INTERVAL)
         options_value = options_dict.get(CONF_UPDATE_INTERVAL)
         
-        _LOGGER.debug("Coordinator init: options=%s, config[%s]=%s, options[%s]=%s", 
-                     options_dict, CONF_UPDATE_INTERVAL, config_value, CONF_UPDATE_INTERVAL, options_value)
+        _LOGGER.debug("Coordinator init: options=%s, config[%s]=%s, options[%s]=%s",
+                     mask_config_for_log(options_dict), CONF_UPDATE_INTERVAL, config_value, CONF_UPDATE_INTERVAL, options_value)
         
         update_interval_seconds = (
             options_value
@@ -348,7 +357,7 @@ class FritzBoxVPNCoordinator(DataUpdateCoordinator):
         super().__init__(
             hass,
             _LOGGER,
-            name="fritzbox_vpn",
+            name=DOMAIN,
             update_interval=timedelta(seconds=update_interval_seconds),
         )
         self.fritz_session = FritzBoxVPNSession(
@@ -381,71 +390,40 @@ class FritzBoxVPNCoordinator(DataUpdateCoordinator):
 
     def _is_auth_error(self, error: Exception) -> bool:
         """Check if an error is an authentication error."""
-        error_str = str(error).lower()
-        error_type = type(error).__name__
-        
-        # Check for authentication-related error messages
-        auth_indicators = [
-            "login failed",
-            "invalid sid",
-            "authentication failed",
-            "invalid credentials",
-            "unauthorized",
-            "access denied",
-        ]
-        
-        # Check if error message contains authentication indicators
-        if any(indicator in error_str for indicator in auth_indicators):
-            return True
-        
-        # Check for ValueError with "Invalid SID" (from async_get_session)
-        if isinstance(error, ValueError) and "invalid sid" in error_str:
-            return True
-        
-        # Check for ConnectionError with "Login failed" (from async_get_session)
-        if isinstance(error, ConnectionError) and "login failed" in error_str:
-            return True
-        
-        return False
+        return any(ind in str(error).lower() for ind in AUTH_INDICATORS)
 
     def _create_auth_error_notification(self, error: Exception) -> None:
         """Create a persistent notification for authentication errors."""
         if self._auth_error_notified:
             # Already notified, don't create duplicate
             return
-        
-        host = self.config.get(CONF_HOST, "Unknown")
-        notification_id = f"{DOMAIN}_auth_error_{self.config.get(CONF_HOST, 'unknown')}"
-        
-        title = "Fritz!Box VPN: Authentifizierungsfehler"
-        
+
+        host = self.config.get(CONF_HOST, HOST_FALLBACK_UNKNOWN)
+        notification_id = auth_error_notification_id(host)
+
         # Create link to integrations page - user can find the integration there
-        # Using the integrations overview page as direct entry_id links may not work reliably
         config_link = ""
         if self.entry_id:
-            # Use the integrations overview page - user can find and configure the integration there
-            config_url = "/config/integrations"
             config_link = (
-                f"\n\n**→ [Zur Konfiguration öffnen]({config_url})**\n\n"
-                f"*Gehen Sie zu Einstellungen > Geräte & Dienste und suchen Sie nach \"Fritz!Box VPN\"*"
+                f"\n\n**→ [Zur Konfiguration öffnen]({CONFIG_URL_INTEGRATIONS})**\n\n"
+                f"*Gehen Sie zu Einstellungen > Geräte & Dienste und suchen Sie nach \"{INTEGRATION_TITLE}\"*"
             )
-        
         message = (
-            f"Die Fritz!Box VPN Integration kann nicht auf die Fritz!Box zugreifen.\n\n"
+            f"Die {NAME_FRITZBOX} VPN Integration kann nicht auf die {NAME_FRITZBOX} zugreifen.\n\n"
             f"**Host:** {host}\n\n"
             f"**Fehler:** {str(error)}\n\n"
             f"**Mögliche Ursachen:**\n"
-            f"- Das Fritz!Box Passwort wurde geändert\n"
+            f"- Das {NAME_FRITZBOX} Passwort wurde geändert\n"
             f"- Der Benutzername ist falsch\n"
-            f"- Die Fritz!Box ist nicht erreichbar\n\n"
+            f"- Die {NAME_FRITZBOX} ist nicht erreichbar\n\n"
             f"Bitte überprüfen Sie die Konfiguration der Integration und aktualisieren Sie die Zugangsdaten falls nötig."
             f"{config_link}"
         )
-        
+
         persistent_notification.create(
             self.hass,
             message,
-            title=title,
+            title=NOTIFICATION_TITLE_AUTH_ERROR,
             notification_id=notification_id,
         )
         
@@ -463,9 +441,9 @@ class FritzBoxVPNCoordinator(DataUpdateCoordinator):
             # Reset notification flag on successful update
             if self._auth_error_notified:
                 self._auth_error_notified = False
-                # Remove the notification if it exists
-                notification_id = f"{DOMAIN}_auth_error_{self.config.get(CONF_HOST, 'unknown')}"
-                persistent_notification.dismiss(self.hass, notification_id)
+                persistent_notification.dismiss(
+                    self.hass, auth_error_notification_id(self.config.get(CONF_HOST, HOST_FALLBACK_UNKNOWN))
+                )
             return connections
         except (ConnectionError, ValueError) as err:
             if self._is_auth_error(err):
