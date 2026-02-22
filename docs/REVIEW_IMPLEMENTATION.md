@@ -1,5 +1,6 @@
 # Review: Vollständigkeit, Best Practice, SOLID, SSOT, CRAP
 
+**Gültig für:** Integration ab Version 0.10.0  
 Stand nach sechster Prüfung: SSOT für SSDP-Indikatoren (FRITZBOX_SSDP_INDICATORS), Fritz-Integrations-Domains (FRITZ_INTEGRATION_DOMAINS), sensible Config-Keys und Log-Maskierung (SENSITIVE_CONFIG_KEYS, mask_config_for_log); NAME_FRITZBOX in allen Coordinator-Fehlermeldungen; CRAP durch zentrale Log-Maskierung reduziert.
 
 ---

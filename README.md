@@ -29,10 +29,10 @@ To install a beta release (e.g. for testing fixes before the next stable release
 1. In HACS, open the **Fritz!Box VPN** integration card.
 2. Click the **⋮** (three dots) in the top right and choose **Redownload**.
 3. Enable **Show beta versions**, wait for the list to refresh.
-4. Select the desired beta version (e.g. `0.9.0b1`) and confirm.
+4. Select the desired beta version (e.g. `0.10.0b1`) and confirm.
 5. Restart Home Assistant.
 
-Beta releases are published as GitHub Pre-releases (tags like `v0.9.0b1`).
+Beta releases are published as GitHub Pre-releases (tags like `v0.10.0b1`).
 
 ## Configuration
 
@@ -164,10 +164,15 @@ Before configuring the integration, you need to enable the required settings in 
 - **TR-064 is required** - The integration cannot work without it
 - **UPnP is recommended** - Enables automatic discovery of your FritzBox via SSDP. If UPnP is disabled, you can still configure the integration manually by entering the IP address
 
+## Documentation
+
+- **Project & issues:** [GitHub repository](https://github.com/rosch100/fritzbox-vpn)
+- **Implementation notes:** See the `docs/` directory in the repository (e.g. architecture and review notes).
+
 ## Support
 
 For problems or questions:
-- Create an issue on GitHub
+- Create an issue on [GitHub](https://github.com/rosch100/fritzbox-vpn/issues)
 - Check the Home Assistant logs
 
 ## Buy me a coffee
