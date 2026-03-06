@@ -4,6 +4,14 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.10.6b0] - 2026-03-07 (Beta)
+
+### Fixed
+
+- Options-Schritt „Unavailable-Entitäten entfernen“ stürzt unter neueren Home-Assistant-Versionen nicht mehr ab (API-Anpassung `async_show_form`).
+
+[0.10.6b0]: https://github.com/rosch100/fritzbox-vpn/releases/tag/v0.10.6b0
+
 ## [0.10.5b0] - 2026-03-07 (Beta)
 
 ### Added
