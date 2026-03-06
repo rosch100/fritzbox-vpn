@@ -20,9 +20,82 @@ API_LOGIN = "/login_sid.lua"
 API_DATA = "/data.lua"
 API_VPN_CONNECTION = "/api/v0/generic/vpn/connection/{uid}"
 
+# API request/response keys (SSOT for Fritz!Box data.lua / boxConnections)
+API_PAGE_SHAREWIREGUARD = "shareWireguard"
+API_KEY_DATA = "data"
+API_KEY_INIT = "init"
+API_KEY_BOX_CONNECTIONS = "boxConnections"
+API_KEY_UID = "uid"
+API_KEY_ACTIVE = "active"
+API_KEY_ACTIVATED = "activated"
+API_KEY_CONNECTED = "connected"
+API_KEY_NAME = "name"
+
+# Entity attribute names (exposed in extra_state_attributes; SSOT for switch/sensor)
+ATTR_UID = "uid"
+ATTR_VPN_UID = "vpn_uid"
+ATTR_STATUS = "status"
+# Error text substring for SID retry detection
+ERROR_MSG_INVALID_SID = "Invalid SID"
+ERROR_MSG_INVALID_SID_403 = "Invalid SID (HTTP 403)"
+ERROR_MSG_INVALID_SID_HTML = "Invalid SID (HTML response)"
+# Full message for login failure (invalid SID) – SSOT for user-facing text
+ERROR_MSG_LOGIN_FAILED_SID = (
+    "Login failed: Invalid SID. This can be caused by: "
+    "(1) Incorrect username or password, or "
+    "(2) TR-064 not being enabled. "
+    "Please check your credentials first, then verify that TR-064 (Permit access for apps) "
+    "is enabled in the {name_fritzbox} under "
+    "Home Network > Network > Network settings > Access Settings in the Home Network. "
+    "Note: UPnP is only needed for automatic discovery via SSDP, not for API access."
+)
+# Allowed protocol values
+PROTOCOL_HTTP = "http"
+PROTOCOL_HTTPS = "https"
+PROTOCOLS_ALLOWED = (PROTOCOL_HTTP, PROTOCOL_HTTPS)
+# Response content-type: substring to detect JSON (data.lua)
+CONTENT_TYPE_JSON = "json"
+
+# HTTP status codes used in API logic
+HTTP_STATUS_OK = 200
+HTTP_STATUS_FORBIDDEN = 403
+HTTPS_FALLBACK_STATUS_CODES = (400, 404, 502, 503)
+
+# Fritz!Box login_sid.lua XML and form keys
+LOGIN_TAG_CHALLENGE = "Challenge"
+LOGIN_TAG_SID = "SID"
+LOGIN_FORM_USERNAME = "username"
+LOGIN_FORM_RESPONSE = "response"
+INVALID_SID_VALUE = "0000000000000000"
+
+# Log/UI labels for VPN state (SSOT for coordinator/session log messages)
+LOG_LABEL_ACTIVATED = "activated"
+LOG_LABEL_DEACTIVATED = "deactivated"
+
+# String values that mean "active" in API response (active/activated field)
+ACTIVE_STATE_STRINGS_TRUE = ("1", "true", "yes", "on")
+
+# HTTP header value for JSON requests (VPN toggle PUT)
+HEADER_VALUE_APPLICATION_JSON = "application/json"
+
+# HTTP header values for VPN API
+AUTH_HEADER_PREFIX = "AVM-SID "
+
 # Data keys
 DATA_COORDINATOR = "coordinator"
 DATA_FRITZ_SESSION = "fritz_session"
+# Per-platform sets of known connection UIDs for dynamic entity discovery (hass.data[DOMAIN][entry_id])
+DATA_KNOWN_UIDS_SWITCH = "known_uids_switch"
+DATA_KNOWN_UIDS_SENSOR = "known_uids_sensor"
+DATA_KNOWN_UIDS_BINARY_SENSOR = "known_uids_binary_sensor"
+
+# Log messages (SSOT) – VPN connections removed from Fritz!Box
+LOG_MSG_VPN_CONNECTIONS_REMOVED = (
+    "VPN connection(s) no longer available on the %s; related entities will show as unavailable: %s"
+)
+LOG_MSG_VPN_CONNECTIONS_REMOVED_HINT = (
+    "You can remove obsolete entities under Settings > Devices & Services > Entities (filter by Fritz!Box VPN)."
+)
 
 # Device/entity defaults
 MANUFACTURER_AVM = "AVM"

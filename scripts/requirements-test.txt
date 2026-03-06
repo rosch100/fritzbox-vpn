@@ -1,0 +1,2 @@
+# For running scripts/test_live_fritzbox_vpn.py (no Home Assistant required)
+aiohttp>=3.8.0
