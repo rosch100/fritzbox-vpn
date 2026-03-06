@@ -35,6 +35,22 @@ API_KEY_NAME = "name"
 ATTR_UID = "uid"
 ATTR_VPN_UID = "vpn_uid"
 ATTR_STATUS = "status"
+# Unique ID prefix for all entities (fritzbox_vpn_{connection_uid}_{suffix}); SSOT for parsing in config_flow
+UNIQUE_ID_PREFIX = f"{DOMAIN}_"
+# Suffixes for entity unique_id (full id = UNIQUE_ID_PREFIX + connection_uid + "_" + suffix)
+UNIQUE_ID_SUFFIX_SWITCH = "switch"
+UNIQUE_ID_SUFFIX_STATUS = "status"
+UNIQUE_ID_SUFFIX_UID = "uid"
+UNIQUE_ID_SUFFIX_VPN_UID = "vpn_uid"
+UNIQUE_ID_SUFFIX_CONNECTED = "connected"
+# All suffixes (for parsing unique_id in config_flow; order so longer suffixes like vpn_uid are tried first)
+UNIQUE_ID_SUFFIXES = (
+    UNIQUE_ID_SUFFIX_VPN_UID,
+    UNIQUE_ID_SUFFIX_CONNECTED,
+    UNIQUE_ID_SUFFIX_STATUS,
+    UNIQUE_ID_SUFFIX_SWITCH,
+    UNIQUE_ID_SUFFIX_UID,
+)
 # Error text substring for SID retry detection
 ERROR_MSG_INVALID_SID = "Invalid SID"
 ERROR_MSG_INVALID_SID_403 = "Invalid SID (HTTP 403)"
@@ -88,6 +104,14 @@ DATA_FRITZ_SESSION = "fritz_session"
 DATA_KNOWN_UIDS_SWITCH = "known_uids_switch"
 DATA_KNOWN_UIDS_SENSOR = "known_uids_sensor"
 DATA_KNOWN_UIDS_BINARY_SENSOR = "known_uids_binary_sensor"
+# Lock per platform to prevent concurrent add-entity runs (avoids duplicate entities)
+DATA_LOCK_ADD_ENTITIES_SWITCH = "lock_add_entities_switch"
+DATA_LOCK_ADD_ENTITIES_SENSOR = "lock_add_entities_sensor"
+DATA_LOCK_ADD_ENTITIES_BINARY_SENSOR = "lock_add_entities_binary_sensor"
+
+# Options flow: action for first step (menu)
+OPTIONS_ACTION_CONFIGURE = "configure"
+OPTIONS_ACTION_CLEANUP = "cleanup"
 
 # Log messages (SSOT) – VPN connections removed from Fritz!Box
 LOG_MSG_VPN_CONNECTIONS_REMOVED = (

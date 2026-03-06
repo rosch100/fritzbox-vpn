@@ -1,5 +1,6 @@
 """Switch platform for FritzBox VPN integration."""
 
+import asyncio
 import logging
 from typing import Any, Dict
 
@@ -14,6 +15,7 @@ from .const import (
     DOMAIN,
     DATA_COORDINATOR,
     DATA_KNOWN_UIDS_SWITCH,
+    DATA_LOCK_ADD_ENTITIES_SWITCH,
     MANUFACTURER_AVM,
     MODEL_WIREGUARD_VPN,
     DEFAULT_NAME_UNKNOWN,
@@ -24,6 +26,8 @@ from .const import (
     ATTR_UID,
     ATTR_VPN_UID,
     ATTR_STATUS,
+    UNIQUE_ID_PREFIX,
+    UNIQUE_ID_SUFFIX_SWITCH,
 )
 from .coordinator import FritzBoxVPNCoordinator
 
@@ -64,14 +68,19 @@ async def async_setup_entry(
     async_add_entities(entities, update_before_add=True)
 
     async def _add_new_switch_entities() -> None:
-        current = set(coordinator.data.keys()) if coordinator.data else set()
-        new_uids = current - known_uids
-        if not new_uids:
-            return
-        new_entities = _create_switch_entities(new_uids)
-        if new_entities:
-            async_add_entities(new_entities)
+        lock = hass.data[DOMAIN][entry.entry_id].setdefault(
+            DATA_LOCK_ADD_ENTITIES_SWITCH, asyncio.Lock()
+        )
+        async with lock:
+            current = set(coordinator.data.keys()) if coordinator.data else set()
+            new_uids = current - known_uids
+            if not new_uids:
+                return
+            new_entities = _create_switch_entities(new_uids)
+            if not new_entities:
+                return
             known_uids.update(new_uids)
+            async_add_entities(new_entities)
             _LOGGER.info(
                 "New VPN connection(s) detected, added %d switch entity(ies): %s",
                 len(new_entities),
@@ -100,7 +109,7 @@ class FritzBoxVPNSwitch(CoordinatorEntity, SwitchEntity):
         self._connection_uid = connection_uid
         self._connection_data = connection_data
         vpn_name = connection_data.get(API_KEY_NAME, DEFAULT_NAME_UNKNOWN)
-        self._attr_unique_id = f"fritzbox_vpn_{connection_uid}_switch"
+        self._attr_unique_id = f"{UNIQUE_ID_PREFIX}{connection_uid}_{UNIQUE_ID_SUFFIX_SWITCH}"
         self._attr_name = None  # Use device name
         self._attr_icon = "mdi:vpn"
         self._attr_has_entity_name = True

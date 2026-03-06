@@ -20,6 +20,8 @@ from .const import (
     DOMAIN,
     DEFAULT_UPDATE_INTERVAL,
     CONF_UPDATE_INTERVAL,
+    UPDATE_INTERVAL_MIN,
+    UPDATE_INTERVAL_MAX,
     DEFAULT_TIMEOUT,
     DEFAULT_PROTOCOL,
     VERIFICATION_DELAY,
@@ -141,6 +143,36 @@ def _extract_box_connections_from_data(data: Dict[str, Any]) -> Any:
     return init.get(API_KEY_BOX_CONNECTIONS)
 
 
+def normalize_update_interval(value: Any) -> int:
+    """Normalize a raw update_interval value to an int in [UPDATE_INTERVAL_MIN, UPDATE_INTERVAL_MAX]. SSOT for parsing."""
+    if value is None:
+        return DEFAULT_UPDATE_INTERVAL
+    if isinstance(value, int):
+        if UPDATE_INTERVAL_MIN <= value <= UPDATE_INTERVAL_MAX:
+            return value
+        _LOGGER.warning(
+            "update_interval %d out of range (%d–%d), using default %s",
+            value, UPDATE_INTERVAL_MIN, UPDATE_INTERVAL_MAX, DEFAULT_UPDATE_INTERVAL,
+        )
+        return DEFAULT_UPDATE_INTERVAL
+    try:
+        n = int(value)
+        if UPDATE_INTERVAL_MIN <= n <= UPDATE_INTERVAL_MAX:
+            return n
+        _LOGGER.warning(
+            "update_interval %r -> %d out of range (%d–%d), using default %s",
+            value, n, UPDATE_INTERVAL_MIN, UPDATE_INTERVAL_MAX, DEFAULT_UPDATE_INTERVAL,
+        )
+        return DEFAULT_UPDATE_INTERVAL
+    except (ValueError, TypeError):
+        _LOGGER.warning(
+            "Invalid update_interval value %r, using default %s",
+            value,
+            DEFAULT_UPDATE_INTERVAL,
+        )
+        return DEFAULT_UPDATE_INTERVAL
+
+
 def _resolve_update_interval_seconds(
     config: Dict[str, Any],
     options: Optional[Dict[str, Any]],
@@ -148,17 +180,7 @@ def _resolve_update_interval_seconds(
     """Resolve update interval in seconds from options, then config, then default. Always returns a valid int."""
     options_dict = options or {}
     value = options_dict.get(CONF_UPDATE_INTERVAL) or config.get(CONF_UPDATE_INTERVAL) or DEFAULT_UPDATE_INTERVAL
-    if isinstance(value, int):
-        return value
-    try:
-        return int(value)
-    except (ValueError, TypeError):
-        _LOGGER.warning(
-            "Coordinator: Invalid update_interval value %r, using default %s",
-            value,
-            DEFAULT_UPDATE_INTERVAL,
-        )
-        return DEFAULT_UPDATE_INTERVAL
+    return normalize_update_interval(value)
 
 
 class FritzBoxVPNSession:

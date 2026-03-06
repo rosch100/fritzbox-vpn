@@ -1,5 +1,6 @@
 """Binary sensor platform for FritzBox VPN integration."""
 
+import asyncio
 import logging
 from typing import Any, Dict
 
@@ -14,11 +15,14 @@ from .const import (
     DOMAIN,
     DATA_COORDINATOR,
     DATA_KNOWN_UIDS_BINARY_SENSOR,
+    DATA_LOCK_ADD_ENTITIES_BINARY_SENSOR,
     MANUFACTURER_AVM,
     MODEL_WIREGUARD_VPN,
     DEFAULT_NAME_UNKNOWN,
     API_KEY_NAME,
     API_KEY_CONNECTED,
+    UNIQUE_ID_PREFIX,
+    UNIQUE_ID_SUFFIX_CONNECTED,
 )
 from .coordinator import FritzBoxVPNCoordinator
 
@@ -58,14 +62,19 @@ async def async_setup_entry(
     async_add_entities(entities, update_before_add=True)
 
     async def _add_new_binary_sensor_entities() -> None:
-        current = set(coordinator.data.keys()) if coordinator.data else set()
-        new_uids = current - known_uids
-        if not new_uids:
-            return
-        new_entities = _create_binary_sensor_entities(new_uids)
-        if new_entities:
-            async_add_entities(new_entities)
+        lock = hass.data[DOMAIN][entry.entry_id].setdefault(
+            DATA_LOCK_ADD_ENTITIES_BINARY_SENSOR, asyncio.Lock()
+        )
+        async with lock:
+            current = set(coordinator.data.keys()) if coordinator.data else set()
+            new_uids = current - known_uids
+            if not new_uids:
+                return
+            new_entities = _create_binary_sensor_entities(new_uids)
+            if not new_entities:
+                return
             known_uids.update(new_uids)
+            async_add_entities(new_entities)
             _LOGGER.info(
                 "New VPN connection(s) detected, added %d binary sensor entity(ies)",
                 len(new_entities),
@@ -93,7 +102,7 @@ class FritzBoxVPNConnectedBinarySensor(CoordinatorEntity, BinarySensorEntity):
         self._connection_uid = connection_uid
         self._connection_data = connection_data
         vpn_name = connection_data.get(API_KEY_NAME, DEFAULT_NAME_UNKNOWN)
-        self._attr_unique_id = f"fritzbox_vpn_{connection_uid}_connected"
+        self._attr_unique_id = f"{UNIQUE_ID_PREFIX}{connection_uid}_{UNIQUE_ID_SUFFIX_CONNECTED}"
         self._attr_name = "Connected"
         self._attr_icon = "mdi:connection"
         self._attr_has_entity_name = True

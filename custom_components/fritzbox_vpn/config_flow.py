@@ -2,7 +2,7 @@
 
 import ipaddress
 import logging
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional, Tuple
 from urllib.parse import urlparse
 
 import voluptuous as vol
@@ -13,15 +13,24 @@ from homeassistant.const import CONF_HOST, CONF_USERNAME, CONF_PASSWORD
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.data_entry_flow import FlowResult
 from homeassistant.exceptions import HomeAssistantError
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.service_info.ssdp import SsdpServiceInfo
 
 from .const import (
     DOMAIN,
     CONF_UPDATE_INTERVAL,
+    DATA_COORDINATOR,
+    DATA_KNOWN_UIDS_SWITCH,
+    DATA_KNOWN_UIDS_SENSOR,
+    DATA_KNOWN_UIDS_BINARY_SENSOR,
     DEFAULT_HOST,
     DEFAULT_UPDATE_INTERVAL,
     INTEGRATION_TITLE,
+    OPTIONS_ACTION_CONFIGURE,
+    OPTIONS_ACTION_CLEANUP,
+    UNIQUE_ID_PREFIX,
+    UNIQUE_ID_SUFFIXES,
     UPDATE_INTERVAL_MIN,
     UPDATE_INTERVAL_MAX,
     REPEATER_INDICATORS,
@@ -34,10 +43,84 @@ from .const import (
     ERROR_KEY_CONFIG_ENTRY_NOT_FOUND,
     mask_config_for_log,
 )
-from .coordinator import FritzBoxVPNSession
+from .coordinator import FritzBoxVPNSession, normalize_update_interval
 from .fritz_config_source import get_existing_fritz_config
 
 _LOGGER = logging.getLogger(__name__)
+
+
+def _connection_uid_from_entity_unique_id(unique_id: str) -> Optional[str]:
+    """Extract connection_uid from an entity unique_id. Returns None if not our format."""
+    if not unique_id or not unique_id.startswith(UNIQUE_ID_PREFIX):
+        return None
+    rest = unique_id[len(UNIQUE_ID_PREFIX) :]
+    for suffix in UNIQUE_ID_SUFFIXES:
+        if rest.endswith("_" + suffix):
+            return rest[: -len(suffix) - 1]
+    return None
+
+
+def _get_orphaned_entity_entries(
+    hass: HomeAssistant, entry_id: str
+) -> Tuple[Optional[List[er.RegistryEntry]], Optional[str]]:
+    """Return entity registry entries for this config entry whose VPN connection is no longer present.
+    Returns (list of entries to remove, None) on success, or (None, error_key) if integration/coordinator not ready.
+    """
+    if DOMAIN not in hass.data or entry_id not in hass.data[DOMAIN]:
+        return (None, "integration_not_loaded")
+    coordinator = hass.data[DOMAIN][entry_id].get(DATA_COORDINATOR)
+    if not coordinator or not hasattr(coordinator, "data"):
+        return (None, "coordinator_not_ready")
+    current_uids = set(coordinator.data.keys()) if coordinator.data else set()
+    registry = er.async_get(hass)
+    to_remove = []
+    for entry in er.async_entries_for_config_entry(registry, entry_id):
+        uid = _connection_uid_from_entity_unique_id(entry.unique_id or "")
+        if uid is not None and uid not in current_uids:
+            to_remove.append(entry)
+    return (to_remove, None)
+
+
+def _remove_orphaned_entities_and_clear_known_uids(
+    hass: HomeAssistant, entry_id: str, entries: List[er.RegistryEntry]
+) -> None:
+    """Remove given entities from the registry and remove their UIDs from known_uids sets."""
+    if not entries:
+        return
+    registry = er.async_get(hass)
+    for entry in entries:
+        registry.async_remove(entry.entity_id)
+        _LOGGER.info("Removed unavailable entity: %s (%s)", entry.entity_id, entry.unique_id)
+    uids_removed = set()
+    for e in entries:
+        uid = _connection_uid_from_entity_unique_id(e.unique_id or "")
+        if uid is not None:
+            uids_removed.add(uid)
+    if not uids_removed or entry_id not in hass.data.get(DOMAIN, {}):
+        return
+    store = hass.data[DOMAIN][entry_id]
+    for key in (DATA_KNOWN_UIDS_SWITCH, DATA_KNOWN_UIDS_SENSOR, DATA_KNOWN_UIDS_BINARY_SENSOR):
+        if key in store and isinstance(store[key], set):
+            store[key] -= uids_removed
+
+
+def _build_configure_schema(
+    current_data: Dict[str, Any], current_options: Dict[str, Any]
+) -> vol.Schema:
+    """Build the configure step schema with defaults from current config/options."""
+    default_password = current_data.get(CONF_PASSWORD, "") or current_data.get("password", "")
+    default_update_interval = normalize_update_interval(
+        current_options.get(CONF_UPDATE_INTERVAL, DEFAULT_UPDATE_INTERVAL)
+    )
+    return vol.Schema({
+        vol.Required(CONF_HOST, default=current_data.get(CONF_HOST) or DEFAULT_HOST): str,
+        vol.Required(CONF_USERNAME, default=current_data.get(CONF_USERNAME) or ""): str,
+        vol.Required(CONF_PASSWORD, default=default_password or ""): str,
+        vol.Required(CONF_UPDATE_INTERVAL, default=default_update_interval): vol.All(
+            vol.Coerce(int),
+            vol.Range(min=UPDATE_INTERVAL_MIN, max=UPDATE_INTERVAL_MAX),
+        ),
+    })
 
 
 def _validation_error_to_error_key(error_msg: str) -> str:
@@ -441,7 +524,66 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
     async def async_step_init(
         self, user_input: Optional[Dict[str, Any]] = None
     ) -> FlowResult:
-        """Manage the options."""
+        """Show menu: Configure or Remove unavailable entities."""
+        if user_input is not None:
+            if user_input.get("action") == OPTIONS_ACTION_CLEANUP:
+                return await self.async_step_cleanup_confirm()
+            return await self.async_step_configure()
+        schema = vol.Schema(
+            {
+                vol.Required("action", default=OPTIONS_ACTION_CONFIGURE): vol.In(
+                    {
+                        OPTIONS_ACTION_CONFIGURE: "Configure (host, user, update interval)",
+                        OPTIONS_ACTION_CLEANUP: "Remove unavailable entities",
+                    }
+                ),
+            }
+        )
+        return self.async_show_form(step_id="init", data_schema=schema)
+
+    async def async_step_cleanup_confirm(
+        self, user_input: Optional[Dict[str, Any]] = None
+    ) -> FlowResult:
+        """Confirm removal of entities whose VPN connection is no longer on the Fritz!Box."""
+        config_entry = self.hass.config_entries.async_get_entry(self._config_entry.entry_id)
+        if not config_entry:
+            return self.async_abort(reason=ERROR_KEY_CONFIG_ENTRY_NOT_FOUND)
+        entry_id = config_entry.entry_id
+        to_remove, error_key = _get_orphaned_entity_entries(self.hass, entry_id)
+        if error_key is not None:
+            return self.async_show_form(
+                step_id="cleanup_confirm",
+                data_schema=vol.Schema({}),
+                errors={"base": error_key},
+            )
+        if user_input is not None and user_input.get("confirm") and to_remove:
+            _remove_orphaned_entities_and_clear_known_uids(self.hass, entry_id, to_remove)
+            await self.hass.config_entries.async_reload(entry_id)
+        if user_input is not None or not to_remove:
+            return self.async_create_entry(
+                title="",
+                data=config_entry.options or {},
+            )
+        schema = vol.Schema({vol.Required("confirm", default=False): bool})
+        return self.async_show_form(
+            step_id="cleanup_confirm",
+            data_schema=schema,
+            description=(
+                "The following **{count}** entity(ies) refer to VPN connections that are no longer "
+                "on the Fritz!Box and will be removed:\n\n**{entity_list}**\n\n"
+                "Check the box below and submit to remove them and reload the integration."
+            ),
+            description_placeholders={
+                "count": str(len(to_remove)),
+                "entity_list": "\n".join(e.entity_id for e in to_remove[:20])
+                + ("\n…" if len(to_remove) > 20 else ""),
+            },
+        )
+
+    async def async_step_configure(
+        self, user_input: Optional[Dict[str, Any]] = None
+    ) -> FlowResult:
+        """Manage the options (host, user, update interval)."""
         errors: Dict[str, str] = {}
         
         if user_input is not None:
@@ -449,7 +591,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
             config_entry = self.hass.config_entries.async_get_entry(self._config_entry.entry_id)
             if not config_entry:
                 errors["base"] = ERROR_KEY_CONFIG_ENTRY_NOT_FOUND
-                return self.async_show_form(step_id="init", data_schema=vol.Schema({}), errors=errors)
+                return self.async_show_form(step_id="configure", data_schema=vol.Schema({}), errors=errors)
             
             # If password is empty, keep the existing password
             if not user_input.get(CONF_PASSWORD):
@@ -475,34 +617,10 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                     CONF_USERNAME: user_input[CONF_USERNAME],
                     CONF_PASSWORD: user_input[CONF_PASSWORD],
                 }
-                # Ensure update interval is stored as integer
-                update_interval = user_input.get(CONF_UPDATE_INTERVAL, DEFAULT_UPDATE_INTERVAL)
-                _LOGGER.debug("OptionsFlow: Received update_interval from user_input: %s (type: %s)", 
-                             update_interval, type(update_interval).__name__)
-                
-                if isinstance(update_interval, str):
-                    try:
-                        update_interval = int(update_interval)
-                    except (ValueError, TypeError):
-                        _LOGGER.warning("OptionsFlow: Failed to convert update_interval '%s' to int, using default", 
-                                       update_interval)
-                        update_interval = DEFAULT_UPDATE_INTERVAL
-                elif not isinstance(update_interval, int):
-                    try:
-                        update_interval = int(update_interval) if update_interval else DEFAULT_UPDATE_INTERVAL
-                    except (ValueError, TypeError):
-                        _LOGGER.warning("OptionsFlow: Failed to convert update_interval '%s' to int, using default", 
-                                       update_interval)
-                        update_interval = DEFAULT_UPDATE_INTERVAL
-                
-                # Validate range
-                if update_interval < UPDATE_INTERVAL_MIN or update_interval > UPDATE_INTERVAL_MAX:
-                    _LOGGER.warning(
-                        "OptionsFlow: update_interval %d is out of range (%d-%d), using default",
-                        update_interval, UPDATE_INTERVAL_MIN, UPDATE_INTERVAL_MAX,
-                    )
-                    update_interval = DEFAULT_UPDATE_INTERVAL
-                
+                # Ensure update interval is stored as integer (SSOT: coordinator.normalize_update_interval)
+                update_interval = normalize_update_interval(
+                    user_input.get(CONF_UPDATE_INTERVAL, DEFAULT_UPDATE_INTERVAL)
+                )
                 _LOGGER.debug("OptionsFlow: Saving update_interval: %d seconds", update_interval)
                 options_data = {
                     CONF_UPDATE_INTERVAL: update_interval,
@@ -541,47 +659,19 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
         config_entry = self.hass.config_entries.async_get_entry(self._config_entry.entry_id)
         if not config_entry:
             errors["base"] = ERROR_KEY_CONFIG_ENTRY_NOT_FOUND
-            return self.async_show_form(step_id="init", data_schema=vol.Schema({}), errors=errors)
+            return self.async_show_form(step_id="configure", data_schema=vol.Schema({}), errors=errors)
         
         # Pre-fill with current values
         current_data = config_entry.data or {}
         current_options = config_entry.options or {}
-        
-        # Pre-fill password from current config if available
-        # Log for debugging (password masked)
-        _LOGGER.debug("OptionsFlow: Current config_entry.data keys: %s", list(current_data.keys()))
-        _LOGGER.debug("OptionsFlow: Has password in data: %s", bool(current_data.get(CONF_PASSWORD)))
-        
-        # Try to get password from data - it should be there if it was saved
-        default_password = current_data.get(CONF_PASSWORD, "")
-        if not default_password:
-            # Also try alternative key names
-            default_password = current_data.get("password", "")
-        
-        # Get update interval from options or use default
-        default_update_interval = current_options.get(CONF_UPDATE_INTERVAL, DEFAULT_UPDATE_INTERVAL)
-        # Ensure default is an integer
-        if not isinstance(default_update_interval, int):
-            try:
-                default_update_interval = int(default_update_interval)
-            except (ValueError, TypeError):
-                default_update_interval = DEFAULT_UPDATE_INTERVAL
-        
-        _LOGGER.debug("OptionsFlow: Using default_update_interval=%d for schema", default_update_interval)
-        
-        # CONF_HOST as str to avoid 500 on options form load (validated on submit).
-        schema = vol.Schema({
-            vol.Required(CONF_HOST, default=current_data.get(CONF_HOST) or DEFAULT_HOST): str,
-            vol.Required(CONF_USERNAME, default=current_data.get(CONF_USERNAME) or ""): str,
-            vol.Required(CONF_PASSWORD, default=default_password or ""): str,
-            vol.Required(CONF_UPDATE_INTERVAL, default=default_update_interval): vol.All(
-                vol.Coerce(int),
-                vol.Range(min=UPDATE_INTERVAL_MIN, max=UPDATE_INTERVAL_MAX)
-            ),
-        })
-
+        _LOGGER.debug(
+            "OptionsFlow: Current config_entry.data keys: %s, has password: %s",
+            list(current_data.keys()),
+            bool(current_data.get(CONF_PASSWORD)),
+        )
+        schema = _build_configure_schema(current_data, current_options)
         return self.async_show_form(
-            step_id="init",
+            step_id="configure",
             data_schema=schema,
             errors=errors,
         )
