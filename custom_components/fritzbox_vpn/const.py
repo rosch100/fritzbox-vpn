@@ -113,6 +113,10 @@ DATA_LOCK_ADD_ENTITIES_BINARY_SENSOR = "lock_add_entities_binary_sensor"
 OPTIONS_ACTION_CONFIGURE = "configure"
 OPTIONS_ACTION_CLEANUP = "cleanup"
 
+# Service names (for programmatic cleanup without options flow)
+SERVICE_REMOVE_UNAVAILABLE_ENTITIES = "remove_unavailable_entities"
+CONF_CONFIG_ENTRY_ID = "config_entry_id"
+
 # Log messages (SSOT) – VPN connections removed from Fritz!Box
 LOG_MSG_VPN_CONNECTIONS_REMOVED = (
     "VPN connection(s) no longer available on the %s; related entities will show as unavailable: %s"

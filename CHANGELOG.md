@@ -4,6 +4,18 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.10.5b0] - 2026-03-07 (Beta)
+
+### Added
+
+- **Service** `fritzbox_vpn.remove_unavailable_entities`: Entfernt nicht mehr vorhandene Entitäten und lädt die Integration neu. Aufruf z. B. über Entwicklerwerkzeuge → Dienste oder eine Schaltfläche; optionaler Parameter `config_entry_id` bei mehreren Integrationen.
+
+### Fixed
+
+- **Options-Dialog**: Kein „Unknown error“ mehr; Menü zeigt die richtige Beschreibung („Wählen Sie eine Aktion“). Schritt „Unavailable-Entitäten entfernen“ stürzt nicht mehr ab (kompatibel mit neueren Home-Assistant-Versionen).
+
+[0.10.5b0]: https://github.com/rosch100/fritzbox-vpn/releases/tag/v0.10.5b0
+
 ## [0.10.4b0] - 2026-03-06 (Beta)
 
 ### Changed

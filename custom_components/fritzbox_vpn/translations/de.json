@@ -31,12 +31,46 @@
     "step": {
       "init": {
         "title": "Fritz!Box VPN Optionen",
+        "description": "Wählen Sie eine Aktion.",
+        "data": {
+          "action": "Aktion"
+        }
+      },
+      "configure": {
+        "title": "Fritz!Box VPN konfigurieren",
         "description": "Aktualisieren Sie die FritzBox-Verbindungsdaten. Das Passwort-Feld wird aus Sicherheitsgründen nicht angezeigt. Lassen Sie es leer, um das aktuelle Passwort beizubehalten, oder geben Sie ein neues Passwort ein, um es zu ändern.",
         "data": {
           "host": "FritzBox IP-Adresse",
           "username": "Benutzername",
           "password": "Passwort (leer lassen, um aktuelles Passwort beizubehalten)",
           "update_interval": "Update-Intervall (Sekunden, 5–3600, max. 1 h)"
+        }
+      },
+      "cleanup_confirm": {
+        "title": "Unavailable-Entitäten entfernen",
+        "description": "Entitäten, die zu VPN-Verbindungen gehören, die auf der Fritz!Box nicht mehr existieren, werden aus der Entity-Registry entfernt. Setzen Sie das Häkchen und senden Sie ab, um sie zu löschen und die Integration neu zu laden.",
+        "data": {
+          "confirm": "Entitäten entfernen und Integration neu laden"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Verbindung zur FritzBox fehlgeschlagen. Bitte überprüfen Sie die IP-Adresse und Netzwerkverbindung.",
+      "invalid_auth": "Authentifizierung fehlgeschlagen. Bitte überprüfen Sie Benutzername und Passwort.",
+      "unknown": "Ein unerwarteter Fehler ist aufgetreten. Bitte prüfen Sie die Home-Assistant-Logs.",
+      "config_entry_not_found": "Konfigurationseintrag nicht gefunden. Bitte die Integration erneut hinzufügen.",
+      "integration_not_loaded": "Integration ist nicht geladen. Bitte zuerst die Integration starten.",
+      "coordinator_not_ready": "Daten werden noch geladen. Bitte kurz warten und erneut versuchen."
+    }
+  },
+  "services": {
+    "remove_unavailable_entities": {
+      "name": "Nicht verfügbare Entitäten entfernen",
+      "description": "Entitäten löschen, deren VPN-Verbindung auf der Fritz!Box nicht mehr existiert; Integration anschließend neu laden. Optional: config_entry_id auf eine bestimmte Integration begrenzen.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Config-Entry-ID",
+          "description": "Optional. Nur diese Integration bereinigen (ID z. B. aus der URL bei Optionen). Ohne Angabe: alle Fritz!Box-VPN-Integrationen."
         }
       }
     }

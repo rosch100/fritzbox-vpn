@@ -3,14 +3,17 @@
 import logging
 from typing import Any
 
+import voluptuous as vol
+
 from homeassistant.components import persistent_notification
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_HOST, CONF_PASSWORD, Platform
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.exceptions import ConfigEntryNotReady
 from homeassistant.helpers import device_registry as dr
 
 from .const import (
+    CONF_CONFIG_ENTRY_ID,
     DATA_COORDINATOR,
     DEFAULT_NAME_UNKNOWN,
     DOMAIN,
@@ -19,6 +22,7 @@ from .const import (
     MANUFACTURER_AVM,
     MODEL_FRITZBOX,
     NAME_FRITZBOX,
+    SERVICE_REMOVE_UNAVAILABLE_ENTITIES,
     auth_error_notification_id,
     mask_config_for_log,
 )
@@ -27,6 +31,11 @@ from .coordinator import FritzBoxVPNCoordinator
 _LOGGER = logging.getLogger(__name__)
 
 PLATFORMS: list[Platform] = [Platform.SWITCH, Platform.BINARY_SENSOR, Platform.SENSOR]
+
+# Optional service parameter: limit cleanup to this config entry ID
+SERVICE_SCHEMA_REMOVE_UNAVAILABLE = vol.Schema(
+    {vol.Optional(CONF_CONFIG_ENTRY_ID): str}
+)
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
@@ -58,6 +67,51 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     hass.data[DOMAIN][entry.entry_id] = {
         DATA_COORDINATOR: coordinator,
     }
+
+    # Register service once (same handler for all entries)
+    if "_service_remove_unavailable_registered" not in hass.data[DOMAIN]:
+        from .config_flow import (
+            _get_orphaned_entity_entries,
+            _remove_orphaned_entities_and_clear_known_uids,
+        )
+
+        async def async_remove_unavailable_entities(call: ServiceCall) -> None:
+            """Remove entity registry entries for VPN connections no longer on the Fritz!Box."""
+            entry_ids: list[str] = []
+            if call.data.get(CONF_CONFIG_ENTRY_ID):
+                entry_ids = [call.data[CONF_CONFIG_ENTRY_ID]]
+            else:
+                entry_ids = [
+                    e.entry_id
+                    for e in hass.config_entries.async_entries(DOMAIN)
+                    if e.entry_id in hass.data.get(DOMAIN, {})
+                ]
+            for entry_id in entry_ids:
+                to_remove, err = _get_orphaned_entity_entries(hass, entry_id)
+                if err:
+                    _LOGGER.warning(
+                        "remove_unavailable_entities: skip entry %s (%s)",
+                        entry_id,
+                        err,
+                    )
+                    continue
+                if not to_remove:
+                    continue
+                _remove_orphaned_entities_and_clear_known_uids(hass, entry_id, to_remove)
+                await hass.config_entries.async_reload(entry_id)
+                _LOGGER.info(
+                    "remove_unavailable_entities: removed %d entities and reloaded entry %s",
+                    len(to_remove),
+                    entry_id,
+                )
+
+        hass.services.async_register(
+            DOMAIN,
+            SERVICE_REMOVE_UNAVAILABLE_ENTITIES,
+            async_remove_unavailable_entities,
+            schema=SERVICE_SCHEMA_REMOVE_UNAVAILABLE,
+        )
+        hass.data[DOMAIN]["_service_remove_unavailable_registered"] = True
 
     # Create parent device registry entry for the FritzBox
     device_registry = dr.async_get(hass)

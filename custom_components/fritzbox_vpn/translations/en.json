@@ -31,12 +31,46 @@
     "step": {
       "init": {
         "title": "Fritz!Box VPN Options",
+        "description": "Choose an action.",
+        "data": {
+          "action": "Action"
+        }
+      },
+      "configure": {
+        "title": "Configure Fritz!Box VPN",
         "description": "Update your FritzBox connection details. The password field is not displayed for security reasons. Leave it empty to keep the current password, or enter a new password to change it.",
         "data": {
           "host": "FritzBox IP Address",
           "username": "Username",
           "password": "Password (leave empty to keep current password)",
           "update_interval": "Update interval (seconds, 5–3600, max. 1 h)"
+        }
+      },
+      "cleanup_confirm": {
+        "title": "Remove unavailable entities",
+        "description": "Entities that refer to VPN connections no longer present on the Fritz!Box will be removed from the entity registry. Check the box below and submit to remove them and reload the integration.",
+        "data": {
+          "confirm": "Remove entities and reload integration"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Failed to connect to FritzBox. Please check the IP address and network connection.",
+      "invalid_auth": "Authentication failed. Please check username and password.",
+      "unknown": "An unexpected error occurred. Please check the Home Assistant logs.",
+      "config_entry_not_found": "Config entry not found. Please add the integration again.",
+      "integration_not_loaded": "Integration is not loaded. Please start the integration first.",
+      "coordinator_not_ready": "Data is still loading. Please wait a moment and try again."
+    }
+  },
+  "services": {
+    "remove_unavailable_entities": {
+      "name": "Remove unavailable entities",
+      "description": "Remove entities whose VPN connection no longer exists on the Fritz!Box, then reload the integration. Optional: config_entry_id to limit to one integration.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Config entry ID",
+          "description": "Optional. Limit cleanup to this integration entry (e.g. from the integration options URL). If omitted, all Fritz!Box VPN entries are processed."
         }
       }
     }

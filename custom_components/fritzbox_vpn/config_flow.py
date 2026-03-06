@@ -568,16 +568,6 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
         return self.async_show_form(
             step_id="cleanup_confirm",
             data_schema=schema,
-            description=(
-                "The following **{count}** entity(ies) refer to VPN connections that are no longer "
-                "on the Fritz!Box and will be removed:\n\n**{entity_list}**\n\n"
-                "Check the box below and submit to remove them and reload the integration."
-            ),
-            description_placeholders={
-                "count": str(len(to_remove)),
-                "entity_list": "\n".join(e.entity_id for e in to_remove[:20])
-                + ("\n…" if len(to_remove) > 20 else ""),
-            },
         )
 
     async def async_step_configure(
