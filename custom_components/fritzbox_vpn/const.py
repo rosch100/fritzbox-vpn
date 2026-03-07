@@ -1,7 +1,10 @@
 """Constants for FritzBox VPN integration."""
 
-DOMAIN = "fritzbox_vpn"
+from typing import Any, Mapping, Optional
 
+from homeassistant.const import CONF_HOST, CONF_PASSWORD
+
+DOMAIN = "fritzbox_vpn"
 CONF_UPDATE_INTERVAL = "update_interval"
 
 DEFAULT_HOST = "192.168.178.1"
@@ -94,7 +97,9 @@ DATA_LOCK_ADD_ENTITIES_BINARY_SENSOR = "lock_add_entities_binary_sensor"
 
 OPTIONS_ACTION_CONFIGURE = "configure"
 OPTIONS_ACTION_CLEANUP = "cleanup"
+OPTIONS_ACTION_REPAIR_ENTITY_IDS = "repair_entity_ids"
 SERVICE_REMOVE_UNAVAILABLE_ENTITIES = "remove_unavailable_entities"
+SERVICE_REPAIR_ENTITY_ID_SUFFIXES = "repair_entity_id_suffixes"
 CONF_CONFIG_ENTRY_ID = "config_entry_id"
 
 LOG_MSG_VPN_CONNECTIONS_REMOVED = (
@@ -125,9 +130,31 @@ def auth_error_notification_id(host: str) -> str:
     return f"{DOMAIN}_auth_error_{host or HOST_FALLBACK_UNKNOWN}"
 
 
+def host_from_config(config: Mapping[str, Any]) -> str:
+    """Host from config/entry data; HOST_FALLBACK_UNKNOWN if missing."""
+    return config.get(CONF_HOST, HOST_FALLBACK_UNKNOWN)
+
+
 def mask_config_for_log(data: dict) -> dict:
     """Return a copy of the config dict with sensitive keys masked."""
     return {k: "***" if k in SENSITIVE_CONFIG_KEYS else v for k, v in data.items()}
+
+
+def password_from_source(source: Optional[Mapping[str, Any]]) -> str:
+    """Return password from one dict (CONF_PASSWORD, 'password', or 'pass'), or empty string."""
+    if not source:
+        return ""
+    return str(source.get(CONF_PASSWORD) or source.get("password") or source.get("pass") or "")
+
+
+def password_from_sources(*sources: Optional[Mapping[str, Any]]) -> str:
+    """Return first non-empty password from any of the given dicts."""
+    for src in sources:
+        p = password_from_source(src)
+        if p:
+            return p
+    return ""
+
 
 STATUS_CONNECTED = "connected"
 STATUS_ENABLED = "enabled"

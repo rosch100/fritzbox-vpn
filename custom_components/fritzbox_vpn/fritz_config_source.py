@@ -15,6 +15,7 @@ from .const import (
     FRITZ_INTEGRATION_DOMAINS,
     REPEATER_INDICATORS,
     mask_config_for_log,
+    password_from_sources,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -114,11 +115,7 @@ async def get_existing_fritz_config(hass: HomeAssistant) -> Optional[Dict[str, A
                     or options_data.get("user")
                 )
                 has_password = bool(
-                    config_data.get(CONF_PASSWORD)
-                    or config_data.get("password")
-                    or config_data.get("pass")
-                    or options_data.get(CONF_PASSWORD)
-                    or options_data.get("password")
+                    password_from_sources(config_data, options_data)
                 )
                 _LOGGER.debug("  Has username: %s, Has password: %s", has_username, has_password)
                 if not has_username and not has_password:
@@ -162,18 +159,12 @@ async def get_existing_fritz_config(hass: HomeAssistant) -> Optional[Dict[str, A
                 or options_data.get("username")
                 or options_data.get("user")
             )
-            password = (
-                config_data.get(CONF_PASSWORD)
-                or config_data.get("password")
-                or config_data.get("pass")
-                or options_data.get(CONF_PASSWORD)
-                or options_data.get("password")
-            )
+            password = password_from_sources(config_data, options_data)
             if not host and "data" in config_data:
                 nested_data = config_data.get("data", {})
                 host = host or nested_data.get("host") or nested_data.get(CONF_HOST)
                 username = username or nested_data.get("username") or nested_data.get(CONF_USERNAME)
-                password = password or nested_data.get("password") or nested_data.get(CONF_PASSWORD)
+                password = password or password_from_sources(nested_data)
 
             if host:
                 _LOGGER.debug(

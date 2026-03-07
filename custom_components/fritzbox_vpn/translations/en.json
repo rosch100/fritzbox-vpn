@@ -52,6 +52,13 @@
         "data": {
           "confirm": "Remove entities and reload integration"
         }
+      },
+      "repair_entity_ids_confirm": {
+        "title": "Repair entity ID suffixes",
+        "description": "Entity IDs that got a _2, _3, _4 suffix (e.g. after faulty deactivation) will be renamed back to the base ID. The stale base entry will be removed. Reload will run after repair.",
+        "data": {
+          "confirm": "Repair entity IDs and reload integration"
+        }
       }
     },
     "error": {
@@ -71,6 +78,16 @@
         "config_entry_id": {
           "name": "Config entry ID",
           "description": "Optional. Limit cleanup to this integration entry (e.g. from the integration options URL). If omitted, all Fritz!Box VPN entries are processed."
+        }
+      }
+    },
+    "repair_entity_id_suffixes": {
+      "name": "Repair entity ID suffixes",
+      "description": "Fix entity IDs that got a _2, _3, _4 suffix (e.g. after faulty deactivation). Removes the stale base entry and renames to the base ID. Optional: config_entry_id to limit to one integration.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Config entry ID",
+          "description": "Optional. Limit repair to this integration entry. If omitted, all Fritz!Box VPN entries are processed."
         }
       }
     }

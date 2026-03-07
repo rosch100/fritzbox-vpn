@@ -10,3 +10,14 @@ remove_unavailable_entities:
       required: false
       selector:
         text:
+
+repair_entity_id_suffixes:
+  name: Repair entity ID suffixes
+  description: Fix entity IDs that got a _2, _3, _4 suffix after faulty deactivation/reactivation. Removes the stale base entry and renames the suffixed entity to the base ID (e.g. switch.xyz_2 → switch.xyz). Optional config_entry_id limits to one entry.
+  fields:
+    config_entry_id:
+      name: Config entry ID
+      description: Optional. Limit repair to this integration entry. If omitted, all Fritz!Box VPN entries are processed.
+      required: false
+      selector:
+        text:

@@ -52,6 +52,13 @@
         "data": {
           "confirm": "Entitäten entfernen und Integration neu laden"
         }
+      },
+      "repair_entity_ids_confirm": {
+        "title": "Entitäts-ID-Suffixe reparieren",
+        "description": "Entitäts-IDs mit Suffix _2, _3, _4 (z. B. nach fehlerhafter Deaktivierung) werden wieder auf die Basis-ID umgestellt. Der verwaiste Basis-Eintrag wird entfernt. Nach der Reparatur wird die Integration neu geladen.",
+        "data": {
+          "confirm": "Entitäts-IDs reparieren und Integration neu laden"
+        }
       }
     },
     "error": {
@@ -71,6 +78,16 @@
         "config_entry_id": {
           "name": "Config-Entry-ID",
           "description": "Optional. Nur diese Integration bereinigen (ID z. B. aus der URL bei Optionen). Ohne Angabe: alle Fritz!Box-VPN-Integrationen."
+        }
+      }
+    },
+    "repair_entity_id_suffixes": {
+      "name": "Entitäts-ID-Suffixe reparieren",
+      "description": "Entitäts-IDs mit Suffix _2, _3, _4 (z. B. nach fehlerhafter Deaktivierung) auf die Basis-ID zurücksetzen. Verwaisten Basis-Eintrag entfernen. Optional: config_entry_id auf eine Integration begrenzen.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Config-Entry-ID",
+          "description": "Optional. Reparatur auf diese Integration beschränken. Ohne Angabe: alle Fritz!Box-VPN-Integrationen."
         }
       }
     }

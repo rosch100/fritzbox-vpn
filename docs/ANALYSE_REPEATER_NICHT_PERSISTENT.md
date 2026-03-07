@@ -31,7 +31,8 @@ Das Verhalten gehört zu bekannten Themen der **offiziellen** Fritz-Integration 
   - [Issue #71822](https://github.com/home-assistant/core/issues/71822) (FRITZ!Box Tools: Rekonfiguration nach jedem Neustart bei Repeater; **closed**, Fix 2023.3 für unreachable)  
   - [Issue #134679](https://github.com/home-assistant/core/issues/134679) (Fritzconnection/Repeater nach 2025.1.0; **closed** not_planned; Repeater werden wieder als neues Gerät erkannt)  
   - [Issue #50159](https://github.com/home-assistant/core/issues/50159) (FRITZ!Box Tools Mesh: Auto-Discovery findet weiterhin neue Geräte; **closed**)  
-  - [Issue #163330](https://github.com/home-assistant/core/issues/163330) (Platform fritz does not generate unique IDs; **open**, under investigation – gleiche Integration/unique_id-Thematik)
+  - [Issue #163330](https://github.com/home-assistant/core/issues/163330) (Platform fritz does not generate unique IDs; **open**, under investigation – gleiche Integration/unique_id-Thematik)  
+  - **Hinweis:** Ein Fix für #165036 (stabiler Config-Entry-unique_id bei SSDP) **löst #163330 nicht**. #163330 betrifft **Entity-unique_ids** (z. B. Kollisionen bei `switch.fritz_box_5490_wi_fi_…`); der Fix betrifft nur den **Config-Entry-unique_id**.
 
 Die eigentliche Ursache liegt in der **Core-Integration** `homeassistant.components.fritz` (Config-Flow, SSDP, unique_id), nicht in der Custom-Integration **Fritz!Box VPN** aus diesem Repo.
 

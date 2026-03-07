@@ -11,7 +11,7 @@ from aiohttp import ClientSession, ClientTimeout, ClientConnectorError
 
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
-from homeassistant.const import CONF_HOST, CONF_USERNAME, CONF_PASSWORD
+from homeassistant.const import CONF_USERNAME, CONF_PASSWORD
 from homeassistant.components import persistent_notification
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.translation import async_get_translations
@@ -28,6 +28,7 @@ from .const import (
     RETRY_AFTER_SECONDS,
     API_LOGIN,
     API_DATA,
+    host_from_config,
     API_VPN_CONNECTION,
     API_PAGE_SHAREWIREGUARD,
     API_KEY_DATA,
@@ -67,7 +68,6 @@ from .const import (
     STATUS_UNKNOWN,
     AUTH_INDICATORS,
     DEFAULT_NAME_UNKNOWN,
-    HOST_FALLBACK_UNKNOWN,
     INTEGRATION_TITLE,
     NAME_FRITZBOX,
     NOTIFICATION_TITLE_AUTH_ERROR,
@@ -442,7 +442,7 @@ class FritzBoxVPNCoordinator(DataUpdateCoordinator):
         )
         self.fritz_session = FritzBoxVPNSession(
             async_get_clientsession(hass),
-            config[CONF_HOST],
+            host_from_config(config),
             config[CONF_USERNAME],
             config[CONF_PASSWORD],
         )
@@ -491,7 +491,7 @@ class FritzBoxVPNCoordinator(DataUpdateCoordinator):
         if self._auth_error_notified:
             return
 
-        host = self.config.get(CONF_HOST, HOST_FALLBACK_UNKNOWN)
+        host = host_from_config(self.config)
         notification_id = auth_error_notification_id(host)
         try:
             trans = await async_get_translations(
@@ -542,8 +542,6 @@ class FritzBoxVPNCoordinator(DataUpdateCoordinator):
         previous_uids = set(self.data.keys()) if self.data else set()
         try:
             connections = await self.fritz_session.async_get_vpn_connections()
-            if connections is None:
-                connections = {}
             if previous_uids:
                 current_uids = set(connections.keys())
                 removed_uids = previous_uids - current_uids
@@ -563,7 +561,7 @@ class FritzBoxVPNCoordinator(DataUpdateCoordinator):
             if self._auth_error_notified:
                 self._auth_error_notified = False
                 persistent_notification.dismiss(
-                    self.hass, auth_error_notification_id(self.config.get(CONF_HOST, HOST_FALLBACK_UNKNOWN))
+                    self.hass, auth_error_notification_id(host_from_config(self.config))
                 )
             return connections
         except (ConnectionError, ValueError) as err:
