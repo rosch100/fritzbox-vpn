@@ -83,7 +83,7 @@ async def async_setup_entry(
             _LOGGER.info(
                 "New VPN connection(s) detected, added %d switch entities: %s",
                 len(new_entities),
-                [coordinator.data[uid].get(API_KEY_NAME, uid) for uid in new_uids if coordinator.data and uid in coordinator.data],
+                [coordinator.data[uid].get(API_KEY_NAME, uid) for uid in new_uids],
             )
 
     def _on_coordinator_update() -> None:
@@ -121,21 +121,21 @@ class FritzBoxVPNSwitch(CoordinatorEntity, SwitchEntity):
 
     @property
     def available(self) -> bool:
-        """Return True if the coordinator has valid data and this connection is still present."""
+        """True if coordinator has valid data and this connection is present."""
         if not self.coordinator.last_update_success or not self.coordinator.data:
             return False
         return self._connection_uid in self.coordinator.data
 
     @property
     def is_on(self) -> bool:
-        """Return True if the VPN connection is active."""
+        """True if the VPN connection is active."""
         if self.coordinator.data and self._connection_uid in self.coordinator.data:
             return self.coordinator.data[self._connection_uid].get(API_KEY_ACTIVE, False)
         return False
 
     @property
     def extra_state_attributes(self) -> Dict[str, Any]:
-        """Return additional state attributes."""
+        """Additional state attributes."""
         if self.coordinator.data and self._connection_uid in self.coordinator.data:
             conn = self.coordinator.data[self._connection_uid]
             active = conn.get(API_KEY_ACTIVE, False)

@@ -122,19 +122,19 @@ class FritzBoxVPNStatusSensor(CoordinatorEntity, SensorEntity):
 
     @property
     def available(self) -> bool:
-        """Return True if the coordinator has valid data and this connection is still present."""
+        """True if coordinator has valid data and this connection is present."""
         if not self.coordinator.last_update_success or not self.coordinator.data:
             return False
         return self._connection_uid in self.coordinator.data
 
     @property
     def native_value(self) -> str:
-        """Return the status as text."""
+        """Status as text."""
         return self.coordinator.get_vpn_status(self._connection_uid)
 
     @property
     def native_unit_of_measurement(self) -> Optional[str]:
-        """Return the unit of measurement (none for status text)."""
+        """Unit of measurement (none for status text)."""
         return None
 
 
@@ -169,19 +169,19 @@ class FritzBoxVPNUIDSensor(CoordinatorEntity, SensorEntity):
 
     @property
     def available(self) -> bool:
-        """Return True if the coordinator has valid data and this connection is still present."""
+        """True if coordinator has valid data and this connection is present."""
         if not self.coordinator.last_update_success or not self.coordinator.data:
             return False
         return self._connection_uid in self.coordinator.data
 
     @property
     def native_value(self) -> str:
-        """Return the connection UID."""
+        """Connection UID."""
         return self._connection_uid
 
     @property
     def native_unit_of_measurement(self) -> Optional[str]:
-        """Return the unit of measurement (none for identifier)."""
+        """Unit of measurement (none for identifier)."""
         return None
 
 
@@ -216,19 +216,19 @@ class FritzBoxVPNVPNUIDSensor(CoordinatorEntity, SensorEntity):
 
     @property
     def available(self) -> bool:
-        """Return True if the coordinator has valid data and this connection is still present."""
+        """True if coordinator has valid data and this connection is present."""
         if not self.coordinator.last_update_success or not self.coordinator.data:
             return False
         return self._connection_uid in self.coordinator.data
 
     @property
     def native_value(self) -> str:
-        """Return the VPN UID."""
+        """VPN UID."""
         if self.coordinator.data and self._connection_uid in self.coordinator.data:
             return self.coordinator.data[self._connection_uid].get(API_KEY_UID, '')
         return ''
 
     @property
     def native_unit_of_measurement(self) -> Optional[str]:
-        """Return the unit of measurement (none for VPN UID)."""
+        """Unit of measurement (none for VPN UID)."""
         return None

@@ -76,6 +76,15 @@ Das Update-Intervall legt fest, wie oft die Integration die FritzBox abfragt. Ni
 
 **Reconnects und Last reduzieren:** Die Integration nutzt Session-Caching (ein Login pro Ladevorgang) und bei Abfragefehlern einen 5‑Minuten-Backoff vor dem nächsten Versuch. Für noch weniger Reconnects und FritzBox-Last das Update-Intervall auf 300 Sekunden (5 Min) oder höher setzen; Maximum ist 3600 (1 h).
 
+### Optionen und Dienste
+
+Unter **Einstellungen > Geräte & Dienste** die Fritz!Box-VPN-Integration auswählen und **Konfigurieren** öffnen:
+
+- **Unavailable-Entitäten entfernen**: Wird nur angezeigt, wenn Entitäten zu VPN-Verbindungen gehören, die auf der Fritz!Box nicht mehr existieren. Entfernt diese Entitäten und Geräte und lädt die Integration neu.
+- **Entitäts-ID-Suffixe reparieren**: Falls Entitäten ein Suffix `_2`, `_3`, … bekommen haben (z. B. nach Deaktivieren/Reaktivieren), werden die ursprünglichen Entitäts-IDs wiederhergestellt, damit Automatisierungen weiter funktionieren.
+
+Die gleichen Aktionen stehen als **Dienste** zur Verfügung (Entwicklerwerkzeuge > Dienste): `fritzbox_vpn.remove_unavailable_entities` und `fritzbox_vpn.repair_entity_id_suffixes`. Optional kann bei mehreren Fritz!Box-VPN-Integrationen `config_entry_id` übergeben werden.
+
 ### Sicherheit
 
 Alle Zugangsdaten (Benutzername und Passwort) werden sicher von Home Assistant gespeichert:
@@ -169,7 +178,6 @@ Vor der Konfiguration der Integration müssen Sie die erforderlichen Einstellung
 ## Dokumentation
 
 - **Projekt & Issues:** [GitHub-Repository](https://github.com/rosch100/fritzbox-vpn)
-- **Implementierungshinweise:** Siehe das Verzeichnis `docs/` im Repository (z. B. Architektur- und Review-Notizen).
 
 ## Unterstützung
 

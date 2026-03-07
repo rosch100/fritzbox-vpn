@@ -80,7 +80,7 @@ _LOGGER = logging.getLogger(__name__)
 
 
 def _connection_active_from_api(conn: Dict[str, Any]) -> bool:
-    """Derive active state from API (keys active/activated, int/str/bool)."""
+    """Active state from API (active/activated, int/str/bool)."""
     raw = conn.get(API_KEY_ACTIVE)
     if raw is None:
         raw = conn.get(API_KEY_ACTIVATED)
@@ -96,7 +96,7 @@ def _connection_active_from_api(conn: Dict[str, Any]) -> bool:
 
 
 def _normalize_box_connections(box: Any) -> Dict[str, Any]:
-    """Convert API boxConnections (list or dict) to dict keyed by uid with normalized active."""
+    """API boxConnections (list or dict) → dict keyed by uid with normalized active."""
     result: Dict[str, Any] = {}
     items = box if isinstance(box, list) else box.values() if isinstance(box, dict) else ()
     for c in items:
@@ -109,7 +109,7 @@ def _normalize_box_connections(box: Any) -> Dict[str, Any]:
 
 
 def _parse_challenge_from_login_xml(content: str) -> Optional[str]:
-    """Extract challenge from login_sid.lua XML; None on parse error or missing."""
+    """Challenge from login_sid.lua XML; None if missing or parse error."""
     if not (content and content.strip()):
         return None
     try:
@@ -120,7 +120,7 @@ def _parse_challenge_from_login_xml(content: str) -> Optional[str]:
 
 
 def _parse_sid_from_login_response(content: str) -> Optional[str]:
-    """Extract SID from login response XML; None on parse error."""
+    """SID from login response XML; None on parse error."""
     if not (content and content.strip()):
         return None
     try:
@@ -131,7 +131,7 @@ def _parse_sid_from_login_response(content: str) -> Optional[str]:
 
 
 def _extract_box_connections_from_data(data: Dict[str, Any]) -> Any:
-    """Extract boxConnections from data.lua JSON; raw list/dict or None if invalid."""
+    """boxConnections from data.lua JSON; raw list/dict or None."""
     if not isinstance(data, dict):
         return None
     data_inner = data.get(API_KEY_DATA)
@@ -144,7 +144,7 @@ def _extract_box_connections_from_data(data: Dict[str, Any]) -> Any:
 
 
 def normalize_update_interval(value: Any) -> int:
-    """Normalize update_interval to int in valid range. SSOT for parsing."""
+    """Update interval as int in valid range. SSOT for parsing."""
     def clamp(n: int) -> int:
         if UPDATE_INTERVAL_MIN <= n <= UPDATE_INTERVAL_MAX:
             return n
@@ -235,7 +235,7 @@ class FritzBoxVPNSession:
         return self.session, self.sid
 
     async def _fetch_login_page(self, login_url: str, timeout: ClientTimeout) -> Optional[str]:
-        """Fetch login page (GET); HTTPS→HTTP fallback. Content or None."""
+        """GET login page; HTTPS→HTTP fallback. Returns content or None."""
         try:
             async with self.session.get(login_url, ssl=False, timeout=timeout) as response:
                 if response.status == HTTP_STATUS_OK:
@@ -272,7 +272,7 @@ class FritzBoxVPNSession:
                 return await response.text()
 
     async def _fetch_vpn_connections_once(self) -> Dict[str, Any]:
-        """One request for VPN connections; {} on non-auth errors."""
+        """Single VPN connections request; {} on non-auth errors."""
         session, sid = await self.async_get_session()
         data_url = f"{self.protocol}://{self.host}{API_DATA}"
         params = {
@@ -292,19 +292,11 @@ class FritzBoxVPNSession:
 
             content_type = (response.headers.get("Content-Type") or "").lower()
             if CONTENT_TYPE_JSON not in content_type:
-                _LOGGER.debug(
-                    "VPN data response has unexpected content type %s, treating as invalid SID",
-                    content_type or "(none)",
-                )
                 raise ValueError(ERROR_MSG_INVALID_SID_HTML)
             try:
                 body = await response.text()
                 data = json.loads(body)
             except (json.JSONDecodeError, TypeError) as err:
-                _LOGGER.debug(
-                    "VPN data response is not valid JSON (%s), treating as invalid SID",
-                    err,
-                )
                 raise ValueError(ERROR_MSG_INVALID_SID_HTML) from err
 
             box = _extract_box_connections_from_data(data)
@@ -417,6 +409,7 @@ class FritzBoxVPNSession:
         self.sid = None
 
     async def async_close(self) -> None:
+        """Clear cached SID."""
         self.sid = None
 
 
@@ -432,7 +425,6 @@ class FritzBoxVPNCoordinator(DataUpdateCoordinator):
         on_orphaned_removed: Optional[Callable[[str, Set[str]], None]] = None,
     ):
         update_interval_seconds = _resolve_update_interval_seconds(config, options)
-        _LOGGER.info("Coordinator: Using update_interval=%d seconds", update_interval_seconds)
 
         super().__init__(
             hass,
@@ -463,11 +455,11 @@ class FritzBoxVPNCoordinator(DataUpdateCoordinator):
         return STATUS_CONNECTED if connected else STATUS_ENABLED
 
     def _is_auth_error(self, error: Exception) -> bool:
-        """Check if an error is an authentication error."""
+        """True if error message indicates authentication failure."""
         return any(ind in str(error).lower() for ind in AUTH_INDICATORS)
 
     def _build_auth_error_fallback_message(self, host: str, error: Exception) -> str:
-        """Fallback auth error message when translations unavailable."""
+        """German fallback when translations unavailable."""
         config_link = ""
         if self.entry_id:
             config_link = (
@@ -531,11 +523,7 @@ class FritzBoxVPNCoordinator(DataUpdateCoordinator):
         )
 
         self._auth_error_notified = True
-        _LOGGER.warning(
-            "Authentication error detected. Notification created. "
-            "Please check credentials in integration settings. Entry ID: %s",
-            self.entry_id
-        )
+        _LOGGER.warning("Auth error; notification shown. Entry ID: %s", self.entry_id)
 
     async def _async_update_data(self) -> Dict[str, Any]:
         """Fetch latest VPN data from Fritz!Box."""
@@ -588,9 +576,10 @@ class FritzBoxVPNCoordinator(DataUpdateCoordinator):
             ) from err
 
     async def toggle_vpn(self, connection_uid: str, enable: bool) -> bool:
+        """Toggle VPN on/off; show auth notification on auth errors."""
         try:
             return await self.fritz_session.async_toggle_vpn(connection_uid, enable)
-        except (ConnectionError, ValueError, Exception) as err:
+        except Exception as err:
             if self._is_auth_error(err):
                 await self._create_auth_error_notification(err)
             raise

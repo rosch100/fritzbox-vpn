@@ -116,14 +116,14 @@ class FritzBoxVPNConnectedBinarySensor(CoordinatorEntity, BinarySensorEntity):
 
     @property
     def available(self) -> bool:
-        """Return True if the coordinator has valid data and this connection is still present."""
+        """True if coordinator has valid data and this connection is present."""
         if not self.coordinator.last_update_success or not self.coordinator.data:
             return False
         return self._connection_uid in self.coordinator.data
 
     @property
     def is_on(self) -> bool:
-        """Return True if the VPN connection is connected."""
+        """True if the VPN connection is connected."""
         if self.coordinator.data and self._connection_uid in self.coordinator.data:
             return self.coordinator.data[self._connection_uid].get(API_KEY_CONNECTED, False)
         return False

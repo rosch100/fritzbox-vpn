@@ -317,13 +317,7 @@ async def validate_input(hass: HomeAssistant, data: Dict[str, Any]) -> Dict[str,
     except Exception as err:
         error_msg = str(err)
         if any(ind in error_msg.lower() for ind in ERROR_INDICATOR_AUTH):
-            _LOGGER.warning(
-                "Authentication failed. Invalid SID can be caused by: (1) Incorrect username or password, or "
-                "(2) TR-064 not being enabled. Please check credentials first, then verify TR-064 is enabled "
-                "at: Home Network > Network > Network settings > Access Settings in the Home Network. "
-                "Note: UPnP is only needed for automatic discovery, not for API access. "
-                "Error: %s", error_msg
-            )
+            _LOGGER.warning("Authentication failed (check credentials and TR-064). Error: %s", error_msg)
             raise InvalidAuth from err
         _LOGGER.exception("Error validating input: %s", err)
         if any(ind in error_msg.lower() for ind in ERROR_INDICATOR_CONNECT):

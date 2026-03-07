@@ -22,7 +22,6 @@ from .const import (
     DATA_COORDINATOR,
     DOMAIN,
     ERROR_INDICATOR_AUTH,
-    HOST_FALLBACK_UNKNOWN,
     host_from_config,
     MANUFACTURER_AVM,
     MODEL_FRITZBOX,
@@ -30,7 +29,6 @@ from .const import (
     SERVICE_REMOVE_UNAVAILABLE_ENTITIES,
     SERVICE_REPAIR_ENTITY_ID_SUFFIXES,
     auth_error_notification_id,
-    mask_config_for_log,
 )
 from .coordinator import FritzBoxVPNCoordinator
 
@@ -123,8 +121,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up FritzBox VPN from a config entry."""
     host = _entry_host(entry)
     _LOGGER.info("Setting up FritzBox VPN integration for host: %s", host)
-    _LOGGER.debug("Config entry data: %s", mask_config_for_log(entry.data))
-    _LOGGER.debug("Config entry options: %s", mask_config_for_log(entry.options or {}))
 
     coordinator = FritzBoxVPNCoordinator(
         hass,

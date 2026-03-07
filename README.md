@@ -76,6 +76,15 @@ The update interval determines how frequently the integration polls the FritzBox
 
 **Reducing reconnects and load:** The integration uses session caching (one login per load) and, on fetch errors, a 5‑minute backoff before retrying. To further reduce reconnects and FritzBox load, set the update interval to 300 seconds (5 min) or higher; maximum is 3600 (1 h).
 
+### Options and services
+
+In **Settings > Devices & Services**, select your Fritz!Box VPN integration and click **Configure** to open the options menu:
+
+- **Remove unavailable entities**: Shown only when some entities refer to VPN connections that no longer exist on the Fritz!Box. Removes those entities and devices from Home Assistant and reloads the integration.
+- **Repair entity ID suffixes**: If entities got a `_2`, `_3`, … suffix (e.g. after disabling/reactivating), this restores the original entity IDs so automations keep working.
+
+The same actions are available as **services** (Developer Tools > Services): `fritzbox_vpn.remove_unavailable_entities` and `fritzbox_vpn.repair_entity_id_suffixes`. You can pass an optional `config_entry_id` when you have multiple Fritz!Box VPN entries.
+
 ### Security
 
 All credentials (username and password) are securely stored by Home Assistant:
@@ -169,7 +178,6 @@ Before configuring the integration, you need to enable the required settings in 
 ## Documentation
 
 - **Project & issues:** [GitHub repository](https://github.com/rosch100/fritzbox-vpn)
-- **Implementation notes:** See the `docs/` directory in the repository (e.g. architecture and review notes).
 
 ## Support
 
