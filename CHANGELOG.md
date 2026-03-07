@@ -4,6 +4,14 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.10.7b0] - 2026-03-07 (Beta)
+
+### Fixed
+
+- **HACS**: Ungültigen Schlüssel `domains` aus `hacs.json` entfernt (HACS-Validation läuft durch).
+
+[0.10.7b0]: https://github.com/rosch100/fritzbox-vpn/releases/tag/v0.10.7b0
+
 ## [0.10.6b0] - 2026-03-07 (Beta)
 
 ### Fixed
