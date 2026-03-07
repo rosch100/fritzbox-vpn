@@ -6,6 +6,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-03-07
+
+### Changed
+
+- **Home Assistant 2026.1.0** or newer required.
+- **Options**: Remove unavailable entities and repair entity IDs with `_2`, `_3`, … suffix (Integration → Configure).
+- **Services**: `fritzbox_vpn.remove_unavailable_entities`, `fritzbox_vpn.repair_entity_id_suffixes` (optional `config_entry_id`).
+- Entity IDs stay stable when a VPN connection disappears temporarily and reappears.
+
+[0.11.0]: https://github.com/rosch100/fritzbox-vpn/releases/tag/v0.11.0
+
 ## [0.10.9b0] - 2026-03-07 (Beta)
 
 ### Changed
