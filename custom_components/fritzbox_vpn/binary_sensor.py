@@ -2,7 +2,7 @@
 
 import asyncio
 import logging
-from typing import Any, Dict
+from typing import Any, Dict, Set
 
 from homeassistant.components.binary_sensor import BinarySensorEntity, BinarySensorDeviceClass
 from homeassistant.config_entries import ConfigEntry
@@ -40,8 +40,8 @@ async def async_setup_entry(
         DATA_KNOWN_UIDS_BINARY_SENSOR, set()
     )
 
-    def _create_binary_sensor_entities(uids: set):
-        """Create connected binary sensor entities for the given UIDs."""
+    def _create_binary_sensor_entities(uids: Set[str]):
+        """Create connected binary sensors for UIDs present in coordinator.data."""
         if not coordinator.data:
             return []
         return [
@@ -76,7 +76,7 @@ async def async_setup_entry(
             known_uids.update(new_uids)
             async_add_entities(new_entities)
             _LOGGER.info(
-                "New VPN connection(s) detected, added %d binary sensor entity(ies)",
+                "New VPN connection(s) detected, added %d binary sensor entities",
                 len(new_entities),
             )
 
@@ -96,7 +96,6 @@ class FritzBoxVPNConnectedBinarySensor(CoordinatorEntity, BinarySensorEntity):
         connection_uid: str,
         connection_data: Dict[str, Any],
     ) -> None:
-        """Initialize the connected binary sensor."""
         super().__init__(coordinator)
         self._entry = entry
         self._connection_uid = connection_uid

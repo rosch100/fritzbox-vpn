@@ -1,7 +1,7 @@
 """The FritzBox VPN integration."""
 
 import logging
-from typing import Any
+from typing import Any, Set
 
 import voluptuous as vol
 
@@ -32,10 +32,40 @@ _LOGGER = logging.getLogger(__name__)
 
 PLATFORMS: list[Platform] = [Platform.SWITCH, Platform.BINARY_SENSOR, Platform.SENSOR]
 
-# Optional service parameter: limit cleanup to this config entry ID
 SERVICE_SCHEMA_REMOVE_UNAVAILABLE = vol.Schema(
     {vol.Optional(CONF_CONFIG_ENTRY_ID): str}
 )
+
+
+def _entry_ids_for_cleanup_service(hass: HomeAssistant, call: ServiceCall) -> list[str]:
+    """Entry IDs to process for remove_unavailable_entities: one from call data or all loaded entries."""
+    if call.data.get(CONF_CONFIG_ENTRY_ID):
+        return [call.data[CONF_CONFIG_ENTRY_ID]]
+    return [
+        e.entry_id
+        for e in hass.config_entries.async_entries(DOMAIN)
+        if e.entry_id in hass.data.get(DOMAIN, {})
+    ]
+
+
+def _apply_auto_cleanup(hass: HomeAssistant, entry_id: str, current_uids: Set[str]) -> None:
+    """Clear known_uids for VPN connections no longer in current_uids. Does not remove registry entries
+    so entity_id stays stable when a connection reappears (e.g. after temporary error).
+    """
+    from .config_flow import (
+        _get_orphaned_entity_entries,
+        _remove_orphaned_entities_and_clear_known_uids,
+    )
+    to_remove, err = _get_orphaned_entity_entries(hass, entry_id, current_uids=current_uids)
+    if err or not to_remove:
+        return
+    _remove_orphaned_entities_and_clear_known_uids(
+        hass, entry_id, to_remove, remove_from_registry=False
+    )
+    _LOGGER.info(
+        "Cleared known_uids for %d unavailable connection(s); entity IDs kept for automation stability",
+        len(to_remove),
+    )
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
@@ -43,14 +73,18 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     _LOGGER.info("Setting up FritzBox VPN integration for host: %s", entry.data.get(CONF_HOST, DEFAULT_NAME_UNKNOWN))
     _LOGGER.debug("Config entry data: %s", mask_config_for_log(entry.data))
     _LOGGER.debug("Config entry options: %s", mask_config_for_log(entry.options or {}))
-    
-    coordinator = FritzBoxVPNCoordinator(hass, entry.data, entry.options, entry.entry_id)
 
-    # Remove any existing authentication error notification (in case of reload)
+    coordinator = FritzBoxVPNCoordinator(
+        hass,
+        entry.data,
+        entry.options,
+        entry.entry_id,
+        on_orphaned_removed=lambda eid, cu: _apply_auto_cleanup(hass, eid, cu),
+    )
+
     host = entry.data.get(CONF_HOST, HOST_FALLBACK_UNKNOWN)
     persistent_notification.dismiss(hass, auth_error_notification_id(host))
 
-    # Fetch initial data so we have data when the entities are added
     try:
         await coordinator.async_config_entry_first_refresh()
         _LOGGER.info("Initial data refresh successful. Found %d VPN connections", len(coordinator.data) if coordinator.data else 0)
@@ -59,7 +93,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         if any(ind in err_lower for ind in ERROR_INDICATOR_AUTH):
             _LOGGER.error("Failed to fetch initial VPN data due to authentication error: %s", err)
             return False
-        
+
         _LOGGER.warning("Failed to fetch initial VPN data, retrying later: %s", err)
         raise ConfigEntryNotReady(f"Timeout/Error connecting to {NAME_FRITZBOX}: {err}") from err
 
@@ -68,7 +102,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         DATA_COORDINATOR: coordinator,
     }
 
-    # Register service once (same handler for all entries)
     if "_service_remove_unavailable_registered" not in hass.data[DOMAIN]:
         from .config_flow import (
             _get_orphaned_entity_entries,
@@ -76,17 +109,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         )
 
         async def async_remove_unavailable_entities(call: ServiceCall) -> None:
-            """Remove entity registry entries for VPN connections no longer on the Fritz!Box."""
-            entry_ids: list[str] = []
-            if call.data.get(CONF_CONFIG_ENTRY_ID):
-                entry_ids = [call.data[CONF_CONFIG_ENTRY_ID]]
-            else:
-                entry_ids = [
-                    e.entry_id
-                    for e in hass.config_entries.async_entries(DOMAIN)
-                    if e.entry_id in hass.data.get(DOMAIN, {})
-                ]
-            for entry_id in entry_ids:
+            """Remove entity and device registry entries for VPN connections no longer on the Fritz!Box."""
+            for entry_id in _entry_ids_for_cleanup_service(hass, call):
                 to_remove, err = _get_orphaned_entity_entries(hass, entry_id)
                 if err:
                     _LOGGER.warning(
@@ -113,7 +137,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         )
         hass.data[DOMAIN]["_service_remove_unavailable_registered"] = True
 
-    # Create parent device registry entry for the FritzBox
     device_registry = dr.async_get(hass)
     host_for_url = entry.data.get(CONF_HOST, HOST_FALLBACK_UNKNOWN)
     parent_device = device_registry.async_get_or_create(
@@ -126,10 +149,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     )
     _LOGGER.info("Created parent device: %s (ID: %s)", parent_device.name, parent_device.id)
 
-    # VPN connection devices will be created automatically by the entities
-    # They use via_device to link to the parent device
-
-    # Forward the setup to the switch platform
     try:
         await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
         _LOGGER.info("Successfully set up all platforms")
@@ -147,8 +166,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     if unload_ok:
         coordinator: FritzBoxVPNCoordinator = hass.data[DOMAIN][entry.entry_id][DATA_COORDINATOR]
         await coordinator.fritz_session.async_close()
-        
-        # Remove authentication error notification if it exists
+
         host = entry.data.get(CONF_HOST, HOST_FALLBACK_UNKNOWN)
         persistent_notification.dismiss(hass, auth_error_notification_id(host))
 

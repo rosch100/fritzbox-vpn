@@ -6,7 +6,7 @@ import json
 import logging
 import xml.etree.ElementTree as ET
 from datetime import timedelta
-from typing import Any, Dict, Optional
+from typing import Any, Callable, Dict, Optional, Set
 from aiohttp import ClientSession, ClientTimeout, ClientConnectorError
 
 from homeassistant.core import HomeAssistant
@@ -80,7 +80,7 @@ _LOGGER = logging.getLogger(__name__)
 
 
 def _connection_active_from_api(conn: Dict[str, Any]) -> bool:
-    """Derive active state from API response. Supports keys 'active' and 'activated', int/str/bool."""
+    """Derive active state from API (keys active/activated, int/str/bool)."""
     raw = conn.get(API_KEY_ACTIVE)
     if raw is None:
         raw = conn.get(API_KEY_ACTIVATED)
@@ -96,7 +96,7 @@ def _connection_active_from_api(conn: Dict[str, Any]) -> bool:
 
 
 def _normalize_box_connections(box: Any) -> Dict[str, Any]:
-    """Convert API boxConnections (list or dict) to dict keyed by uid with normalized 'active'."""
+    """Convert API boxConnections (list or dict) to dict keyed by uid with normalized active."""
     result: Dict[str, Any] = {}
     items = box if isinstance(box, list) else box.values() if isinstance(box, dict) else ()
     for c in items:
@@ -109,7 +109,7 @@ def _normalize_box_connections(box: Any) -> Dict[str, Any]:
 
 
 def _parse_challenge_from_login_xml(content: str) -> Optional[str]:
-    """Extract challenge from login_sid.lua XML. Returns None on parse error or missing challenge."""
+    """Extract challenge from login_sid.lua XML; None on parse error or missing."""
     if not (content and content.strip()):
         return None
     try:
@@ -120,7 +120,7 @@ def _parse_challenge_from_login_xml(content: str) -> Optional[str]:
 
 
 def _parse_sid_from_login_response(content: str) -> Optional[str]:
-    """Extract SID from login response XML. Returns None on parse error."""
+    """Extract SID from login response XML; None on parse error."""
     if not (content and content.strip()):
         return None
     try:
@@ -131,7 +131,7 @@ def _parse_sid_from_login_response(content: str) -> Optional[str]:
 
 
 def _extract_box_connections_from_data(data: Dict[str, Any]) -> Any:
-    """Extract boxConnections from data.lua JSON. Returns raw list/dict or None if structure invalid."""
+    """Extract boxConnections from data.lua JSON; raw list/dict or None if invalid."""
     if not isinstance(data, dict):
         return None
     data_inner = data.get(API_KEY_DATA)
@@ -144,26 +144,22 @@ def _extract_box_connections_from_data(data: Dict[str, Any]) -> Any:
 
 
 def normalize_update_interval(value: Any) -> int:
-    """Normalize a raw update_interval value to an int in [UPDATE_INTERVAL_MIN, UPDATE_INTERVAL_MAX]. SSOT for parsing."""
-    if value is None:
-        return DEFAULT_UPDATE_INTERVAL
-    if isinstance(value, int):
-        if UPDATE_INTERVAL_MIN <= value <= UPDATE_INTERVAL_MAX:
-            return value
-        _LOGGER.warning(
-            "update_interval %d out of range (%d–%d), using default %s",
-            value, UPDATE_INTERVAL_MIN, UPDATE_INTERVAL_MAX, DEFAULT_UPDATE_INTERVAL,
-        )
-        return DEFAULT_UPDATE_INTERVAL
-    try:
-        n = int(value)
+    """Normalize update_interval to int in valid range. SSOT for parsing."""
+    def clamp(n: int) -> int:
         if UPDATE_INTERVAL_MIN <= n <= UPDATE_INTERVAL_MAX:
             return n
         _LOGGER.warning(
-            "update_interval %r -> %d out of range (%d–%d), using default %s",
-            value, n, UPDATE_INTERVAL_MIN, UPDATE_INTERVAL_MAX, DEFAULT_UPDATE_INTERVAL,
+            "update_interval %d out of range (%d–%d), using default %s",
+            n, UPDATE_INTERVAL_MIN, UPDATE_INTERVAL_MAX, DEFAULT_UPDATE_INTERVAL,
         )
         return DEFAULT_UPDATE_INTERVAL
+
+    if value is None:
+        return DEFAULT_UPDATE_INTERVAL
+    if isinstance(value, int):
+        return clamp(value)
+    try:
+        return clamp(int(value))
     except (ValueError, TypeError):
         _LOGGER.warning(
             "Invalid update_interval value %r, using default %s",
@@ -177,7 +173,7 @@ def _resolve_update_interval_seconds(
     config: Dict[str, Any],
     options: Optional[Dict[str, Any]],
 ) -> int:
-    """Resolve update interval in seconds from options, then config, then default. Always returns a valid int."""
+    """Resolve update interval from options, then config, then default."""
     options_dict = options or {}
     value = options_dict.get(CONF_UPDATE_INTERVAL) or config.get(CONF_UPDATE_INTERVAL) or DEFAULT_UPDATE_INTERVAL
     return normalize_update_interval(value)
@@ -187,18 +183,15 @@ class FritzBoxVPNSession:
     """Session manager for FritzBox Web-UI API."""
 
     def __init__(self, session: ClientSession, host: str, username: str, password: str, protocol: str = DEFAULT_PROTOCOL):
-        """Initialize the session manager."""
         self.session = session
         self.host = host
         self.username = username
         self.password = password
-        # Validate and set protocol (default to https, fallback to http if https fails)
         self.protocol = protocol if protocol in PROTOCOLS_ALLOWED else DEFAULT_PROTOCOL
         self.sid: Optional[str] = None
 
     async def async_get_session(self) -> tuple[ClientSession, str]:
-        """Get a session ID from the FritzBox. Reuses cached SID if valid to avoid
-        re-login on every poll (reduces router login notifications / email spam)."""
+        """Return session and SID; reuse cached SID if valid."""
         if self.sid is not None:
             return self.session, self.sid
 
@@ -242,7 +235,7 @@ class FritzBoxVPNSession:
         return self.session, self.sid
 
     async def _fetch_login_page(self, login_url: str, timeout: ClientTimeout) -> Optional[str]:
-        """Fetch login page (GET). Handles HTTPS→HTTP fallback. Returns page content or None."""
+        """Fetch login page (GET); HTTPS→HTTP fallback. Content or None."""
         try:
             async with self.session.get(login_url, ssl=False, timeout=timeout) as response:
                 if response.status == HTTP_STATUS_OK:
@@ -279,7 +272,7 @@ class FritzBoxVPNSession:
                 return await response.text()
 
     async def _fetch_vpn_connections_once(self) -> Dict[str, Any]:
-        """Perform one request to get VPN connections. Returns {} on non-auth errors."""
+        """One request for VPN connections; {} on non-auth errors."""
         session, sid = await self.async_get_session()
         data_url = f"{self.protocol}://{self.host}{API_DATA}"
         params = {
@@ -320,7 +313,7 @@ class FritzBoxVPNSession:
             return {}
 
     async def async_get_vpn_connections(self) -> Dict[str, Any]:
-        """Get list of WireGuard VPN connections. Uses cached session; retries once on SID expiry."""
+        """WireGuard VPN connections; cached session, retry once on SID expiry."""
         try:
             return await self._fetch_vpn_connections_once()
         except ValueError as err:
@@ -336,8 +329,7 @@ class FritzBoxVPNSession:
             raise
 
     async def async_toggle_vpn(self, connection_uid: str, enable: bool, _sid_retry: bool = True) -> bool:
-        """Toggle a VPN connection on/off. Uses cached session; retries once on 403 (expired SID)."""
-        # Get connection details to find the UID
+        """Toggle VPN on/off; retry once on 403 (expired SID)."""
         connections = await self.async_get_vpn_connections()
         if connection_uid not in connections:
             _LOGGER.error("VPN connection %s not found", connection_uid)
@@ -349,7 +341,6 @@ class FritzBoxVPNSession:
             _LOGGER.error("VPN connection %s has no UID", connection_uid)
             return False
 
-        # Check current status
         current_active = conn.get(API_KEY_ACTIVE, False)
         if current_active == enable:
             vpn_name = conn.get(API_KEY_NAME, DEFAULT_NAME_UNKNOWN)
@@ -422,29 +413,25 @@ class FritzBoxVPNSession:
             return False
 
     def invalidate_session(self) -> None:
-        """Invalidate cached SID so next request will perform a new login."""
+        """Invalidate cached SID so next request performs new login."""
         self.sid = None
 
     async def async_close(self) -> None:
-        """Close the session."""
-        # Only clear SID, do not close the shared session
         self.sid = None
 
 
 class FritzBoxVPNCoordinator(DataUpdateCoordinator):
     """Coordinator for FritzBox VPN data."""
 
-    def __init__(self, hass: HomeAssistant, config: Dict[str, Any], options: Optional[Dict[str, Any]] = None, entry_id: Optional[str] = None):
-        """Initialize the coordinator."""
+    def __init__(
+        self,
+        hass: HomeAssistant,
+        config: Dict[str, Any],
+        options: Optional[Dict[str, Any]] = None,
+        entry_id: Optional[str] = None,
+        on_orphaned_removed: Optional[Callable[[str, Set[str]], None]] = None,
+    ):
         update_interval_seconds = _resolve_update_interval_seconds(config, options)
-        _LOGGER.debug(
-            "Coordinator init: options=%s, config[%s]=%s, options[%s]=%s",
-            mask_config_for_log(options or {}),
-            CONF_UPDATE_INTERVAL,
-            config.get(CONF_UPDATE_INTERVAL),
-            CONF_UPDATE_INTERVAL,
-            (options or {}).get(CONF_UPDATE_INTERVAL),
-        )
         _LOGGER.info("Coordinator: Using update_interval=%d seconds", update_interval_seconds)
 
         super().__init__(
@@ -462,6 +449,7 @@ class FritzBoxVPNCoordinator(DataUpdateCoordinator):
         self.config = config
         self.entry_id = entry_id
         self._auth_error_notified = False
+        self._on_orphaned_removed = on_orphaned_removed
 
     def get_vpn_status(self, connection_uid: str) -> str:
         """Get the textual status of a VPN connection."""
@@ -479,7 +467,7 @@ class FritzBoxVPNCoordinator(DataUpdateCoordinator):
         return any(ind in str(error).lower() for ind in AUTH_INDICATORS)
 
     def _build_auth_error_fallback_message(self, host: str, error: Exception) -> str:
-        """Build fallback auth error message (no translations). Single source for fallback text."""
+        """Fallback auth error message when translations unavailable."""
         config_link = ""
         if self.entry_id:
             config_link = (
@@ -499,7 +487,7 @@ class FritzBoxVPNCoordinator(DataUpdateCoordinator):
         )
 
     async def _create_auth_error_notification(self, error: Exception) -> None:
-        """Create a persistent notification for authentication errors."""
+        """Show persistent notification for authentication errors."""
         if self._auth_error_notified:
             return
 
@@ -541,7 +529,7 @@ class FritzBoxVPNCoordinator(DataUpdateCoordinator):
             title=title,
             notification_id=notification_id,
         )
-        
+
         self._auth_error_notified = True
         _LOGGER.warning(
             "Authentication error detected. Notification created. "
@@ -550,11 +538,13 @@ class FritzBoxVPNCoordinator(DataUpdateCoordinator):
         )
 
     async def _async_update_data(self) -> Dict[str, Any]:
-        """Fetch the latest VPN data."""
+        """Fetch latest VPN data from Fritz!Box."""
         previous_uids = set(self.data.keys()) if self.data else set()
         try:
             connections = await self.fritz_session.async_get_vpn_connections()
-            if previous_uids and connections is not None:
+            if connections is None:
+                connections = {}
+            if previous_uids:
                 current_uids = set(connections.keys())
                 removed_uids = previous_uids - current_uids
                 if removed_uids:
@@ -568,7 +558,8 @@ class FritzBoxVPNCoordinator(DataUpdateCoordinator):
                         names or list(removed_uids),
                     )
                     _LOGGER.info(LOG_MSG_VPN_CONNECTIONS_REMOVED_HINT)
-            # Reset notification flag on successful update
+                    if self._on_orphaned_removed and self.entry_id:
+                        self._on_orphaned_removed(self.entry_id, current_uids)
             if self._auth_error_notified:
                 self._auth_error_notified = False
                 persistent_notification.dismiss(
@@ -579,7 +570,6 @@ class FritzBoxVPNCoordinator(DataUpdateCoordinator):
             if self._is_auth_error(err):
                 await self._create_auth_error_notification(err)
                 raise UpdateFailed(f"Error fetching VPN data: {err}") from err
-            # Transient error: backoff to avoid reconnect storm (next try in RETRY_AFTER_SECONDS)
             raise UpdateFailed(
                 f"Error fetching VPN data: {err}",
                 retry_after=RETRY_AFTER_SECONDS,
@@ -600,7 +590,6 @@ class FritzBoxVPNCoordinator(DataUpdateCoordinator):
             ) from err
 
     async def toggle_vpn(self, connection_uid: str, enable: bool) -> bool:
-        """Toggle a VPN connection."""
         try:
             return await self.fritz_session.async_toggle_vpn(connection_uid, enable)
         except (ConnectionError, ValueError, Exception) as err:

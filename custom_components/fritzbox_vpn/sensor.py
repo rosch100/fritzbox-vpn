@@ -2,7 +2,7 @@
 
 import asyncio
 import logging
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Set
 
 from homeassistant.components.sensor import SensorEntity
 from homeassistant.config_entries import ConfigEntry
@@ -43,8 +43,8 @@ async def async_setup_entry(
         DATA_KNOWN_UIDS_SENSOR, set()
     )
 
-    def _create_sensor_entities(uids: set):
-        """Create status/uid/vpn_uid sensor entities for the given UIDs."""
+    def _create_sensor_entities(uids: Set[str]):
+        """Create status/uid/vpn_uid sensors for UIDs present in coordinator.data."""
         if not coordinator.data:
             return []
         entities = []
@@ -83,7 +83,7 @@ async def async_setup_entry(
             known_uids.update(new_uids)
             async_add_entities(new_entities)
             _LOGGER.info(
-                "New VPN connection(s) detected, added %d sensor entity(ies)",
+                "New VPN connection(s) detected, added %d sensor entities",
                 len(new_entities),
             )
 
@@ -103,7 +103,6 @@ class FritzBoxVPNStatusSensor(CoordinatorEntity, SensorEntity):
         connection_uid: str,
         connection_data: Dict[str, Any],
     ) -> None:
-        """Initialize the status sensor."""
         super().__init__(coordinator)
         self._entry = entry
         self._connection_uid = connection_uid
@@ -142,7 +141,7 @@ class FritzBoxVPNStatusSensor(CoordinatorEntity, SensorEntity):
 class FritzBoxVPNUIDSensor(CoordinatorEntity, SensorEntity):
     """Sensor entity for VPN connection UID."""
 
-    _attr_entity_registry_enabled_default = False  # Disabled by default
+    _attr_entity_registry_enabled_default = False
 
     def __init__(
         self,
@@ -151,7 +150,6 @@ class FritzBoxVPNUIDSensor(CoordinatorEntity, SensorEntity):
         connection_uid: str,
         connection_data: Dict[str, Any],
     ) -> None:
-        """Initialize the UID sensor."""
         super().__init__(coordinator)
         self._entry = entry
         self._connection_uid = connection_uid
@@ -190,7 +188,7 @@ class FritzBoxVPNUIDSensor(CoordinatorEntity, SensorEntity):
 class FritzBoxVPNVPNUIDSensor(CoordinatorEntity, SensorEntity):
     """Sensor entity for VPN internal UID."""
 
-    _attr_entity_registry_enabled_default = False  # Disabled by default
+    _attr_entity_registry_enabled_default = False
 
     def __init__(
         self,
@@ -199,7 +197,6 @@ class FritzBoxVPNVPNUIDSensor(CoordinatorEntity, SensorEntity):
         connection_uid: str,
         connection_data: Dict[str, Any],
     ) -> None:
-        """Initialize the VPN UID sensor."""
         super().__init__(coordinator)
         self._entry = entry
         self._connection_uid = connection_uid

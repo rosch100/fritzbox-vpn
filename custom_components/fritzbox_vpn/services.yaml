@@ -1,5 +1,4 @@
 # Fritz!Box VPN services
-# Call from Developer Tools > Services or from scripts/automations/dashboard buttons.
 
 remove_unavailable_entities:
   name: Remove unavailable entities

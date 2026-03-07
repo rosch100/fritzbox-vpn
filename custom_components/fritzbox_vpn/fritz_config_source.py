@@ -1,6 +1,6 @@
 """Source for existing FritzBox/AVM integration config.
 
-Used by the config flow to reuse host/username/password from an existing
+Used by config flow to reuse host/username/password from an existing
 Fritz or FritzBox Tools integration. Repeaters are filtered out (no WireGuard).
 """
 

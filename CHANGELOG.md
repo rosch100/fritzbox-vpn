@@ -4,6 +4,24 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.10.8b0] - 2026-03-07 (Beta)
+
+### Added
+
+- **Dokumentation**: HACS- und Home-Assistant-Konformitätsprüfung (`docs/HACS_AND_HOMEASSISTANT_COMPLIANCE.md`) inkl. Link zum Brands-Eintrag [custom_integrations/fritzbox_vpn](https://github.com/home-assistant/brands/tree/master/custom_integrations/fritzbox_vpn).
+
+### Changed
+
+- **Refactor**: `config_flow`: Hilfsfunktion `_resolve_current_uids`; `__init__`: `_entry_ids_for_cleanup_service` für den Service; `switch`: gemeinsame Toggle-Logik in `_async_toggle_connection(enable)`.
+- **Options**: Option „Unavailable-Entitäten entfernen“ wird nur angezeigt, wenn tatsächlich verwaiste Einträge vorhanden sind.
+- **Auto-Cleanup**: Entfernt nur aus `known_uids`, nicht aus Entity/Device-Registry – Entity-IDs bleiben bei wieder erscheinenden VPN-Verbindungen stabil.
+
+### Removed
+
+- Alte Release-Notes-Dateien (`release_notes_0.10.4b0.md` bis `0.10.6b0.md`).
+
+[0.10.8b0]: https://github.com/rosch100/fritzbox-vpn/releases/tag/v0.10.8b0
+
 ## [0.10.7b0] - 2026-03-07 (Beta)
 
 ### Fixed

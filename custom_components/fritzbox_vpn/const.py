@@ -4,23 +4,21 @@ DOMAIN = "fritzbox_vpn"
 
 CONF_UPDATE_INTERVAL = "update_interval"
 
-# Default values
 DEFAULT_HOST = "192.168.178.1"
 HOST_FALLBACK_UNKNOWN = "unknown"
-DEFAULT_UPDATE_INTERVAL = 30  # seconds
+DEFAULT_UPDATE_INTERVAL = 30
 UPDATE_INTERVAL_MIN = 5
-UPDATE_INTERVAL_MAX = 3600  # 1 hour
-RETRY_AFTER_SECONDS = 300  # 5 min backoff after fetch errors (reduces reconnect storm)
-DEFAULT_TIMEOUT = 10  # seconds
-DEFAULT_PROTOCOL = "https"  # Use HTTPS by default for security
-VERIFICATION_DELAY = 1.5  # seconds - delay to wait for VPN status change to take effect
+UPDATE_INTERVAL_MAX = 3600
+RETRY_AFTER_SECONDS = 300
+DEFAULT_TIMEOUT = 10
+DEFAULT_PROTOCOL = "https"
+VERIFICATION_DELAY = 1.5
 
-# API endpoints
 API_LOGIN = "/login_sid.lua"
 API_DATA = "/data.lua"
 API_VPN_CONNECTION = "/api/v0/generic/vpn/connection/{uid}"
 
-# API request/response keys (SSOT for Fritz!Box data.lua / boxConnections)
+# API request/response keys (Fritz!Box data.lua / boxConnections)
 API_PAGE_SHAREWIREGUARD = "shareWireguard"
 API_KEY_DATA = "data"
 API_KEY_INIT = "init"
@@ -31,19 +29,15 @@ API_KEY_ACTIVATED = "activated"
 API_KEY_CONNECTED = "connected"
 API_KEY_NAME = "name"
 
-# Entity attribute names (exposed in extra_state_attributes; SSOT for switch/sensor)
 ATTR_UID = "uid"
 ATTR_VPN_UID = "vpn_uid"
 ATTR_STATUS = "status"
-# Unique ID prefix for all entities (fritzbox_vpn_{connection_uid}_{suffix}); SSOT for parsing in config_flow
 UNIQUE_ID_PREFIX = f"{DOMAIN}_"
-# Suffixes for entity unique_id (full id = UNIQUE_ID_PREFIX + connection_uid + "_" + suffix)
 UNIQUE_ID_SUFFIX_SWITCH = "switch"
 UNIQUE_ID_SUFFIX_STATUS = "status"
 UNIQUE_ID_SUFFIX_UID = "uid"
 UNIQUE_ID_SUFFIX_VPN_UID = "vpn_uid"
 UNIQUE_ID_SUFFIX_CONNECTED = "connected"
-# All suffixes (for parsing unique_id in config_flow; order so longer suffixes like vpn_uid are tried first)
 UNIQUE_ID_SUFFIXES = (
     UNIQUE_ID_SUFFIX_VPN_UID,
     UNIQUE_ID_SUFFIX_CONNECTED,
@@ -51,11 +45,9 @@ UNIQUE_ID_SUFFIXES = (
     UNIQUE_ID_SUFFIX_SWITCH,
     UNIQUE_ID_SUFFIX_UID,
 )
-# Error text substring for SID retry detection
 ERROR_MSG_INVALID_SID = "Invalid SID"
 ERROR_MSG_INVALID_SID_403 = "Invalid SID (HTTP 403)"
 ERROR_MSG_INVALID_SID_HTML = "Invalid SID (HTML response)"
-# Full message for login failure (invalid SID) – SSOT for user-facing text
 ERROR_MSG_LOGIN_FAILED_SID = (
     "Login failed: Invalid SID. This can be caused by: "
     "(1) Incorrect username or password, or "
@@ -65,59 +57,46 @@ ERROR_MSG_LOGIN_FAILED_SID = (
     "Home Network > Network > Network settings > Access Settings in the Home Network. "
     "Note: UPnP is only needed for automatic discovery via SSDP, not for API access."
 )
-# Allowed protocol values
 PROTOCOL_HTTP = "http"
 PROTOCOL_HTTPS = "https"
 PROTOCOLS_ALLOWED = (PROTOCOL_HTTP, PROTOCOL_HTTPS)
-# Response content-type: substring to detect JSON (data.lua)
 CONTENT_TYPE_JSON = "json"
 
-# HTTP status codes used in API logic
 HTTP_STATUS_OK = 200
 HTTP_STATUS_FORBIDDEN = 403
 HTTPS_FALLBACK_STATUS_CODES = (400, 404, 502, 503)
 
-# Fritz!Box login_sid.lua XML and form keys
 LOGIN_TAG_CHALLENGE = "Challenge"
 LOGIN_TAG_SID = "SID"
 LOGIN_FORM_USERNAME = "username"
 LOGIN_FORM_RESPONSE = "response"
 INVALID_SID_VALUE = "0000000000000000"
 
-# Log/UI labels for VPN state (SSOT for coordinator/session log messages)
 LOG_LABEL_ACTIVATED = "activated"
 LOG_LABEL_DEACTIVATED = "deactivated"
-
-# String values that mean "active" in API response (active/activated field)
 ACTIVE_STATE_STRINGS_TRUE = ("1", "true", "yes", "on")
-
-# HTTP header value for JSON requests (VPN toggle PUT)
 HEADER_VALUE_APPLICATION_JSON = "application/json"
-
-# HTTP header values for VPN API
 AUTH_HEADER_PREFIX = "AVM-SID "
 
-# Data keys
 DATA_COORDINATOR = "coordinator"
 DATA_FRITZ_SESSION = "fritz_session"
-# Per-platform sets of known connection UIDs for dynamic entity discovery (hass.data[DOMAIN][entry_id])
 DATA_KNOWN_UIDS_SWITCH = "known_uids_switch"
 DATA_KNOWN_UIDS_SENSOR = "known_uids_sensor"
 DATA_KNOWN_UIDS_BINARY_SENSOR = "known_uids_binary_sensor"
-# Lock per platform to prevent concurrent add-entity runs (avoids duplicate entities)
+DATA_KNOWN_UIDS_KEYS = (
+    DATA_KNOWN_UIDS_SWITCH,
+    DATA_KNOWN_UIDS_SENSOR,
+    DATA_KNOWN_UIDS_BINARY_SENSOR,
+)
 DATA_LOCK_ADD_ENTITIES_SWITCH = "lock_add_entities_switch"
 DATA_LOCK_ADD_ENTITIES_SENSOR = "lock_add_entities_sensor"
 DATA_LOCK_ADD_ENTITIES_BINARY_SENSOR = "lock_add_entities_binary_sensor"
 
-# Options flow: action for first step (menu)
 OPTIONS_ACTION_CONFIGURE = "configure"
 OPTIONS_ACTION_CLEANUP = "cleanup"
-
-# Service names (for programmatic cleanup without options flow)
 SERVICE_REMOVE_UNAVAILABLE_ENTITIES = "remove_unavailable_entities"
 CONF_CONFIG_ENTRY_ID = "config_entry_id"
 
-# Log messages (SSOT) – VPN connections removed from Fritz!Box
 LOG_MSG_VPN_CONNECTIONS_REMOVED = (
     "VPN connection(s) no longer available on the %s; related entities will show as unavailable: %s"
 )
@@ -125,17 +104,14 @@ LOG_MSG_VPN_CONNECTIONS_REMOVED_HINT = (
     "You can remove obsolete entities under Settings > Devices & Services > Entities (filter by Fritz!Box VPN)."
 )
 
-# Device/entity defaults
 MANUFACTURER_AVM = "AVM"
 NAME_FRITZBOX = "Fritz!Box"
 MODEL_FRITZBOX = "Fritz!Box"
 MODEL_WIREGUARD_VPN = "WireGuard VPN"
 DEFAULT_NAME_UNKNOWN = "Unknown"
 INTEGRATION_TITLE = "Fritz!Box VPN"
-# Fallback when translation is unavailable; normal title from common.auth_error_notification_title (en.json/de.json)
 NOTIFICATION_TITLE_AUTH_ERROR = "Fritz!Box VPN: Authentifizierungsfehler"
 
-# Config flow error keys (must match translation keys in en.json / de.json)
 ERROR_KEY_UNKNOWN = "unknown"
 ERROR_KEY_CANNOT_CONNECT = "cannot_connect"
 ERROR_KEY_INVALID_AUTH = "invalid_auth"
@@ -153,13 +129,11 @@ def mask_config_for_log(data: dict) -> dict:
     """Return a copy of the config dict with sensitive keys masked."""
     return {k: "***" if k in SENSITIVE_CONFIG_KEYS else v for k, v in data.items()}
 
-# Status constants
 STATUS_CONNECTED = "connected"
 STATUS_ENABLED = "enabled"
 STATUS_DISABLED = "disabled"
 STATUS_UNKNOWN = "unknown"
 
-# SSDP: FritzBox device indicators (lowercase for comparison)
 FRITZBOX_SSDP_INDICATORS = (
     "fritz.box",
     "fritzbox",
@@ -168,12 +142,9 @@ FRITZBOX_SSDP_INDICATORS = (
     "fritz",
 )
 
-# Domains to check for existing Fritz/AVM integration
 FRITZ_INTEGRATION_DOMAINS = ("fritz", "fritzbox_tools", "fritzbox", "fritzbox_tools_plus")
-
 SENSITIVE_CONFIG_KEYS = ("password", "pass", "username", "user")
 
-# Repeater detection (used in SSDP and config entry filtering; repeaters have no WireGuard)
 REPEATER_INDICATORS = (
     "repeater",
     "wlan repeater",
@@ -181,7 +152,6 @@ REPEATER_INDICATORS = (
     "fritz!wlanrepeater",
 )
 
-# Error message substrings for mapping validation/session errors
 ERROR_INDICATOR_AUTH = ("login failed", "invalid sid")
 ERROR_INDICATOR_CONNECT = ("failed to get login page", "connection")
 AUTH_INDICATORS = (

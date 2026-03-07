@@ -2,7 +2,7 @@
 
 import asyncio
 import logging
-from typing import Any, Dict
+from typing import Any, Dict, Set
 
 from homeassistant.components.switch import SwitchEntity
 from homeassistant.config_entries import ConfigEntry
@@ -45,8 +45,8 @@ async def async_setup_entry(
         DATA_KNOWN_UIDS_SWITCH, set()
     )
 
-    def _create_switch_entities(uids: set):
-        """Create switch entities for the given connection UIDs (data must be in coordinator.data)."""
+    def _create_switch_entities(uids: Set[str]):
+        """Create switch entities for UIDs present in coordinator.data."""
         if not coordinator.data:
             return []
         return [
@@ -55,7 +55,6 @@ async def async_setup_entry(
             if uid in coordinator.data
         ]
 
-    # Initial entities from current coordinator data
     if coordinator.data:
         initial_uids = set(coordinator.data.keys())
         known_uids.update(initial_uids)
@@ -82,7 +81,7 @@ async def async_setup_entry(
             known_uids.update(new_uids)
             async_add_entities(new_entities)
             _LOGGER.info(
-                "New VPN connection(s) detected, added %d switch entity(ies): %s",
+                "New VPN connection(s) detected, added %d switch entities: %s",
                 len(new_entities),
                 [coordinator.data[uid].get(API_KEY_NAME, uid) for uid in new_uids if coordinator.data and uid in coordinator.data],
             )
@@ -103,14 +102,13 @@ class FritzBoxVPNSwitch(CoordinatorEntity, SwitchEntity):
         connection_uid: str,
         connection_data: Dict[str, Any],
     ) -> None:
-        """Initialize the switch."""
         super().__init__(coordinator)
         self._entry = entry
         self._connection_uid = connection_uid
         self._connection_data = connection_data
         vpn_name = connection_data.get(API_KEY_NAME, DEFAULT_NAME_UNKNOWN)
         self._attr_unique_id = f"{UNIQUE_ID_PREFIX}{connection_uid}_{UNIQUE_ID_SUFFIX_SWITCH}"
-        self._attr_name = None  # Use device name
+        self._attr_name = None
         self._attr_icon = "mdi:vpn"
         self._attr_has_entity_name = True
         self._attr_device_info = DeviceInfo(
@@ -142,10 +140,7 @@ class FritzBoxVPNSwitch(CoordinatorEntity, SwitchEntity):
             conn = self.coordinator.data[self._connection_uid]
             active = conn.get(API_KEY_ACTIVE, False)
             connected = conn.get(API_KEY_CONNECTED, False)
-            
-            # Use centralized status logic
             status = self.coordinator.get_vpn_status(self._connection_uid)
-            
             return {
                 API_KEY_NAME: conn.get(API_KEY_NAME),
                 ATTR_UID: self._connection_uid,
@@ -156,34 +151,26 @@ class FritzBoxVPNSwitch(CoordinatorEntity, SwitchEntity):
             }
         return {}
 
+    async def _async_toggle_connection(self, enable: bool) -> None:
+        """Turn VPN connection on or off; refresh coordinator afterward."""
+        vpn_name = self._connection_data.get(API_KEY_NAME, DEFAULT_NAME_UNKNOWN)
+        action = "on" if enable else "off"
+        _LOGGER.info("Turning %s VPN connection: %s", action, vpn_name)
+        success = await self.coordinator.toggle_vpn(self._connection_uid, enable)
+        await self.coordinator.async_request_refresh()
+        if success:
+            _LOGGER.info("Successfully turned %s VPN connection: %s", action, vpn_name)
+        else:
+            _LOGGER.error(
+                "Failed to %s VPN connection: %s",
+                "activate" if enable else "deactivate",
+                vpn_name,
+            )
+
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Turn on the VPN connection."""
-        vpn_name = self._connection_data.get(API_KEY_NAME, DEFAULT_NAME_UNKNOWN)
-        _LOGGER.info("Turning on VPN connection: %s", vpn_name)
-        success = await self.coordinator.toggle_vpn(self._connection_uid, True)
-        if success:
-            # Force refresh to get updated status
-            await self.coordinator.async_request_refresh()
-            # Wait a moment for the data to be updated (can be removed if coordinator handles it well, but keeping for safety)
-            # await asyncio.sleep(0.5) 
-            # Note: We rely on the coordinator update now
-            _LOGGER.info("Successfully turned on VPN connection: %s", vpn_name)
-        else:
-            _LOGGER.error("Failed to activate VPN connection: %s", vpn_name)
-            # Still refresh to show current state
-            await self.coordinator.async_request_refresh()
+        await self._async_toggle_connection(True)
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Turn off the VPN connection."""
-        vpn_name = self._connection_data.get(API_KEY_NAME, DEFAULT_NAME_UNKNOWN)
-        _LOGGER.info("Turning off VPN connection: %s", vpn_name)
-        success = await self.coordinator.toggle_vpn(self._connection_uid, False)
-        if success:
-            # Force refresh to get updated status
-            await self.coordinator.async_request_refresh()
-            # Note: We rely on the coordinator update now
-            _LOGGER.info("Successfully turned off VPN connection: %s", vpn_name)
-        else:
-            _LOGGER.error("Failed to deactivate VPN connection: %s", vpn_name)
-            # Still refresh to show current state
-            await self.coordinator.async_request_refresh()
+        await self._async_toggle_connection(False)
