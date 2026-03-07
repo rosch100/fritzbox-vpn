@@ -13,7 +13,7 @@ Stand: Prüfung am Repo-Stand (nach Refactor).
 | **manifest.json** (Pflichtfelder) | `domain`, `name`, `version`, `codeowners`, `issue_tracker`, `documentation` alle gesetzt |
 | **README.md im Repo-Root** | Vorhanden (inkl. Link zu README.de.md) |
 | **info.md** | Optional; mit `render_readme: true` in `hacs.json` wird die README angezeigt – ausreichend |
-| **hacs.json** | Im Repo-Root, mit `name`, `render_readme`, `homeassistant` (min. 2025.3.0) |
+| **hacs.json** | Im Repo-Root, mit `name`, `render_readme`, `homeassistant` (min. 2026.1.0) |
 
 ### Optional / Empfehlungen
 
@@ -52,11 +52,12 @@ Stand: Prüfung am Repo-Stand (nach Refactor).
 
 Für höhere Stufen (Silver/Gold) ggf. weitere offizielle [Quality-Scale-Regeln](https://developers.home-assistant.io/docs/core/integration-quality-scale/) prüfen (z. B. Tests, Stabilität, Entitäts-/Geräte-Modelle).
 
-### Optimierung für neueste Home-Assistant-Version (2025.3+)
+### Optimierung für neueste Home-Assistant-Version (2026.x)
 
-- **Mindestversion**: `hacs.json` fordert `homeassistant": "2025.3.0"`.
-- **Config-Entries**: Nutzung von `hass.config_entries.async_loaded_entries(DOMAIN)` für die Liste geladener Einträge (z. B. bei Diensten), statt manueller Filterung über `hass.data`.
-- **Service-Lifecycle**: Beim Unload des **letzten** Config-Eintrags werden die Integration-Dienste (`remove_unavailable_entities`, `repair_entity_id_suffixes`) abgemeldet; bei erneutem Hinzufügen einer Integration werden sie wieder registriert.
+- **Mindestversion**: `hacs.json` fordert `"homeassistant": "2026.1.0"` (aktuell getestet mit 2026.3).
+- **Config-Entries**: Nutzung von `hass.config_entries.async_loaded_entries(DOMAIN)` für die Liste geladener Einträge (z. B. bei Diensten).
+- **Service-Lifecycle**: Beim Unload des **letzten** Config-Eintrags werden die Integration-Dienste abgemeldet; bei erneutem Hinzufügen wieder registriert.
+- **Config-Entry unique_id**: Muss String sein (ab 2026 wird bei nicht-String ein Fehler ausgelöst); diese Integration setzt stets einen String (Host/IP).
 
 ---
 

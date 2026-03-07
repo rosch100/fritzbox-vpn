@@ -44,7 +44,7 @@ SERVICE_SCHEMA_OPTIONAL_ENTRY_ID = vol.Schema(
 
 
 def _entry_host(entry: ConfigEntry) -> str:
-    """Host from config entry; HOST_FALLBACK_UNKNOWN if missing."""
+    """Host from config entry."""
     return host_from_config(entry.data)
 
 
@@ -79,9 +79,7 @@ async def _async_repair_entity_id_suffixes(hass: HomeAssistant, call: ServiceCal
 
 
 def _apply_auto_cleanup(hass: HomeAssistant, entry_id: str, current_uids: Set[str]) -> None:
-    """Clear known_uids for VPN connections no longer in current_uids. Does not remove registry entries
-    so entity_id stays stable when a connection reappears (e.g. after temporary error).
-    """
+    """Clear known_uids for UIDs no longer present; do not remove from registry so entity_id stays stable."""
     to_remove, err = _get_orphaned_entity_entries(hass, entry_id, current_uids=current_uids)
     if err or not to_remove:
         return
@@ -89,13 +87,13 @@ def _apply_auto_cleanup(hass: HomeAssistant, entry_id: str, current_uids: Set[st
         hass, entry_id, to_remove, remove_from_registry=False
     )
     _LOGGER.info(
-        "Cleared known_uids for %d unavailable connection(s); entity IDs kept for automation stability",
+        "Cleared known_uids for %d unavailable connection(s); entity IDs kept",
         len(to_remove),
     )
 
 
 def _register_services_if_needed(hass: HomeAssistant) -> None:
-    """Register remove_unavailable_entities and repair_entity_id_suffixes once per HA instance."""
+    """Register integration services once per HA instance."""
     if "_service_remove_unavailable_registered" in hass.data.get(DOMAIN, {}):
         return
     hass.data.setdefault(DOMAIN, {})

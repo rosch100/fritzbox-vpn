@@ -17,7 +17,7 @@ Diese Integration ermöglicht die Steuerung von WireGuard VPN-Verbindungen auf e
 
 ## Installation
 
-Es wird **Home Assistant 2025.3.0** oder neuer benötigt.
+Es wird **Home Assistant 2026.1.0** oder neuer benötigt.
 
 1. Öffnen Sie HACS in Home Assistant
 2. Gehen Sie zu Integrations

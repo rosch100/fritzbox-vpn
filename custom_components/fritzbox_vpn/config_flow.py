@@ -52,7 +52,7 @@ _LOGGER = logging.getLogger(__name__)
 
 
 def _connection_uid_from_entity_unique_id(unique_id: str) -> Optional[str]:
-    """Extract connection_uid from entity unique_id; None if not our format."""
+    """Connection UID from entity unique_id; None if not our format."""
     if not unique_id or not unique_id.startswith(UNIQUE_ID_PREFIX):
         return None
     rest = unique_id[len(UNIQUE_ID_PREFIX) :]
@@ -65,7 +65,7 @@ def _connection_uid_from_entity_unique_id(unique_id: str) -> Optional[str]:
 def _resolve_current_uids(
     hass: HomeAssistant, entry_id: str
 ) -> Tuple[Optional[Set[str]], Optional[str]]:
-    """Resolve set of current VPN UIDs from coordinator.data. (uids, None) or (None, error_key)."""
+    """Current VPN UIDs from coordinator.data. Returns (uids, None) or (None, error_key)."""
     if DOMAIN not in hass.data or entry_id not in hass.data[DOMAIN]:
         return (None, "integration_not_loaded")
     coordinator = hass.data[DOMAIN][entry_id].get(DATA_COORDINATOR)
@@ -80,9 +80,7 @@ def _get_orphaned_entity_entries(
     entry_id: str,
     current_uids: Optional[Set[str]] = None,
 ) -> Tuple[Optional[List[er.RegistryEntry]], Optional[str]]:
-    """Entity registry entries for this entry whose VPN connection is no longer present. (entries, None) or (None, error_key).
-    If current_uids is provided, use it as the set of valid UIDs; otherwise read from coordinator.data.
-    """
+    """Orphaned entity entries for this entry (VPN no longer present). Returns (entries, None) or (None, error_key)."""
     if current_uids is None:
         current_uids, error_key = _resolve_current_uids(hass, entry_id)
         if error_key is not None:
@@ -97,7 +95,7 @@ def _get_orphaned_entity_entries(
 
 
 def _uids_from_entries(entries: List[er.RegistryEntry]) -> Set[str]:
-    """Set of connection UIDs extracted from entity registry entries."""
+    """Connection UIDs from entity registry entries."""
     uids: Set[str] = set()
     for e in entries:
         uid = _connection_uid_from_entity_unique_id(e.unique_id or "")
@@ -110,23 +108,20 @@ _ENTITY_ID_OBJECT_ID_SUFFIX_RE = re.compile(r"^(.+)_(\d+)$")
 
 
 def _entity_id_base(entity_id: str) -> Optional[str]:
-    """Return base entity_id if entity_id has numeric suffix (_2, _3, ...), else None."""
+    """Base entity_id when object_id has numeric suffix (_2, _3, …), else None."""
     if not entity_id or "." not in entity_id:
         return None
     domain, object_id = entity_id.split(".", 1)
     match = _ENTITY_ID_OBJECT_ID_SUFFIX_RE.match(object_id)
     if not match:
         return None
-    base_object_id = match.group(1)
-    if not base_object_id:
-        return None
-    return f"{domain}.{base_object_id}"
+    return f"{domain}.{match.group(1)}"
 
 
 def _get_entity_id_suffix_repairs(
     registry: er.EntityRegistry, entry_id: str
 ) -> List[Tuple[er.RegistryEntry, str]]:
-    """Find (suffixed entry, base_entity_id) where base exists for same config entry."""
+    """(suffixed entry, base_entity_id) pairs where base exists for same config entry."""
     all_entries = er.async_entries_for_config_entry(registry, entry_id)
     by_entity_id = {e.entity_id: e for e in all_entries}
     result: List[Tuple[er.RegistryEntry, str]] = []
@@ -144,7 +139,7 @@ def _get_entity_id_suffix_repairs(
 def repair_entity_id_suffixes(
     hass: HomeAssistant, entry_id: str
 ) -> Tuple[int, List[str]]:
-    """Remove stale base entity and assign its entity_id to the suffixed entry. Returns (count, messages)."""
+    """Remove stale base entity and assign its entity_id to suffixed entry. Returns (count, messages)."""
     registry = er.async_get(hass)
     repairs = _get_entity_id_suffix_repairs(registry, entry_id)
     messages: List[str] = []
@@ -165,12 +160,7 @@ def _remove_orphaned_entities_and_clear_known_uids(
     entries: List[er.RegistryEntry],
     remove_from_registry: bool = True,
 ) -> None:
-    """Clear known_uids for UIDs that are no longer present.
-    If remove_from_registry is True (manual cleanup): remove entities and devices from registries.
-    If remove_from_registry is False (auto cleanup): do NOT remove from registries. The unique_id
-    remains in the entity registry so that when the same VPN connection reappears, HA reuses the
-    same entity_id and automations keep working.
-    """
+    """Clear known_uids for UIDs no longer present; optionally remove from entity/device registry."""
     if not entries:
         return
 
@@ -222,7 +212,7 @@ def _remove_orphaned_entities_and_clear_known_uids(
 def _build_configure_schema(
     current_data: Dict[str, Any], current_options: Dict[str, Any]
 ) -> vol.Schema:
-    """Build configure step schema with defaults from current config/options."""
+    """Configure step schema with defaults from current config/options."""
     host_default, username_default, password_default = _credentials_defaults_from_config(current_data)
     default_update_interval = normalize_update_interval(
         current_options.get(CONF_UPDATE_INTERVAL, DEFAULT_UPDATE_INTERVAL)
@@ -249,7 +239,7 @@ def _validation_error_to_error_key(error_msg: str) -> str:
 def _fill_password_if_missing(
     user_input: Dict[str, Any], *sources: Optional[Mapping[str, Any]]
 ) -> None:
-    """Set user_input[CONF_PASSWORD] from first non-empty of sources if not already set."""
+    """Set user_input password from first non-empty source if missing."""
     if user_input.get(CONF_PASSWORD):
         return
     user_input[CONF_PASSWORD] = password_from_sources(*sources)
@@ -281,7 +271,7 @@ def validate_host(host: str) -> str:
 def _credentials_schema(
     host_default: str, username_default: str, password_default: str
 ) -> vol.Schema:
-    """Build credentials form schema (host, username, password) with given defaults."""
+    """Credentials form (host, username, password) with given defaults."""
     return vol.Schema(_credentials_schema_keys(host_default, username_default, password_default))
 
 
@@ -290,7 +280,7 @@ def _credentials_defaults_from_config(
     host_fallback: str = DEFAULT_HOST,
     extra_password_sources: Tuple[Optional[Mapping[str, Any]], ...] = (),
 ) -> Tuple[str, str, str]:
-    """Return (host, username, password) for credential form; config or host_fallback when config is None."""
+    """(host, username, password) for credential form from config or fallbacks."""
     if not config:
         return (host_fallback, "", "")
     host = config.get(CONF_HOST) or host_fallback
@@ -302,7 +292,7 @@ def _credentials_defaults_from_config(
 def _credentials_schema_keys(
     host_default: str, username_default: str, password_default: str
 ) -> Dict[Any, Any]:
-    """Credential form fields (host, username, password) for reuse in larger schemas."""
+    """Vol schema keys for host, username, password."""
     return {
         vol.Required(CONF_HOST, default=host_default): vol.All(str, validate_host),
         vol.Required(CONF_USERNAME, default=username_default): str,
@@ -546,13 +536,13 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
         self._config_entry = config_entry
 
     def _get_current_entry(self) -> Optional[config_entries.ConfigEntry]:
-        """Return the current config entry; None if removed."""
+        """Current config entry or None if removed."""
         return self.hass.config_entries.async_get_entry(self._config_entry.entry_id)
 
     async def async_step_init(
         self, user_input: Optional[Dict[str, Any]] = None
     ) -> FlowResult:
-        """Menu: Configure, Remove unavailable entities, or Repair entity ID suffixes."""
+        """Options menu: configure, cleanup, or repair entity ID suffixes."""
         if user_input is not None:
             if user_input.get("action") == OPTIONS_ACTION_CLEANUP:
                 return await self.async_step_cleanup_confirm()
