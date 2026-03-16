@@ -542,17 +542,30 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
         """Current config entry or None if removed."""
         return self.hass.config_entries.async_get_entry(self._config_entry.entry_id)
 
+    def _get_available_actions(self) -> Tuple[bool, bool, int]:
+        """Return (has_cleanup_action, has_repair_action, repair_count) safely."""
+        try:
+            to_remove, error_key = _get_orphaned_entity_entries(
+                self.hass, self._config_entry.entry_id
+            )
+            registry = er.async_get(self.hass)
+            repairs = _get_entity_id_suffix_repairs(registry, self._config_entry.entry_id)
+            has_cleanup_action = error_key is None and bool(to_remove)
+            has_repair_action = bool(repairs)
+            return (has_cleanup_action, has_repair_action, len(repairs))
+        except Exception as err:
+            _LOGGER.exception(
+                "Failed to evaluate available options actions for entry %s: %s",
+                self._config_entry.entry_id,
+                err,
+            )
+            return (False, False, 0)
+
     async def async_step_init(
         self, user_input: Optional[Dict[str, Any]] = None
     ) -> FlowResult:
         """Options menu: configure, cleanup, or repair entity ID suffixes."""
-        to_remove, error_key = _get_orphaned_entity_entries(
-            self.hass, self._config_entry.entry_id
-        )
-        registry = er.async_get(self.hass)
-        repairs = _get_entity_id_suffix_repairs(registry, self._config_entry.entry_id)
-        has_cleanup_action = error_key is None and bool(to_remove)
-        has_repair_action = bool(repairs)
+        has_cleanup_action, has_repair_action, repair_count = self._get_available_actions()
         has_extra_actions = has_cleanup_action or has_repair_action
 
         if user_input is None and not has_extra_actions:
@@ -572,7 +585,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
             choices[OPTIONS_ACTION_CLEANUP] = "Nicht verfügbare Entitäten entfernen"
         if has_repair_action:
             choices[OPTIONS_ACTION_REPAIR_ENTITY_IDS] = (
-                f"Entitäts-IDs reparieren ({len(repairs)} mit _2, _3, ... -> Basis-ID)"
+                f"Entitäts-IDs reparieren ({repair_count} mit _2, _3, ... -> Basis-ID)"
             )
         schema = vol.Schema(
             {

@@ -49,6 +49,7 @@ requirements.txt
 # IDE
 .vscode/
 .idea/
+fritzbox-vpn.code-workspace
 *.swp
 *.swo
 *~
