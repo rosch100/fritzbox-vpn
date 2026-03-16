@@ -212,17 +212,32 @@ def _build_configure_schema(
     current_data: Dict[str, Any], current_options: Dict[str, Any]
 ) -> vol.Schema:
     """Configure step schema with defaults from current config/options."""
-    host_default, username_default, password_default = _credentials_defaults_from_config(current_data)
+    host_default, username_default, _ = _credentials_defaults_from_config(current_data)
+    try:
+        host_default = validate_host(host_default)
+    except vol.Invalid:
+        _LOGGER.warning(
+            "Invalid host in config entry for options form: %r. Falling back to default host.",
+            host_default,
+        )
+        host_default = DEFAULT_HOST
+    # Do not prefill passwords in options forms.
+    password_default = ""
     default_update_interval = normalize_update_interval(
         current_options.get(CONF_UPDATE_INTERVAL, DEFAULT_UPDATE_INTERVAL)
     )
-    return vol.Schema({
-        **_credentials_schema_keys(host_default, username_default, password_default),
-        vol.Required(CONF_UPDATE_INTERVAL, default=default_update_interval): vol.All(
-            vol.Coerce(int),
-            vol.Range(min=UPDATE_INTERVAL_MIN, max=UPDATE_INTERVAL_MAX),
-        ),
-    })
+    return vol.Schema(
+        {
+            **_credentials_schema_keys(host_default, username_default, password_default),
+            vol.Required(
+                CONF_UPDATE_INTERVAL, default=default_update_interval
+            ): vol.All(
+                vol.Coerce(int),
+                vol.Range(min=UPDATE_INTERVAL_MIN, max=UPDATE_INTERVAL_MAX),
+            ),
+        },
+        extra=vol.ALLOW_EXTRA,
+    )
 
 
 def _validation_error_to_error_key(error_msg: str) -> str:
@@ -536,25 +551,33 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
         self, user_input: Optional[Dict[str, Any]] = None
     ) -> FlowResult:
         """Options menu: configure, cleanup, or repair entity ID suffixes."""
+        to_remove, error_key = _get_orphaned_entity_entries(
+            self.hass, self._config_entry.entry_id
+        )
+        registry = er.async_get(self.hass)
+        repairs = _get_entity_id_suffix_repairs(registry, self._config_entry.entry_id)
+        has_cleanup_action = error_key is None and bool(to_remove)
+        has_repair_action = bool(repairs)
+        has_extra_actions = has_cleanup_action or has_repair_action
+
+        if user_input is None and not has_extra_actions:
+            return await self.async_step_configure()
+
         if user_input is not None:
             if user_input.get("action") == OPTIONS_ACTION_CLEANUP:
                 return await self.async_step_cleanup_confirm()
             if user_input.get("action") == OPTIONS_ACTION_REPAIR_ENTITY_IDS:
                 return await self.async_step_repair_entity_ids_confirm()
             return await self.async_step_configure()
+
         choices = {
-            OPTIONS_ACTION_CONFIGURE: "Configure (host, user, update interval)",
+            OPTIONS_ACTION_CONFIGURE: "Konfigurieren (Host, Benutzer, Update-Intervall)",
         }
-        to_remove, error_key = _get_orphaned_entity_entries(
-            self.hass, self._config_entry.entry_id
-        )
-        if error_key is None and to_remove:
-            choices[OPTIONS_ACTION_CLEANUP] = "Remove unavailable entities"
-        registry = er.async_get(self.hass)
-        repairs = _get_entity_id_suffix_repairs(registry, self._config_entry.entry_id)
-        if repairs:
+        if has_cleanup_action:
+            choices[OPTIONS_ACTION_CLEANUP] = "Nicht verfügbare Entitäten entfernen"
+        if has_repair_action:
             choices[OPTIONS_ACTION_REPAIR_ENTITY_IDS] = (
-                f"Repair entity IDs ({len(repairs)} with _2, _3, … → base ID)"
+                f"Entitäts-IDs reparieren ({len(repairs)} mit _2, _3, ... -> Basis-ID)"
             )
         schema = vol.Schema(
             {
