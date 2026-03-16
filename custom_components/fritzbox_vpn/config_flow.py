@@ -226,18 +226,13 @@ def _build_configure_schema(
     default_update_interval = normalize_update_interval(
         current_options.get(CONF_UPDATE_INTERVAL, DEFAULT_UPDATE_INTERVAL)
     )
-    return vol.Schema(
-        {
-            **_credentials_schema_keys(host_default, username_default, password_default),
-            vol.Required(
-                CONF_UPDATE_INTERVAL, default=default_update_interval
-            ): vol.All(
-                vol.Coerce(int),
-                vol.Range(min=UPDATE_INTERVAL_MIN, max=UPDATE_INTERVAL_MAX),
-            ),
-        },
-        extra=vol.ALLOW_EXTRA,
-    )
+    return vol.Schema({
+        **_credentials_schema_keys(host_default, username_default, password_default),
+        vol.Required(CONF_UPDATE_INTERVAL, default=default_update_interval): vol.All(
+            vol.Coerce(int),
+            vol.Range(min=UPDATE_INTERVAL_MIN, max=UPDATE_INTERVAL_MAX),
+        ),
+    })
 
 
 def _validation_error_to_error_key(error_msg: str) -> str:
@@ -647,6 +642,9 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
             return self.async_abort(reason=ERROR_KEY_CONFIG_ENTRY_NOT_FOUND)
 
         if user_input is not None:
+            # Ignore stale action payload from init step when opening configure directly.
+            user_input = dict(user_input)
+            user_input.pop("action", None)
             _fill_password_if_missing(user_input, config_entry.data or {})
 
             try:
