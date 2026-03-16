@@ -237,7 +237,7 @@ def _build_configure_schema(
         current_options.get(CONF_UPDATE_INTERVAL, DEFAULT_UPDATE_INTERVAL)
     )
     return vol.Schema({
-        **_credentials_schema_keys(host_default, username_default, password_default),
+        **_configure_schema_keys(host_default, username_default, password_default),
         vol.Required(CONF_UPDATE_INTERVAL, default=default_update_interval): vol.All(
             vol.Coerce(int),
             vol.Range(min=UPDATE_INTERVAL_MIN, max=UPDATE_INTERVAL_MAX),
@@ -352,6 +352,17 @@ def _credentials_schema_keys(
         vol.Required(CONF_HOST, default=host_default): str,
         vol.Required(CONF_USERNAME, default=username_default): str,
         vol.Required(CONF_PASSWORD, default=password_default): str,
+    }
+
+
+def _configure_schema_keys(
+    host_default: str, username_default: str, password_default: str
+) -> Dict[Any, Any]:
+    """Vol schema keys for options configure form (password optional)."""
+    return {
+        vol.Required(CONF_HOST, default=host_default): str,
+        vol.Required(CONF_USERNAME, default=username_default): str,
+        vol.Optional(CONF_PASSWORD, default=password_default): str,
     }
 
 
