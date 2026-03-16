@@ -40,14 +40,24 @@ from .const import (
     ERROR_KEY_UNKNOWN,
     ERROR_KEY_CANNOT_CONNECT,
     ERROR_KEY_INVALID_AUTH,
+    ERROR_KEY_INVALID_HOST,
     ERROR_KEY_CONFIG_ENTRY_NOT_FOUND,
-    mask_config_for_log,
     password_from_sources,
 )
 from .coordinator import FritzBoxVPNSession, normalize_update_interval
 from .fritz_config_source import get_existing_fritz_config
 
 _LOGGER = logging.getLogger(__name__)
+
+OPTIONS_LABEL_CONFIGURE = (
+    "%key:component::fritzbox_vpn::options::selector::action::options::configure%"
+)
+OPTIONS_LABEL_CLEANUP = (
+    "%key:component::fritzbox_vpn::options::selector::action::options::cleanup%"
+)
+OPTIONS_LABEL_REPAIR_ENTITY_IDS = (
+    "%key:component::fritzbox_vpn::options::selector::action::options::repair_entity_ids%"
+)
 
 
 def _connection_uid_from_entity_unique_id(unique_id: str) -> Optional[str]:
@@ -245,6 +255,24 @@ def _validation_error_to_error_key(error_msg: str) -> str:
     return ERROR_KEY_UNKNOWN
 
 
+def _set_validation_error(
+    errors: Dict[str, str], err: Exception, *, log_unknown_details: bool
+) -> None:
+    """Set config-flow error key from validation exception."""
+    if isinstance(err, CannotConnect):
+        errors["base"] = ERROR_KEY_CANNOT_CONNECT
+        return
+    if isinstance(err, InvalidAuth):
+        errors["base"] = ERROR_KEY_INVALID_AUTH
+        return
+
+    error_msg = str(err)
+    _LOGGER.exception("Unexpected exception during validation: %s", error_msg)
+    errors["base"] = _validation_error_to_error_key(error_msg)
+    if log_unknown_details and errors["base"] == ERROR_KEY_UNKNOWN:
+        _LOGGER.error("Unknown error details: %s", error_msg)
+
+
 def _fill_password_if_missing(
     user_input: Dict[str, Any], *sources: Optional[Mapping[str, Any]]
 ) -> None:
@@ -284,6 +312,23 @@ def _credentials_schema(
     return vol.Schema(_credentials_schema_keys(host_default, username_default, password_default))
 
 
+def _build_confirm_schema(
+    existing_config: Optional[Mapping[str, Any]],
+    discovered_host: Optional[str],
+    current_input: Optional[Mapping[str, Any]] = None,
+) -> vol.Schema:
+    """Schema for SSDP confirm step from existing config or current form input."""
+    host_fallback = discovered_host or DEFAULT_HOST
+    source = current_input if current_input is not None else existing_config
+    extra_password_sources = (existing_config,) if current_input is not None else ()
+    host_default, username_default, password_default = _credentials_defaults_from_config(
+        source,
+        host_fallback,
+        extra_password_sources,
+    )
+    return _credentials_schema(host_default, username_default, password_default)
+
+
 def _credentials_defaults_from_config(
     config: Optional[Mapping[str, Any]],
     host_fallback: str = DEFAULT_HOST,
@@ -303,10 +348,21 @@ def _credentials_schema_keys(
 ) -> Dict[Any, Any]:
     """Vol schema keys for host, username, password."""
     return {
-        vol.Required(CONF_HOST, default=host_default): vol.All(str, validate_host),
+        # Keep schema serializable for HA UI; host validation runs on submit.
+        vol.Required(CONF_HOST, default=host_default): str,
         vol.Required(CONF_USERNAME, default=username_default): str,
         vol.Required(CONF_PASSWORD, default=password_default): str,
     }
+
+
+def _validate_host_on_submit(user_input: Dict[str, Any], errors: Dict[str, str]) -> bool:
+    """Validate host from submitted user_input and set form field error."""
+    try:
+        validate_host(str(user_input.get(CONF_HOST, "")))
+    except vol.Invalid:
+        errors[CONF_HOST] = ERROR_KEY_INVALID_HOST
+        return False
+    return True
 
 
 async def validate_input(hass: HomeAssistant, data: Dict[str, Any]) -> Dict[str, Any]:
@@ -374,18 +430,13 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             return self.async_show_form(step_id="user", data_schema=schema, errors=errors)
 
         _fill_password_if_missing(user_input, self._existing_config)
+        if not _validate_host_on_submit(user_input, errors):
+            schema = _credentials_schema(*_credentials_defaults_from_config(user_input))
+            return self.async_show_form(step_id="user", data_schema=schema, errors=errors)
         try:
             info = await validate_input(self.hass, user_input)
-        except CannotConnect:
-            errors["base"] = ERROR_KEY_CANNOT_CONNECT
-        except InvalidAuth:
-            errors["base"] = ERROR_KEY_INVALID_AUTH
         except Exception as err:
-            error_msg = str(err)
-            _LOGGER.exception("Unexpected exception during validation: %s", error_msg)
-            errors["base"] = _validation_error_to_error_key(error_msg)
-            if errors["base"] == ERROR_KEY_UNKNOWN:
-                _LOGGER.error("Unknown error details: %s", error_msg)
+            _set_validation_error(errors, err, log_unknown_details=True)
         else:
             host = user_input.get(CONF_HOST)
             await self.async_set_unique_id(host)
@@ -427,40 +478,47 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         self, user_input: Optional[Dict[str, Any]] = None
     ) -> FlowResult:
         errors: Dict[str, str] = {}
-        
+
         if user_input is None:
-            host_default, username_default, password_default = _credentials_defaults_from_config(
-                self._existing_config, self._discovered_host or DEFAULT_HOST
-            )
             return self.async_show_form(
                 step_id="confirm",
-                data_schema=_credentials_schema(host_default, username_default, password_default),
-                description_placeholders={"host": host_default},
+                data_schema=_build_confirm_schema(
+                    self._existing_config, self._discovered_host
+                ),
+                description_placeholders={
+                    "host": self._discovered_host or DEFAULT_HOST
+                },
             )
 
         _fill_password_if_missing(user_input, self._existing_config)
+        if not _validate_host_on_submit(user_input, errors):
+            return self.async_show_form(
+                step_id="confirm",
+                data_schema=_build_confirm_schema(
+                    self._existing_config,
+                    self._discovered_host,
+                    current_input=user_input,
+                ),
+                errors=errors,
+            )
 
         try:
             info = await validate_input(self.hass, user_input)
-        except CannotConnect:
-            errors["base"] = ERROR_KEY_CANNOT_CONNECT
-        except InvalidAuth:
-            errors["base"] = ERROR_KEY_INVALID_AUTH
         except Exception as err:
-            _LOGGER.exception("Unexpected exception")
-            errors["base"] = _validation_error_to_error_key(str(err))
+            _set_validation_error(errors, err, log_unknown_details=False)
         else:
             host = user_input.get(CONF_HOST)
             await self.async_set_unique_id(host)
             self._abort_if_unique_id_configured()
             return self.async_create_entry(title=info["title"], data=user_input)
 
-        host_default, username_default, password_default = _credentials_defaults_from_config(
-            user_input, self._discovered_host or DEFAULT_HOST, (self._existing_config,)
-        )
         return self.async_show_form(
             step_id="confirm",
-            data_schema=_credentials_schema(host_default, username_default, password_default),
+            data_schema=_build_confirm_schema(
+                self._existing_config,
+                self._discovered_host,
+                current_input=user_input,
+            ),
             errors=errors,
         )
 
@@ -565,7 +623,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
         self, user_input: Optional[Dict[str, Any]] = None
     ) -> FlowResult:
         """Options menu: configure, cleanup, or repair entity ID suffixes."""
-        has_cleanup_action, has_repair_action, repair_count = self._get_available_actions()
+        has_cleanup_action, has_repair_action, _ = self._get_available_actions()
         has_extra_actions = has_cleanup_action or has_repair_action
 
         if user_input is None and not has_extra_actions:
@@ -579,14 +637,12 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
             return await self.async_step_configure()
 
         choices = {
-            OPTIONS_ACTION_CONFIGURE: "Konfigurieren (Host, Benutzer, Update-Intervall)",
+            OPTIONS_ACTION_CONFIGURE: OPTIONS_LABEL_CONFIGURE,
         }
         if has_cleanup_action:
-            choices[OPTIONS_ACTION_CLEANUP] = "Nicht verfügbare Entitäten entfernen"
+            choices[OPTIONS_ACTION_CLEANUP] = OPTIONS_LABEL_CLEANUP
         if has_repair_action:
-            choices[OPTIONS_ACTION_REPAIR_ENTITY_IDS] = (
-                f"Entitäts-IDs reparieren ({repair_count} mit _2, _3, ... -> Basis-ID)"
-            )
+            choices[OPTIONS_ACTION_REPAIR_ENTITY_IDS] = OPTIONS_LABEL_REPAIR_ENTITY_IDS
         schema = vol.Schema(
             {
                 vol.Required("action", default=OPTIONS_ACTION_CONFIGURE): vol.In(choices),
@@ -659,19 +715,19 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
             user_input = dict(user_input)
             user_input.pop("action", None)
             _fill_password_if_missing(user_input, config_entry.data or {})
+            if not _validate_host_on_submit(user_input, errors):
+                current_options = config_entry.options or {}
+                schema = _build_configure_schema(user_input, current_options)
+                return self.async_show_form(
+                    step_id="configure",
+                    data_schema=schema,
+                    errors=errors,
+                )
 
             try:
                 info = await validate_input(self.hass, user_input)
-            except CannotConnect:
-                errors["base"] = ERROR_KEY_CANNOT_CONNECT
-            except InvalidAuth:
-                errors["base"] = ERROR_KEY_INVALID_AUTH
             except Exception as err:
-                error_msg = str(err)
-                _LOGGER.exception("Unexpected exception during validation: %s", error_msg)
-                errors["base"] = _validation_error_to_error_key(error_msg)
-                if errors["base"] == ERROR_KEY_UNKNOWN:
-                    _LOGGER.error("Unknown error details: %s", error_msg)
+                _set_validation_error(errors, err, log_unknown_details=True)
             else:
                 config_data = {
                     CONF_HOST: user_input[CONF_HOST],

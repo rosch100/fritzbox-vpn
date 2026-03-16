@@ -120,6 +120,7 @@ NOTIFICATION_TITLE_AUTH_ERROR = "Fritz!Box VPN: Authentifizierungsfehler"
 ERROR_KEY_UNKNOWN = "unknown"
 ERROR_KEY_CANNOT_CONNECT = "cannot_connect"
 ERROR_KEY_INVALID_AUTH = "invalid_auth"
+ERROR_KEY_INVALID_HOST = "invalid_host"
 ERROR_KEY_CONFIG_ENTRY_NOT_FOUND = "config_entry_not_found"
 
 CONFIG_URL_INTEGRATIONS = "/config/integrations"

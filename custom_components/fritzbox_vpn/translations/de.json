@@ -18,6 +18,7 @@
     "error": {
       "cannot_connect": "Verbindung zur FritzBox fehlgeschlagen. Bitte überprüfen Sie die IP-Adresse und Netzwerkverbindung.",
       "invalid_auth": "Authentifizierung fehlgeschlagen. Bitte überprüfen Sie Benutzername und Passwort. Falls die Anmeldedaten korrekt sind, aktivieren Sie TR-064 (Zugriff für Apps erlauben) in der FritzBox unter Heimnetz > Netzwerk > Netzwerkeinstellungen > Zugriffseinstellungen im Heimnetz. Hinweis: UPnP wird nur für die automatische Erkennung benötigt, nicht für die API-Zugriffe.",
+      "invalid_host": "Ungültiger Host. Bitte gültige IP-Adresse oder Hostname eingeben.",
       "unknown": "Ein unerwarteter Fehler ist aufgetreten. Bitte überprüfen Sie die Home Assistant Logs für Details. Stellen Sie sicher, dass TR-064 (Zugriff für Apps erlauben) in der FritzBox aktiviert ist.",
       "config_entry_not_found": "Konfigurationseintrag nicht gefunden. Bitte die Integration erneut hinzufügen."
     },
@@ -28,6 +29,15 @@
     }
   },
   "options": {
+    "selector": {
+      "action": {
+        "options": {
+          "configure": "Konfigurieren (Host, Benutzer, Update-Intervall)",
+          "cleanup": "Nicht verfügbare Entitäten entfernen",
+          "repair_entity_ids": "Entitäts-IDs reparieren"
+        }
+      }
+    },
     "step": {
       "init": {
         "title": "Fritz!Box VPN Optionen",
@@ -64,6 +74,7 @@
     "error": {
       "cannot_connect": "Verbindung zur FritzBox fehlgeschlagen. Bitte überprüfen Sie die IP-Adresse und Netzwerkverbindung.",
       "invalid_auth": "Authentifizierung fehlgeschlagen. Bitte überprüfen Sie Benutzername und Passwort.",
+      "invalid_host": "Ungültiger Host. Bitte gültige IP-Adresse oder Hostname eingeben.",
       "unknown": "Ein unerwarteter Fehler ist aufgetreten. Bitte prüfen Sie die Home-Assistant-Logs.",
       "config_entry_not_found": "Konfigurationseintrag nicht gefunden. Bitte die Integration erneut hinzufügen.",
       "integration_not_loaded": "Integration ist nicht geladen. Bitte zuerst die Integration starten.",
