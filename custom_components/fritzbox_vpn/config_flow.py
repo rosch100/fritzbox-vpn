@@ -9,7 +9,6 @@ from urllib.parse import urlparse
 import voluptuous as vol
 
 from homeassistant import config_entries
-from homeassistant.components import ssdp
 from homeassistant.const import CONF_HOST, CONF_USERNAME, CONF_PASSWORD
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.data_entry_flow import FlowResult
