@@ -11,6 +11,7 @@ from homeassistant.const import CONF_PASSWORD, Platform
 from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.exceptions import ConfigEntryNotReady
 from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers import entity_registry as er
 
 from .config_flow import (
     _get_orphaned_entity_entries,
@@ -117,6 +118,31 @@ def _register_services_if_needed(hass: HomeAssistant) -> None:
     )
 
 
+def _cleanup_empty_connection_devices(hass: HomeAssistant, entry_id: str) -> int:
+    """Remove empty child devices of this config entry (parent device is kept)."""
+    device_registry = dr.async_get(hass)
+    entity_registry = er.async_get(hass)
+    removed = 0
+
+    for device in dr.async_entries_for_config_entry(device_registry, entry_id):
+        is_connection_device = any(
+            identifier[0] == DOMAIN and identifier[1] == entry_id and len(identifier) == 3
+            for identifier in device.identifiers
+        )
+        if not is_connection_device:
+            continue
+        if entity_registry.async_entries_for_device(device.id):
+            continue
+        device_registry.async_remove_device(device.id)
+        removed += 1
+        _LOGGER.info(
+            "Removed empty connection device at startup: %s (device_id: %s)",
+            device.name_by_user or device.name,
+            device.id,
+        )
+    return removed
+
+
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up FritzBox VPN from a config entry."""
     host = _entry_host(entry)
@@ -168,6 +194,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     except Exception as err:
         _LOGGER.error("Failed to set up platforms: %s", err, exc_info=True)
         return False
+
+    removed_empty_devices = _cleanup_empty_connection_devices(hass, entry.entry_id)
+    if removed_empty_devices:
+        _LOGGER.info(
+            "Cleaned up %d empty connection device(s) after setup",
+            removed_empty_devices,
+        )
 
     count, _ = repair_entity_id_suffixes(hass, entry.entry_id)
     if count:

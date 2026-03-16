@@ -95,16 +95,42 @@ def _connection_active_from_api(conn: Dict[str, Any]) -> bool:
     return False
 
 
+def _normalize_connection_uid(raw_uid: Any) -> Optional[str]:
+    """Normalize a connection uid to a stable canonical string."""
+    if raw_uid is None:
+        return None
+    uid = str(raw_uid).strip()
+    if not uid:
+        return None
+    return uid
+
+
 def _normalize_box_connections(box: Any) -> Dict[str, Any]:
     """API boxConnections (list or dict) → dict keyed by uid with normalized active."""
     result: Dict[str, Any] = {}
     items = box if isinstance(box, list) else box.values() if isinstance(box, dict) else ()
     for c in items:
-        if not isinstance(c, dict) or c.get(API_KEY_UID) is None:
+        if not isinstance(c, dict):
+            continue
+        raw_uid = c.get(API_KEY_UID)
+        uid = _normalize_connection_uid(raw_uid)
+        if uid is None:
             continue
         entry = dict(c)
+        entry[API_KEY_UID] = uid
         entry[API_KEY_ACTIVE] = _connection_active_from_api(c)
-        result[str(entry[API_KEY_UID])] = entry
+        if uid in result:
+            _LOGGER.warning(
+                "Duplicate VPN uid detected after normalization: %r. Latest payload wins.",
+                uid,
+            )
+        elif isinstance(raw_uid, str) and raw_uid != uid:
+            _LOGGER.debug(
+                "Normalized VPN uid from %r to %r",
+                raw_uid,
+                uid,
+            )
+        result[uid] = entry
     return result
 
 
