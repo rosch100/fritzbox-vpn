@@ -193,7 +193,7 @@ def _remove_orphaned_entities_and_clear_known_uids(
             device = device_registry.async_get(dev_id)
             if not device:
                 continue
-            if not entity_registry.async_entries_for_device(dev_id):
+            if not er.async_entries_for_device(entity_registry, dev_id):
                 device_registry.async_remove_device(dev_id)
                 _LOGGER.info(
                     "Removed empty device (no entities left): %s (device_id: %s)",

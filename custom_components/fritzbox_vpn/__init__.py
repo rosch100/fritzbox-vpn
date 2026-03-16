@@ -131,7 +131,7 @@ def _cleanup_empty_connection_devices(hass: HomeAssistant, entry_id: str) -> int
         )
         if not is_connection_device:
             continue
-        if entity_registry.async_entries_for_device(device.id):
+        if er.async_entries_for_device(entity_registry, device.id):
             continue
         device_registry.async_remove_device(device.id)
         removed += 1
