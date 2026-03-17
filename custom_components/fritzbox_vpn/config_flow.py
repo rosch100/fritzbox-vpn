@@ -50,13 +50,13 @@ from .fritz_config_source import get_existing_fritz_config
 _LOGGER = logging.getLogger(__name__)
 
 OPTIONS_LABEL_CONFIGURE = (
-    "%key:component::fritzbox_vpn::options::selector::action::options::configure%"
+    "Configure (host, user, update interval)"
 )
 OPTIONS_LABEL_CLEANUP = (
-    "%key:component::fritzbox_vpn::options::selector::action::options::cleanup%"
+    "Remove unavailable entities"
 )
 OPTIONS_LABEL_REPAIR_ENTITY_IDS = (
-    "%key:component::fritzbox_vpn::options::selector::action::options::repair_entity_ids%"
+    "Repair entity IDs"
 )
 
 

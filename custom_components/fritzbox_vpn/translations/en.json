@@ -29,15 +29,6 @@
     }
   },
   "options": {
-    "selector": {
-      "action": {
-        "options": {
-          "configure": "Configure (host, user, update interval)",
-          "cleanup": "Remove unavailable entities",
-          "repair_entity_ids": "Repair entity IDs"
-        }
-      }
-    },
     "step": {
       "init": {
         "title": "Fritz!Box VPN Options",
