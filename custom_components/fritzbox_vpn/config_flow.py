@@ -127,34 +127,67 @@ def _entity_id_base(entity_id: str) -> Optional[str]:
     return f"{domain}.{match.group(1)}"
 
 
+def _entity_id_suffix_number(entity_id: str) -> Optional[int]:
+    """Numeric suffix from entity_id object_id (_2, _3, ...), else None."""
+    if not entity_id or "." not in entity_id:
+        return None
+    _, object_id = entity_id.split(".", 1)
+    match = _ENTITY_ID_OBJECT_ID_SUFFIX_RE.match(object_id)
+    if not match:
+        return None
+    try:
+        return int(match.group(2))
+    except (TypeError, ValueError):
+        return None
+
+
 def _get_entity_id_suffix_repairs(
     registry: er.EntityRegistry, entry_id: str
-) -> List[Tuple[er.RegistryEntry, str]]:
-    """(suffixed entry, base_entity_id) pairs where base exists for same config entry."""
+) -> List[Tuple[er.RegistryEntry, str, bool]]:
+    """Repair operations as (suffixed entry, base_entity_id, remove_base_first)."""
     all_entries = er.async_entries_for_config_entry(registry, entry_id)
     by_entity_id = {e.entity_id: e for e in all_entries}
-    result: List[Tuple[er.RegistryEntry, str]] = []
+    suffixed_by_base: Dict[str, List[er.RegistryEntry]] = {}
+
     for entry in all_entries:
         base = _entity_id_base(entry.entity_id)
         if not base:
             continue
-        base_entry = by_entity_id.get(base)
-        if not base_entry or base_entry.id == entry.id:
+        suffixed_by_base.setdefault(base, []).append(entry)
+
+    result: List[Tuple[er.RegistryEntry, str, bool]] = []
+    for base_entity_id, suffixed_entries in suffixed_by_base.items():
+        preferred = sorted(
+            suffixed_entries,
+            key=lambda e: (_entity_id_suffix_number(e.entity_id) or 10_000, e.entity_id),
+        )[0]
+        base_entry = by_entity_id.get(base_entity_id)
+        if base_entry and base_entry.id == preferred.id:
             continue
-        result.append((entry, base))
+
+        # Base ID is free globally: rename preferred suffixed entity directly.
+        if not base_entry and registry.async_get(base_entity_id) is None:
+            result.append((preferred, base_entity_id, False))
+            continue
+
+        # Stale base from same config entry exists: replace it with preferred suffix.
+        if base_entry and base_entry.config_entry_id == entry_id:
+            result.append((preferred, base_entity_id, True))
+
     return result
 
 
 def repair_entity_id_suffixes(
     hass: HomeAssistant, entry_id: str
 ) -> Tuple[int, List[str]]:
-    """Remove stale base entity and assign its entity_id to suffixed entry. Returns (count, messages)."""
+    """Repair suffixed entity IDs (_2, _3, ...) to base IDs. Returns (count, messages)."""
     registry = er.async_get(hass)
     repairs = _get_entity_id_suffix_repairs(registry, entry_id)
     messages: List[str] = []
-    for suffixed_entry, base_entity_id in repairs:
+    for suffixed_entry, base_entity_id, remove_base_first in repairs:
         try:
-            registry.async_remove(base_entity_id)
+            if remove_base_first:
+                registry.async_remove(base_entity_id)
             registry.async_update_entity(suffixed_entry.entity_id, new_entity_id=base_entity_id)
             messages.append(f"{suffixed_entry.entity_id} → {base_entity_id}")
             _LOGGER.info("Repaired entity ID: %s → %s", suffixed_entry.entity_id, base_entity_id)
