@@ -32,6 +32,7 @@ automations_AppleTV.yaml
 shell_commands_AppleTV.yaml
 
 # Analyse- und Dokumentationsdateien (lokal)
+CHANGELOG.md
 ANALYSE_HA_FRITZBOX_VPN.md
 FRITZBOX_TOOLS_QUELLEN.md
 CUSTOM_COMPONENT_ZUSAMMENFASSUNG.md
