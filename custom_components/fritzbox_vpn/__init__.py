@@ -36,10 +36,16 @@ from .coordinator import FritzBoxVPNCoordinator
 _LOGGER = logging.getLogger(__name__)
 
 PLATFORMS: list[Platform] = [Platform.SWITCH, Platform.BINARY_SENSOR, Platform.SENSOR]
+SERVICE_REGISTRATION_FLAG = "_service_remove_unavailable_registered"
 
 SERVICE_SCHEMA_OPTIONAL_ENTRY_ID = vol.Schema(
     {vol.Optional(CONF_CONFIG_ENTRY_ID): str}
 )
+
+
+def _domain_store(hass: HomeAssistant) -> dict:
+    """Integration domain store in hass.data."""
+    return hass.data.setdefault(DOMAIN, {})
 
 
 def _entry_host(entry: ConfigEntry) -> str:
@@ -93,10 +99,10 @@ def _apply_auto_cleanup(hass: HomeAssistant, entry_id: str, current_uids: Set[st
 
 def _register_services_if_needed(hass: HomeAssistant) -> None:
     """Register integration services once per HA instance."""
-    if "_service_remove_unavailable_registered" in hass.data.get(DOMAIN, {}):
+    store = _domain_store(hass)
+    if SERVICE_REGISTRATION_FLAG in store:
         return
-    hass.data.setdefault(DOMAIN, {})
-    hass.data[DOMAIN]["_service_remove_unavailable_registered"] = True
+    store[SERVICE_REGISTRATION_FLAG] = True
 
     async def _handle_remove_unavailable(call: ServiceCall) -> None:
         await _async_remove_unavailable_entities(hass, call)
@@ -143,6 +149,17 @@ def _cleanup_empty_connection_devices(hass: HomeAssistant, entry_id: str) -> int
     return removed
 
 
+def _repair_suffixes_before_platform_setup(hass: HomeAssistant, entry_id: str) -> int:
+    """Repair entity-id suffixes before platform setup."""
+    repaired_count, _ = repair_entity_id_suffixes(hass, entry_id)
+    if repaired_count:
+        _LOGGER.info(
+            "Repaired %d entity ID suffix(es) before platform setup",
+            repaired_count,
+        )
+    return repaired_count
+
+
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up FritzBox VPN from a config entry."""
     host = _entry_host(entry)
@@ -170,8 +187,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         _LOGGER.warning("Failed to fetch initial VPN data, retrying later: %s", err)
         raise ConfigEntryNotReady(f"Timeout/Error connecting to {NAME_FRITZBOX}: {err}") from err
 
-    hass.data.setdefault(DOMAIN, {})
-    hass.data[DOMAIN][entry.entry_id] = {
+    _domain_store(hass)[entry.entry_id] = {
         DATA_COORDINATOR: coordinator,
     }
 
@@ -188,6 +204,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     )
     _LOGGER.info("Created parent device: %s (ID: %s)", parent_device.name, parent_device.id)
 
+    # Do registry repair before forwarding platforms to avoid reloading during setup,
+    # which can trigger "already been setup" errors for the same config entry.
+    _repair_suffixes_before_platform_setup(hass, entry.entry_id)
+
     try:
         await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
         _LOGGER.info("Successfully set up all platforms")
@@ -201,15 +221,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             "Cleaned up %d empty connection device(s) after setup",
             removed_empty_devices,
         )
-
-    count, _ = repair_entity_id_suffixes(hass, entry.entry_id)
-    if count:
-        _LOGGER.info(
-            "Repaired %d entity ID suffix(es) at setup; reloading to apply",
-            count,
-        )
-        await hass.config_entries.async_reload(entry.entry_id)
-        return True
 
     return True
 
@@ -230,7 +241,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             e for e in hass.config_entries.async_loaded_entries(DOMAIN)
             if e.entry_id != entry.entry_id
         ]
-        if not other_loaded and hass.data[DOMAIN].pop("_service_remove_unavailable_registered", None):
+        if not other_loaded and hass.data[DOMAIN].pop(SERVICE_REGISTRATION_FLAG, None):
             hass.services.async_remove(DOMAIN, SERVICE_REMOVE_UNAVAILABLE_ENTITIES)
             hass.services.async_remove(DOMAIN, SERVICE_REPAIR_ENTITY_ID_SUFFIXES)
 
