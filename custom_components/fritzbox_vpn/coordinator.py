@@ -156,17 +156,81 @@ def _parse_sid_from_login_response(content: str) -> Optional[str]:
         return None
 
 
-def _extract_box_connections_from_data(data: Dict[str, Any]) -> Any:
-    """boxConnections from data.lua JSON; raw list/dict or None."""
+def _describe_json_value(value: Any, *, max_keys: int = 20) -> Dict[str, Any]:
+    """Return a small summary for debug logs (no full payload)."""
+    if isinstance(value, dict):
+        keys = list(value.keys())
+        return {
+            "type": "dict",
+            "len": len(value),
+            "keys": keys[:max_keys],
+        }
+    if isinstance(value, list):
+        return {"type": "list", "len": len(value)}
+    return {"type": type(value).__name__}
+
+
+def _extract_box_connections_from_data(
+    data: Dict[str, Any], page: str
+) -> Any:
+    """Extract boxConnections from data.lua JSON (WireGuard page).
+
+    Fritz!Box firmware versions vary slightly in where `boxConnections` is
+    nested. We try the most common structures.
+    """
     if not isinstance(data, dict):
         return None
+
     data_inner = data.get(API_KEY_DATA)
     if not isinstance(data_inner, dict):
         return None
+
     init = data_inner.get(API_KEY_INIT)
-    if not isinstance(init, dict):
-        return None
-    return init.get(API_KEY_BOX_CONNECTIONS)
+    if isinstance(init, dict):
+        # Preferred structure: data["data"]["init"]["boxConnections"]
+        box_connections = init.get(API_KEY_BOX_CONNECTIONS)
+        if box_connections is not None:
+            return box_connections
+
+        # Alternate: data["data"]["init"][<page>]["boxConnections"]
+        page_payload = init.get(page)
+        if isinstance(page_payload, dict):
+            box_connections = page_payload.get(API_KEY_BOX_CONNECTIONS)
+            if box_connections is not None:
+                return box_connections
+
+    # Alternate structures (less common, but seen in the wild)
+    box_connections = data_inner.get(API_KEY_BOX_CONNECTIONS)
+    if box_connections is not None:
+        return box_connections
+
+    page_payload = data_inner.get(page)
+    if isinstance(page_payload, dict):
+        box_connections = page_payload.get(API_KEY_BOX_CONNECTIONS)
+        if box_connections is not None:
+            return box_connections
+
+    _LOGGER.debug(
+        "Could not extract boxConnections from data.lua JSON. data.lua structure summary=%s",
+        {
+            "data_keys": list(data.keys())[:50],
+            "data_inner": _describe_json_value(data_inner),
+            "init": _describe_json_value(init),
+            "init_page_payload": _describe_json_value(
+                init.get(page) if isinstance(init, dict) else None
+            ),
+            "data_inner_page_payload": _describe_json_value(
+                data_inner.get(page) if isinstance(data_inner, dict) else None
+            ),
+            "data_inner_boxConnections": _describe_json_value(
+                data_inner.get(API_KEY_BOX_CONNECTIONS)
+                if isinstance(data_inner, dict)
+                else None
+            ),
+            "requested_page": page,
+        },
+    )
+    return None
 
 
 def normalize_update_interval(value: Any) -> int:
@@ -325,7 +389,7 @@ class FritzBoxVPNSession:
             except (json.JSONDecodeError, TypeError) as err:
                 raise ValueError(ERROR_MSG_INVALID_SID_HTML) from err
 
-            box = _extract_box_connections_from_data(data)
+            box = _extract_box_connections_from_data(data, API_PAGE_SHAREWIREGUARD)
             if box is not None:
                 return _normalize_box_connections(box)
             return {}
