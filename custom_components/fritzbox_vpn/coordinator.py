@@ -339,8 +339,7 @@ class FritzBoxVPNSession:
         # Fritz!Box Login protocol uses MD5(challenge-password) as part of the
         # challenge-response computation (protocol digest, not password hashing).
         md5_input = f"{challenge}-{self.password}".encode("utf-16le")
-        # codeql[py/weak-sensitive-data-hashing]
-        response_hash = hashlib.md5(md5_input).hexdigest()
+        response_hash = hashlib.md5(md5_input).hexdigest()  # codeql[py/weak-sensitive-data-hashing]
         login_data = {
             LOGIN_FORM_USERNAME: self.username,
             LOGIN_FORM_RESPONSE: f"{challenge}-{response_hash}",
