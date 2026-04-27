@@ -25,7 +25,6 @@ jobs:
         with:
           languages: python
           build-mode: none
-          packs: codeql/python-queries:AlertSuppression.ql
 
       - name: Perform CodeQL Analysis
         id: analyze
