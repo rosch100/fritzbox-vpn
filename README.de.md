@@ -175,7 +175,7 @@ Bei Problemen oder Fragen:
 - Erstelle ein [Issue auf GitHub](https://github.com/rosch100/fritzbox-vpn/issues)
 - Überprüfe die Home Assistant Logs
 
-### Debug-Logging & Log herunterladen (UI only)
+### Debug-Logging
 
 1. Installiere die Beta-Version.
 2. Öffne die Integrationsseite: **Einstellungen → Geräte & Dienste → Fritz!Box VPN**.
