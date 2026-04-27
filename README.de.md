@@ -19,10 +19,10 @@ Diese Integration ermöglicht die Steuerung von WireGuard VPN-Verbindungen auf e
 
 Es wird **Home Assistant 2026.1.0** oder neuer benötigt.
 
-1. Öffnen Sie HACS in Home Assistant
-2. Gehen Sie zu Integrations
-3. Suchen Sie nach "Fritz!Box VPN" und installieren Sie es
-4. Starten Sie Home Assistant neu
+1. Öffne HACS in Home Assistant
+2. Geh zu Integrations
+3. Such nach "Fritz!Box VPN" und installiere es
+4. Starte Home Assistant neu
 
 ### Beta-Version zum Testen
 
@@ -38,39 +38,37 @@ Beta-Releases erscheinen als GitHub-Vorabversionen (Tags wie `v0.10.0b1`).
 
 ## Konfiguration
 
+**Wichtig:** TR-064 ist immer für API-Zugriffe erforderlich (siehe Abschnitt Voraussetzungen). Für die automatische Erkennung sollte UPnP in deiner FritzBox aktiviert sein (empfohlen, aber nicht erforderlich). Wenn UPnP deaktiviert ist, kannst du die Integration weiterhin manuell konfigurieren.
+
 ### Automatische Erkennung (Empfohlen)
 
-1. Gehen Sie zu Einstellungen > Geräte & Dienste
-2. Klicken Sie auf Integration hinzufügen
+1. Geh zu Einstellungen > Geräte & Dienste
+2. Klicke auf Integration hinzufügen
 3. Falls eine FritzBox im Netzwerk gefunden wird, wird sie automatisch erkannt
 4. Die Integration versucht, Zugangsdaten aus Fritz!Box Tools zu verwenden, falls verfügbar
-5. Geben Sie bei Bedarf Ihre Zugangsdaten ein und klicken Sie auf Absenden
-
-**Hinweis:** Für die automatische Erkennung sollte UPnP in Ihrer FritzBox aktiviert sein (empfohlen, aber nicht erforderlich). Wenn UPnP deaktiviert ist, können Sie die Integration weiterhin manuell konfigurieren. TR-064 ist immer für API-Zugriffe erforderlich (siehe Abschnitt Voraussetzungen).
+5. Gib bei Bedarf deine Zugangsdaten ein und klicke auf Absenden
 
 ### Manuelle Konfiguration
 
-1. Gehen Sie zu Einstellungen > Geräte & Dienste
-2. Klicken Sie auf Integration hinzufügen
-3. Geben Sie die folgenden Informationen ein:
+1. Geh zu Einstellungen > Geräte & Dienste
+2. Klicke auf Integration hinzufügen
+3. Gib die folgenden Informationen ein:
    - FritzBox IP-Adresse: z.B. `192.168.178.1`
-   - Benutzername: Ihr FritzBox Benutzername
-   - Passwort: Ihr FritzBox Passwort
-4. Klicken Sie auf Absenden
+   - Benutzername: dein FritzBox Benutzername
+   - Passwort: dein FritzBox Passwort
+4. Klicke auf Absenden
 
-**Wichtig:** Stellen Sie sicher, dass TR-064 in Ihrer FritzBox aktiviert ist (siehe Abschnitt Voraussetzungen oben). Falls Sie Authentifizierungsfehler erhalten, überprüfen Sie, ob TR-064 aktiviert ist.
-
-Die Integration erkennt automatisch alle WireGuard VPN-Verbindungen auf Ihrer FritzBox und erstellt für jede eine Switch Entity.
+Die Integration erkennt automatisch alle WireGuard VPN-Verbindungen auf deiner FritzBox und erstellt für jede eine Switch Entity.
 
 ### Update-Intervall konfigurieren
 
-Sie können das Update-Intervall (wie oft die Integration den VPN-Status prüft) in den Integrations-Optionen konfigurieren:
+Du kannst das Update-Intervall (wie oft die Integration den VPN-Status prüft) in den Integrations-Optionen konfigurieren:
 
-1. Gehen Sie zu Einstellungen > Geräte & Dienste
-2. Finden Sie Ihre Fritz!Box VPN Integration
-3. Klicken Sie auf Konfigurieren
-4. Passen Sie das Update-Intervall an (5–3600 Sekunden, Standard: 30 Sekunden; maximal 1 Stunde).
-5. Klicken Sie auf Absenden
+1. Geh zu Einstellungen > Geräte & Dienste
+2. Finde deine Fritz!Box VPN Integration
+3. Klicke auf Konfigurieren
+4. Passe das Update-Intervall an (5–3600 Sekunden, Standard: 30 Sekunden; maximal 1 Stunde).
+5. Klicke auf Absenden
 
 Das Update-Intervall legt fest, wie oft die Integration die FritzBox abfragt. Niedrigere Werte = häufigere Updates, höhere Werte (bis 3600 s = 1 h) reduzieren Reconnects und Last.
 
@@ -89,12 +87,12 @@ Die gleichen Aktionen stehen als **Dienste** zur Verfügung (Entwicklerwerkzeuge
 
 Alle Zugangsdaten (Benutzername und Passwort) werden sicher von Home Assistant gespeichert:
 - Zugangsdaten werden verschlüsselt im sicheren Speicher von Home Assistant gespeichert
-- Sie werden niemals in Logs oder Konfigurationsdateien exponiert
+- Du wirst niemals in Logs oder Konfigurationsdateien exponiert
 - Der Zugriff ist auf die Integration selbst beschränkt
 
 ## Verwendung
 
-Nach der Konfiguration finden Sie für jede VPN-Verbindung folgende Entitäten:
+Nach der Konfiguration findest du für jede VPN-Verbindung folgende Entitäten:
 
 ### Switch
 - Zweck: VPN-Verbindungen ein- und ausschalten (Aktiviert/Deaktiviert)
@@ -114,7 +112,7 @@ Nach der Konfiguration finden Sie für jede VPN-Verbindung folgende Entitäten:
 1. Status Sensor
    - Zweck: Zeigt den kombinierten VPN-Status als Text an
    - Entitäts-ID: `sensor.fritzbox_vpn_<connection_uid>_status`
-   - Werte: 
+   - Werte:
      - `connected` - VPN ist aktiviert und verbunden
      - `enabled` - VPN ist aktiviert, aber nicht verbunden
      - `disabled` - VPN ist deaktiviert
@@ -130,7 +128,7 @@ Nach der Konfiguration finden Sie für jede VPN-Verbindung folgende Entitäten:
    - Entitäts-ID: `sensor.fritzbox_vpn_<connection_uid>_vpn_uid`
    - Wert: Die interne VPN UID als Zeichenkette (aus `conn.get('uid')`)
 
-Sie können diese Entitäten verwenden, um:
+Du kannst diese Entitäten verwenden, um:
 - VPN-Verbindungen ein- und auszuschalten (switch)
 - Verbindungsstatus zu überwachen (connected binary sensor)
 - Detaillierte Statusinformationen anzuzeigen (status sensor)
@@ -162,28 +160,30 @@ Jede VPN-Switch-Entity bietet folgende Attribute:
 
 ### FritzBox-Einstellungen
 
-Vor der Konfiguration der Integration müssen Sie die erforderlichen Einstellungen in Ihrer FritzBox aktivieren:
+Vor der Konfiguration der Integration musst du die erforderlichen Einstellungen in deiner FritzBox aktivieren:
 
-1. Öffnen Sie die FritzBox-Benutzeroberfläche
-2. Gehen Sie zu **Heimnetz** > **Netzwerk** > **Netzwerkeinstellungen**
-3. Klicken Sie auf **Zugriffseinstellungen im Heimnetz**
-4. Aktivieren Sie **TR-064 (Zugriff für Apps erlauben)** - **Erforderlich** für API-Zugriff
-5. Aktivieren Sie **UPnP (Statusinformationen über UPnP übertragen)** - **Empfohlen** für automatische Erkennung
-6. Klicken Sie auf **Übernehmen**
-
-**Hinweis:** 
-- **TR-064 ist erforderlich** - Die Integration funktioniert nicht ohne diese Einstellung
-- **UPnP ist empfohlen** - Ermöglicht die automatische Erkennung Ihrer FritzBox via SSDP. Wenn UPnP deaktiviert ist, können Sie die Integration weiterhin manuell konfigurieren, indem Sie die IP-Adresse eingeben
-
-## Dokumentation
-
-- **Projekt & Issues:** [GitHub-Repository](https://github.com/rosch100/fritzbox-vpn)
+1. Öffne die FritzBox-Benutzeroberfläche
+2. Geh zu **Heimnetz** > **Netzwerk** > **Netzwerkeinstellungen**
+3. Klicke auf **Zugriffseinstellungen im Heimnetz**
+4. Aktiviere **TR-064 (Zugriff für Apps erlauben)** - **Erforderlich** für API-Zugriff
+5. Aktiviere **UPnP (Statusinformationen über UPnP übertragen)** - **Empfohlen** für automatische Erkennung
+6. Klicke auf **Übernehmen**
 
 ## Unterstützung
 
 Bei Problemen oder Fragen:
-- Erstellen Sie ein [Issue auf GitHub](https://github.com/rosch100/fritzbox-vpn/issues)
-- Überprüfen Sie die Home Assistant Logs
+- Erstelle ein [Issue auf GitHub](https://github.com/rosch100/fritzbox-vpn/issues)
+- Überprüfe die Home Assistant Logs
+
+### Debug-Logging & Log herunterladen (UI only)
+
+1. Installiere die Beta-Version.
+2. Öffne die Integrationsseite: **Einstellungen → Geräte & Dienste → Fritz!Box VPN**.
+3. Öffne das **Optionsmenü (⋮)** (oben rechts) und wähle **Enable debug logging**.
+4. Klicke **Neu laden** (Integration reload), damit das nächste Update den neuen Log-Level nutzt.
+5. Reproduziere das Problem (oder warte auf das nächste Update).
+6. Deaktiviere Debug-Logging wieder. Das Logfile wird automatisch heruntergeladen. Hänge das Log dem GitHub-Issue an.
+7. (Optional) Öffne **Einstellungen → System → Logs** und verwende **Download**, um `home-assistant.log` zu erhalten.
 
 ## Buy me a coffee
 

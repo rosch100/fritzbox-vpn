@@ -38,6 +38,8 @@ Beta releases are published as GitHub Pre-releases (tags like `v0.10.0b1`).
 
 ## Configuration
 
+**Important:** TR-064 is always required for API access (see Requirements section). For automatic discovery to work, UPnP should be enabled in your FritzBox (recommended, but not required). If UPnP is disabled, you can still configure the integration manually.
+
 ### Automatic Discovery (Recommended)
 
 1. Go to Settings > Devices & Services
@@ -45,8 +47,6 @@ Beta releases are published as GitHub Pre-releases (tags like `v0.10.0b1`).
 3. If a FritzBox is found on your network, it will be automatically discovered
 4. The integration will try to use credentials from Fritz!Box Tools if available
 5. Enter your credentials if needed and click Submit
-
-**Note:** For automatic discovery to work, UPnP should be enabled in your FritzBox (recommended, but not required). If UPnP is disabled, you can still configure the integration manually. TR-064 is always required for API access (see Requirements section).
 
 ### Manual Configuration
 
@@ -57,8 +57,6 @@ Beta releases are published as GitHub Pre-releases (tags like `v0.10.0b1`).
    - Username: Your FritzBox username
    - Password: Your FritzBox password
 4. Click Submit
-
-**Important:** Make sure TR-064 is enabled in your FritzBox (see Requirements section above). If you encounter authentication errors, check that TR-064 is enabled.
 
 The integration automatically detects all WireGuard VPN connections on your FritzBox and creates a Switch entity for each one.
 
@@ -114,7 +112,7 @@ After configuration, you will find the following entities for each VPN connectio
 1. Status Sensor
    - Purpose: Shows the combined VPN status as text
    - Entity ID: `sensor.fritzbox_vpn_<connection_uid>_status`
-   - Values: 
+   - Values:
      - `connected` - VPN is enabled and connected
      - `enabled` - VPN is enabled but not connected
      - `disabled` - VPN is disabled
@@ -171,19 +169,25 @@ Before configuring the integration, you need to enable the required settings in 
 5. Enable **UPnP (Transmit status information over UPnP)** - **Recommended** for automatic discovery
 6. Click **Apply**
 
-**Note:** 
+**Note:**
 - **TR-064 is required** - The integration cannot work without it
 - **UPnP is recommended** - Enables automatic discovery of your FritzBox via SSDP. If UPnP is disabled, you can still configure the integration manually by entering the IP address
-
-## Documentation
-
-- **Project & issues:** [GitHub repository](https://github.com/rosch100/fritzbox-vpn)
 
 ## Support
 
 For problems or questions:
 - Create an issue on [GitHub](https://github.com/rosch100/fritzbox-vpn/issues)
 - Check the Home Assistant logs
+
+### Debug logging & log download (UI only)
+
+1. Install the beta version.
+2. Open the integration page: **Settings → Devices & Services → Fritz!Box VPN**.
+3. Open the **options menu (⋮)** (top right) and select **Enable debug logging**.
+4. Click **Reload** (integration reload) so the next update uses the new log level.
+5. Reproduce the issue (or wait for the next update).
+6. Disable debug logging. The log file download should start automatically. Attach the downloaded log file to the GitHub issue.
+7. (Optional) Go to **Settings → System → Logs** and use **Download** to get `home-assistant.log`.
 
 ## Buy me a coffee
 
