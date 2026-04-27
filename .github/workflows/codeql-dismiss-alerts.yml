@@ -1,0 +1,45 @@
+name: CodeQL Dismiss Alerts
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch: {}
+
+jobs:
+  analyze:
+    name: Analyze and dismiss (python)
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      packages: read
+      actions: read
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: python
+          build-mode: none
+          packs: codeql/python-queries:AlertSuppression.ql
+
+      - name: Perform CodeQL Analysis
+        id: analyze
+        uses: github/codeql-action/analyze@v2
+        with:
+          category: "/language:python"
+          output: sarif-results
+
+      - name: Dismiss alerts from SARIF suppression
+        if: github.ref == 'refs/heads/main'
+        uses: advanced-security/dismiss-alerts@v2
+        with:
+          sarif-id: ${{ steps.analyze.outputs.sarif-id }}
+          sarif-file: sarif-results/python.sarif
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+
