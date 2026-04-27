@@ -5,6 +5,7 @@ import hashlib
 import json
 import logging
 import xml.etree.ElementTree as ET
+from urllib.parse import urlsplit
 from datetime import timedelta
 from typing import Any, Callable, Dict, Optional, Set
 from aiohttp import ClientSession, ClientTimeout, ClientConnectorError
@@ -52,6 +53,7 @@ from .const import (
     HTTPS_FALLBACK_STATUS_CODES,
     LOGIN_TAG_CHALLENGE,
     LOGIN_TAG_SID,
+    LOGIN_TAG_BLOCKTIME,
     LOGIN_FORM_USERNAME,
     LOGIN_FORM_RESPONSE,
     INVALID_SID_VALUE,
@@ -153,6 +155,20 @@ def _parse_sid_from_login_response(content: str) -> Optional[str]:
         root = ET.fromstring(content)
         return root.findtext(LOGIN_TAG_SID)
     except ET.ParseError:
+        return None
+
+
+def _parse_blocktime_from_login_xml(content: str) -> Optional[int]:
+    """BlockTime from login_sid.lua XML; None if missing or parse error."""
+    if not (content and content.strip()):
+        return None
+    try:
+        root = ET.fromstring(content)
+        raw = root.findtext(LOGIN_TAG_BLOCKTIME)
+        if raw is None:
+            return None
+        return int(raw)
+    except (ET.ParseError, ValueError):
         return None
 
 
@@ -285,9 +301,23 @@ class FritzBoxVPNSession:
         if self.sid is not None:
             return self.session, self.sid
 
-        login_url = f"{self.protocol}://{self.host}{API_LOGIN}"
         timeout = ClientTimeout(total=DEFAULT_TIMEOUT)
 
+        # Prefer PBKDF2 (Fritz!OS >= 7.24) and fall back to legacy MD5.
+        sid = None
+        try:
+            sid = await self._try_get_session_via_pbkdf2(timeout)
+        except (ConnectionError, ValueError):
+            _LOGGER.debug("PBKDF2 login not usable; falling back to MD5.")
+
+        if sid:
+            _LOGGER.debug("Using PBKDF2 login flow for session generation.")
+            self.sid = sid
+            return self.session, self.sid
+        if sid is None:
+            _LOGGER.debug("PBKDF2 not supported by this Fritz!OS (or challenge format mismatch); falling back to MD5.")
+
+        login_url = f"{self.protocol}://{self.host}{API_LOGIN}"
         try:
             content = await self._fetch_login_page(login_url, timeout)
         except (ConnectionError, ValueError) as err:
@@ -304,9 +334,13 @@ class FritzBoxVPNSession:
         if not challenge:
             raise ValueError("Could not parse login response XML or find challenge")
 
-        response_hash = hashlib.md5(
-            f"{challenge}-{self.password}".encode("utf-16le")
-        ).hexdigest()
+        _LOGGER.debug("Using legacy MD5 login flow for session generation.")
+
+        # Fritz!Box Login protocol uses MD5(challenge-password) as part of the
+        # challenge-response computation (protocol digest, not password hashing).
+        md5_input = f"{challenge}-{self.password}".encode("utf-16le")
+        # codeql[py/weak-sensitive-data-hashing]
+        response_hash = hashlib.md5(md5_input).hexdigest()
         login_data = {
             LOGIN_FORM_USERNAME: self.username,
             LOGIN_FORM_RESPONSE: f"{challenge}-{response_hash}",
@@ -324,8 +358,72 @@ class FritzBoxVPNSession:
         self.sid = sid
         return self.session, self.sid
 
+    async def _try_get_session_via_pbkdf2(self, timeout: ClientTimeout) -> Optional[str]:
+        """Return valid SID via pbkdf2 challenge-response, or None if unsupported."""
+        _LOGGER.debug("Trying PBKDF2 login flow (login_sid.lua?version=2).")
+        login_url_get = f"{self.protocol}://{self.host}{API_LOGIN}?version=2"
+        content = await self._fetch_login_page(login_url_get, timeout)
+        if not content:
+            return None
+
+        challenge = _parse_challenge_from_login_xml(content)
+        if not challenge or not challenge.startswith("2$"):
+            _LOGGER.debug("PBKDF2 not supported (challenge format mismatch); falling back.")
+            return None
+
+        blocktime = _parse_blocktime_from_login_xml(content)
+        if blocktime and blocktime > 0:
+            _LOGGER.debug("PBKDF2 BlockTime=%d; waiting before login.", blocktime)
+            await asyncio.sleep(blocktime)
+
+        response = self._calculate_pbkdf2_response(challenge, self.password)
+        login_data = {
+            LOGIN_FORM_USERNAME: self.username,
+            LOGIN_FORM_RESPONSE: response,
+        }
+
+        # `_fetch_login_page` may switch self.protocol to HTTP; rebuild URL accordingly.
+        login_url_post = f"{self.protocol}://{self.host}{API_LOGIN}?version=2"
+        async with self.session.post(login_url_post, data=login_data, ssl=False, timeout=timeout) as response_http:
+            if response_http.status != HTTP_STATUS_OK:
+                return None
+            resp_content = await response_http.text()
+
+        sid = _parse_sid_from_login_response(resp_content)
+        if not sid or sid == INVALID_SID_VALUE:
+            return None
+        _LOGGER.debug("PBKDF2 login flow succeeded for session generation.")
+        return sid
+
+    @staticmethod
+    def _calculate_pbkdf2_response(challenge: str, password: str) -> str:
+        """Calculate PBKDF2-based Fritz!Box web login response."""
+        parts = challenge.split("$")
+        if len(parts) < 5 or parts[0] != "2":
+            raise ValueError("Unexpected PBKDF2 challenge format")
+
+        # Challenge parts:
+        # 2$iter1$salt1$iter2$salt2
+        iter1 = int(parts[1])
+        salt1_hex = parts[2]
+        iter2 = int(parts[3])
+        salt2_hex = parts[4]
+
+        salt1 = bytes.fromhex(salt1_hex)
+        salt2 = bytes.fromhex(salt2_hex)
+
+        # Spec: double hashing with PBKDF2-HMAC-SHA256.
+        hash1 = hashlib.pbkdf2_hmac("sha256", password.encode(), salt1, iter1)
+        hash2 = hashlib.pbkdf2_hmac("sha256", hash1, salt2, iter2)
+
+        # Response = salt2 + "$" + hex(hash2)
+        return f"{salt2_hex}${hash2.hex()}"
+
     async def _fetch_login_page(self, login_url: str, timeout: ClientTimeout) -> Optional[str]:
         """GET login page; HTTPS→HTTP fallback. Returns content or None."""
+        parsed = urlsplit(login_url)
+        api_path = parsed.path
+        query = parsed.query
         try:
             async with self.session.get(login_url, ssl=False, timeout=timeout) as response:
                 if response.status == HTTP_STATUS_OK:
@@ -337,7 +435,10 @@ class FritzBoxVPNSession:
                         response.status, NAME_FRITZBOX,
                     )
                     self.protocol = PROTOCOL_HTTP
-                    login_url = f"{self.protocol}://{self.host}{API_LOGIN}"
+                    login_url = (
+                        f"{self.protocol}://{self.host}{api_path}"
+                        f"{'?' + query if query else ''}"
+                    )
                     async with self.session.get(login_url, ssl=False, timeout=timeout) as retry_response:
                         if retry_response.status != HTTP_STATUS_OK:
                             raise ConnectionError(
@@ -353,7 +454,10 @@ class FritzBoxVPNSession:
                 err,
             )
             self.protocol = PROTOCOL_HTTP
-            login_url = f"{self.protocol}://{self.host}{API_LOGIN}"
+            login_url = (
+                f"{self.protocol}://{self.host}{api_path}"
+                f"{'?' + query if query else ''}"
+            )
             async with self.session.get(login_url, ssl=False, timeout=timeout) as response:
                 if response.status != HTTP_STATUS_OK:
                     raise ConnectionError(

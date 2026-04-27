@@ -260,8 +260,7 @@ def _build_configure_schema(
         host_default = validate_host(host_default)
     except vol.Invalid:
         _LOGGER.warning(
-            "Invalid host in config entry for options form: %r. Falling back to default host.",
-            host_default,
+            "Invalid host in config entry for options form. Falling back to default host.",
         )
         host_default = DEFAULT_HOST
     # Do not prefill passwords in options forms.
@@ -300,10 +299,16 @@ def _set_validation_error(
         return
 
     error_msg = str(err)
-    _LOGGER.exception("Unexpected exception during validation: %s", error_msg)
+    _LOGGER.exception(
+        "Unexpected exception during validation (%s)",
+        type(err).__name__,
+    )
     errors["base"] = _validation_error_to_error_key(error_msg)
     if log_unknown_details and errors["base"] == ERROR_KEY_UNKNOWN:
-        _LOGGER.error("Unknown error details: %s", error_msg)
+        _LOGGER.error(
+            "Unknown error details during validation (%s)",
+            type(err).__name__,
+        )
 
 
 def _fill_password_if_missing(
