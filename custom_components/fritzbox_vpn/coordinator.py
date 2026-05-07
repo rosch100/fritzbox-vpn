@@ -110,11 +110,20 @@ def _normalize_connection_uid(raw_uid: Any) -> Optional[str]:
 def _normalize_box_connections(box: Any) -> Dict[str, Any]:
     """API boxConnections (list or dict) → dict keyed by uid with normalized active."""
     result: Dict[str, Any] = {}
-    items = box if isinstance(box, list) else box.values() if isinstance(box, dict) else ()
-    for c in items:
+    if isinstance(box, dict):
+        items_with_keys = box.items()
+    elif isinstance(box, list):
+        items_with_keys = ((None, c) for c in box)
+    else:
+        items_with_keys = ()
+    for dict_key, c in items_with_keys:
         if not isinstance(c, dict):
             continue
         raw_uid = c.get(API_KEY_UID)
+        if isinstance(dict_key, str) and (
+            raw_uid is None or (isinstance(raw_uid, str) and not raw_uid.strip())
+        ):
+            raw_uid = dict_key
         uid = _normalize_connection_uid(raw_uid)
         if uid is None:
             continue
