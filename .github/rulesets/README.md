@@ -4,15 +4,17 @@
 
 `copilot-code-review.json` – automatische Copilot-Reviews auf PRs (alle Branches, bei jedem Push).
 
-## Required CI checks (optional)
+## Required CI checks (aktiv)
 
-`required-ci.json` ist **deaktiviert** (`enforcement: disabled`), weil `main` derzeit keinen Branch-Schutz hat.
+`required-ci.json` – Pflicht-Checks auf **`main`** vor Merge:
 
-Zum Aktivieren:
+- `Ruff`, `pytest`, `HACS validate`, `hassfest` (Workflow **CI**)
+- `strict_required_status_checks_policy`: false
+- `do_not_enforce_on_create`: true
 
-1. Settings → Rules → Rulesets → Import `required-ci.json`
-2. Enforcement auf **Active** setzen
-3. Prüfen, dass die Check-Namen mit dem **CI**-Workflow übereinstimmen: `Ruff`, `pytest`, `HACS validate`, `hassfest`
+Ruleset-ID: **16545012** – [Einstellungen](https://github.com/rosch100/fritzbox-vpn/rules/16545012)
+
+Re-Import nur nötig nach manueller Löschung des Rulesets.
 
 ## CodeQL
 

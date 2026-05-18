@@ -15,6 +15,10 @@ on:
       - "pyproject.toml"
       - ".pre-commit-config.yaml"
       - ".github/workflows/ci.yml"
+      - ".github/rulesets/**"
+      - ".github/instructions/**"
+      - ".github/copilot-instructions.md"
+      - "AGENTS.md"
   pull_request:
     paths: *ci-paths
   schedule:
