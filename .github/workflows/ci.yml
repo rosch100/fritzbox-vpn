@@ -16,6 +16,7 @@ on:
       - "pyproject.toml"
       - ".pre-commit-config.yaml"
       - ".github/workflows/ci.yml"
+      - ".github/workflows/publish-pypi.yml"
       - ".github/rulesets/**"
       - ".github/instructions/**"
       - ".github/copilot-instructions.md"
