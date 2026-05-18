@@ -3,41 +3,42 @@
 import ipaddress
 import logging
 import re
-from typing import Any, Dict, List, Mapping, Optional, Set, Tuple
-import voluptuous as vol
+from collections.abc import Mapping
+from typing import Any
 
+import voluptuous as vol
 from homeassistant import config_entries
-from homeassistant.const import CONF_HOST, CONF_USERNAME, CONF_PASSWORD
+from homeassistant.const import CONF_HOST, CONF_PASSWORD, CONF_USERNAME
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.data_entry_flow import FlowResult
 from homeassistant.exceptions import HomeAssistantError
-from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.service_info.ssdp import SsdpServiceInfo
 
 from .const import (
-    DOMAIN,
     CONF_UPDATE_INTERVAL,
     DATA_COORDINATOR,
     DATA_KNOWN_UIDS_KEYS,
     DEFAULT_HOST,
     DEFAULT_UPDATE_INTERVAL,
+    DOMAIN,
+    ERROR_INDICATOR_AUTH,
+    ERROR_INDICATOR_CONNECT,
+    ERROR_KEY_CANNOT_CONNECT,
+    ERROR_KEY_CONFIG_ENTRY_NOT_FOUND,
+    ERROR_KEY_INVALID_AUTH,
+    ERROR_KEY_INVALID_HOST,
+    ERROR_KEY_UNKNOWN,
     INTEGRATION_TITLE,
-    OPTIONS_ACTION_CONFIGURE,
     OPTIONS_ACTION_CLEANUP,
+    OPTIONS_ACTION_CONFIGURE,
     OPTIONS_ACTION_REPAIR_ENTITY_IDS,
     UNIQUE_ID_PREFIX,
     UNIQUE_ID_SUFFIXES,
-    UPDATE_INTERVAL_MIN,
     UPDATE_INTERVAL_MAX,
-    ERROR_INDICATOR_AUTH,
-    ERROR_INDICATOR_CONNECT,
-    ERROR_KEY_UNKNOWN,
-    ERROR_KEY_CANNOT_CONNECT,
-    ERROR_KEY_INVALID_AUTH,
-    ERROR_KEY_INVALID_HOST,
-    ERROR_KEY_CONFIG_ENTRY_NOT_FOUND,
+    UPDATE_INTERVAL_MIN,
     password_from_sources,
 )
 from .coordinator import FritzBoxVPNSession, normalize_update_interval
@@ -61,7 +62,7 @@ OPTIONS_LABEL_REPAIR_ENTITY_IDS = (
 )
 
 
-def _connection_uid_from_entity_unique_id(unique_id: str) -> Optional[str]:
+def _connection_uid_from_entity_unique_id(unique_id: str) -> str | None:
     """Connection UID from entity unique_id; None if not our format."""
     if not unique_id or not unique_id.startswith(UNIQUE_ID_PREFIX):
         return None
@@ -74,7 +75,7 @@ def _connection_uid_from_entity_unique_id(unique_id: str) -> Optional[str]:
 
 def _resolve_current_uids(
     hass: HomeAssistant, entry_id: str
-) -> Tuple[Optional[Set[str]], Optional[str]]:
+) -> tuple[set[str] | None, str | None]:
     """Current VPN UIDs from coordinator.data. Returns (uids, None) or (None, error_key)."""
     if DOMAIN not in hass.data or entry_id not in hass.data[DOMAIN]:
         return (None, "integration_not_loaded")
@@ -88,8 +89,8 @@ def _resolve_current_uids(
 def _get_orphaned_entity_entries(
     hass: HomeAssistant,
     entry_id: str,
-    current_uids: Optional[Set[str]] = None,
-) -> Tuple[Optional[List[er.RegistryEntry]], Optional[str]]:
+    current_uids: set[str] | None = None,
+) -> tuple[list[er.RegistryEntry] | None, str | None]:
     """Orphaned entity entries for this entry (VPN no longer present). Returns (entries, None) or (None, error_key)."""
     if current_uids is None:
         current_uids, error_key = _resolve_current_uids(hass, entry_id)
@@ -104,9 +105,9 @@ def _get_orphaned_entity_entries(
     return (to_remove, None)
 
 
-def _uids_from_entries(entries: List[er.RegistryEntry]) -> Set[str]:
+def _uids_from_entries(entries: list[er.RegistryEntry]) -> set[str]:
     """Connection UIDs from entity registry entries."""
-    uids: Set[str] = set()
+    uids: set[str] = set()
     for e in entries:
         uid = _connection_uid_from_entity_unique_id(e.unique_id or "")
         if uid is not None:
@@ -117,7 +118,7 @@ def _uids_from_entries(entries: List[er.RegistryEntry]) -> Set[str]:
 _ENTITY_ID_OBJECT_ID_SUFFIX_RE = re.compile(r"^(.+)_(\d+)$")
 
 
-def _entity_id_base(entity_id: str) -> Optional[str]:
+def _entity_id_base(entity_id: str) -> str | None:
     """Base entity_id when object_id has numeric suffix (_2, _3, …), else None."""
     if not entity_id or "." not in entity_id:
         return None
@@ -128,7 +129,7 @@ def _entity_id_base(entity_id: str) -> Optional[str]:
     return f"{domain}.{match.group(1)}"
 
 
-def _entity_id_suffix_number(entity_id: str) -> Optional[int]:
+def _entity_id_suffix_number(entity_id: str) -> int | None:
     """Numeric suffix from entity_id object_id (_2, _3, ...), else None."""
     if not entity_id or "." not in entity_id:
         return None
@@ -144,11 +145,11 @@ def _entity_id_suffix_number(entity_id: str) -> Optional[int]:
 
 def _get_entity_id_suffix_repairs(
     registry: er.EntityRegistry, entry_id: str
-) -> List[Tuple[er.RegistryEntry, str, bool]]:
+) -> list[tuple[er.RegistryEntry, str, bool]]:
     """Repair operations as (suffixed entry, base_entity_id, remove_base_first)."""
     all_entries = er.async_entries_for_config_entry(registry, entry_id)
     by_entity_id = {e.entity_id: e for e in all_entries}
-    suffixed_by_base: Dict[str, List[er.RegistryEntry]] = {}
+    suffixed_by_base: dict[str, list[er.RegistryEntry]] = {}
 
     for entry in all_entries:
         base = _entity_id_base(entry.entity_id)
@@ -156,7 +157,7 @@ def _get_entity_id_suffix_repairs(
             continue
         suffixed_by_base.setdefault(base, []).append(entry)
 
-    result: List[Tuple[er.RegistryEntry, str, bool]] = []
+    result: list[tuple[er.RegistryEntry, str, bool]] = []
     for base_entity_id, suffixed_entries in suffixed_by_base.items():
         preferred = sorted(
             suffixed_entries,
@@ -180,11 +181,11 @@ def _get_entity_id_suffix_repairs(
 
 def repair_entity_id_suffixes(
     hass: HomeAssistant, entry_id: str
-) -> Tuple[int, List[str]]:
+) -> tuple[int, list[str]]:
     """Repair suffixed entity IDs (_2, _3, ...) to base IDs. Returns (count, messages)."""
     registry = er.async_get(hass)
     repairs = _get_entity_id_suffix_repairs(registry, entry_id)
-    messages: List[str] = []
+    messages: list[str] = []
     for suffixed_entry, base_entity_id, remove_base_first in repairs:
         try:
             if remove_base_first:
@@ -200,7 +201,7 @@ def repair_entity_id_suffixes(
 def _remove_orphaned_entities_and_clear_known_uids(
     hass: HomeAssistant,
     entry_id: str,
-    entries: List[er.RegistryEntry],
+    entries: list[er.RegistryEntry],
     remove_from_registry: bool = True,
 ) -> None:
     """Clear known_uids for UIDs no longer present; optionally remove from entity/device registry."""
@@ -253,7 +254,7 @@ def _remove_orphaned_entities_and_clear_known_uids(
 
 
 def _build_configure_schema(
-    current_data: Dict[str, Any], current_options: Dict[str, Any]
+    current_data: dict[str, Any], current_options: dict[str, Any]
 ) -> vol.Schema:
     """Configure step schema with defaults from current config/options."""
     host_default, username_default, _ = _credentials_defaults_from_config(current_data)
@@ -289,7 +290,7 @@ def _validation_error_to_error_key(error_msg: str) -> str:
 
 
 def _set_validation_error(
-    errors: Dict[str, str], err: Exception, *, log_unknown_details: bool
+    errors: dict[str, str], err: Exception, *, log_unknown_details: bool
 ) -> None:
     """Set config-flow error key from validation exception."""
     if isinstance(err, CannotConnect):
@@ -313,7 +314,7 @@ def _set_validation_error(
 
 
 def _fill_password_if_missing(
-    user_input: Dict[str, Any], *sources: Optional[Mapping[str, Any]]
+    user_input: dict[str, Any], *sources: Mapping[str, Any] | None
 ) -> None:
     """Set user_input password from first non-empty source if missing."""
     if user_input.get(CONF_PASSWORD):
@@ -352,9 +353,9 @@ def _credentials_schema(
 
 
 def _build_confirm_schema(
-    existing_config: Optional[Mapping[str, Any]],
-    discovered_host: Optional[str],
-    current_input: Optional[Mapping[str, Any]] = None,
+    existing_config: Mapping[str, Any] | None,
+    discovered_host: str | None,
+    current_input: Mapping[str, Any] | None = None,
 ) -> vol.Schema:
     """Schema for SSDP confirm step from existing config or current form input."""
     host_fallback = discovered_host or DEFAULT_HOST
@@ -369,10 +370,10 @@ def _build_confirm_schema(
 
 
 def _credentials_defaults_from_config(
-    config: Optional[Mapping[str, Any]],
+    config: Mapping[str, Any] | None,
     host_fallback: str = DEFAULT_HOST,
-    extra_password_sources: Tuple[Optional[Mapping[str, Any]], ...] = (),
-) -> Tuple[str, str, str]:
+    extra_password_sources: tuple[Mapping[str, Any] | None, ...] = (),
+) -> tuple[str, str, str]:
     """(host, username, password) for credential form from config or fallbacks."""
     if not config:
         return (host_fallback, "", "")
@@ -384,7 +385,7 @@ def _credentials_defaults_from_config(
 
 def _credentials_schema_keys(
     host_default: str, username_default: str, password_default: str
-) -> Dict[Any, Any]:
+) -> dict[Any, Any]:
     """Vol schema keys for host, username, password."""
     return {
         # Keep schema serializable for HA UI; host validation runs on submit.
@@ -396,7 +397,7 @@ def _credentials_schema_keys(
 
 def _configure_schema_keys(
     host_default: str, username_default: str, password_default: str
-) -> Dict[Any, Any]:
+) -> dict[Any, Any]:
     """Vol schema keys for options configure form (password optional)."""
     return {
         vol.Required(CONF_HOST, default=host_default): str,
@@ -405,7 +406,7 @@ def _configure_schema_keys(
     }
 
 
-def _validate_host_on_submit(user_input: Dict[str, Any], errors: Dict[str, str]) -> bool:
+def _validate_host_on_submit(user_input: dict[str, Any], errors: dict[str, str]) -> bool:
     """Validate host from submitted user_input and set form field error."""
     try:
         validate_host(str(user_input.get(CONF_HOST, "")))
@@ -415,7 +416,7 @@ def _validate_host_on_submit(user_input: Dict[str, Any], errors: Dict[str, str])
     return True
 
 
-async def validate_input(hass: HomeAssistant, data: Dict[str, Any]) -> Dict[str, Any]:
+async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> dict[str, Any]:
     """Validate that we can connect to the FritzBox. VPN connections are discovered during setup."""
     session = FritzBoxVPNSession(
         async_get_clientsession(hass),
@@ -446,14 +447,14 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     VERSION = 1
 
     def __init__(self):
-        self._discovered_host: Optional[str] = None
-        self._discovered_unique_id: Optional[str] = None
-        self._existing_config: Optional[Dict[str, Any]] = None
+        self._discovered_host: str | None = None
+        self._discovered_unique_id: str | None = None
+        self._existing_config: dict[str, Any] | None = None
 
     async def async_step_user(
-        self, user_input: Optional[Dict[str, Any]] = None
+        self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
-        errors: Dict[str, str] = {}
+        errors: dict[str, str] = {}
 
         if user_input is None:
             self._existing_config = await get_existing_fritz_config(self.hass)
@@ -527,9 +528,9 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         return await self.async_step_confirm()
 
     async def async_step_confirm(
-        self, user_input: Optional[Dict[str, Any]] = None
+        self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
-        errors: Dict[str, str] = {}
+        errors: dict[str, str] = {}
 
         if user_input is None:
             return self.async_show_form(
@@ -589,11 +590,11 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
         super().__init__()
         self._config_entry = config_entry
 
-    def _get_current_entry(self) -> Optional[config_entries.ConfigEntry]:
+    def _get_current_entry(self) -> config_entries.ConfigEntry | None:
         """Current config entry or None if removed."""
         return self.hass.config_entries.async_get_entry(self._config_entry.entry_id)
 
-    def _get_available_actions(self) -> Tuple[bool, bool, int]:
+    def _get_available_actions(self) -> tuple[bool, bool, int]:
         """Return (has_cleanup_action, has_repair_action, repair_count) safely."""
         try:
             to_remove, error_key = _get_orphaned_entity_entries(
@@ -613,7 +614,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
             return (False, False, 0)
 
     async def async_step_init(
-        self, user_input: Optional[Dict[str, Any]] = None
+        self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
         """Options menu: configure, cleanup, or repair entity ID suffixes."""
         has_cleanup_action, has_repair_action, _ = self._get_available_actions()
@@ -644,7 +645,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
         return self.async_show_form(step_id="init", data_schema=schema)
 
     async def async_step_cleanup_confirm(
-        self, user_input: Optional[Dict[str, Any]] = None
+        self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
         """Confirm removal of entities for VPN connections no longer on the Fritz!Box."""
         config_entry = self._get_current_entry()
@@ -673,7 +674,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
         )
 
     async def async_step_repair_entity_ids_confirm(
-        self, user_input: Optional[Dict[str, Any]] = None
+        self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
         """Confirm repair of entity IDs (_2, _3, … → base ID)."""
         config_entry = self._get_current_entry()
@@ -696,9 +697,9 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
         )
 
     async def async_step_configure(
-        self, user_input: Optional[Dict[str, Any]] = None
+        self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
-        errors: Dict[str, str] = {}
+        errors: dict[str, str] = {}
         config_entry = self._get_current_entry()
         if not config_entry:
             return self.async_abort(reason=ERROR_KEY_CONFIG_ENTRY_NOT_FOUND)
@@ -718,7 +719,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                 )
 
             try:
-                info = await validate_input(self.hass, user_input)
+                await validate_input(self.hass, user_input)
             except Exception as err:
                 _set_validation_error(errors, err, log_unknown_details=True)
             else:

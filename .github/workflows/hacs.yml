@@ -2,15 +2,36 @@ name: HACS Validation
 
 on:
   push:
+    branches:
+      - main
+    paths:
+      - "custom_components/**"
+      - "hacs.json"
+      - ".github/workflows/hacs.yml"
   pull_request:
+    paths:
+      - "custom_components/**"
+      - "hacs.json"
+      - ".github/workflows/hacs.yml"
   schedule:
-    - cron: "0 0 * * *"  # Täglich um Mitternacht
+    - cron: "0 0 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: hacs-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write
 
 jobs:
   validate:
+    name: HACS validate
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
-      - name: Checkout repository
+      - name: Check out repository
         uses: actions/checkout@v6
 
       - name: HACS Action

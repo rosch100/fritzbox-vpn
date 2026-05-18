@@ -1,11 +1,11 @@
 """Config source from existing FritzBox/AVM integrations for config flow. Repeaters excluded."""
 
 import logging
-from typing import Any, Dict, Optional
+from typing import Any
 
 from homeassistant import config_entries
+from homeassistant.const import CONF_HOST, CONF_PASSWORD, CONF_USERNAME
 from homeassistant.core import HomeAssistant
-from homeassistant.const import CONF_HOST, CONF_USERNAME, CONF_PASSWORD
 
 from .const import (
     FRITZ_INTEGRATION_DOMAINS,
@@ -27,7 +27,7 @@ def _entry_has_credentials(entry: config_entries.ConfigEntry) -> bool:
     return bool(password_from_sources(data, options))
 
 
-def _host_username_password_from_entry(entry: config_entries.ConfigEntry) -> Optional[Dict[str, Any]]:
+def _host_username_password_from_entry(entry: config_entries.ConfigEntry) -> dict[str, Any] | None:
     """Host, username, password from entry; None if no host."""
     config_data = entry.data or {}
     options_data = entry.options or {}
@@ -59,7 +59,7 @@ def _host_username_password_from_entry(entry: config_entries.ConfigEntry) -> Opt
     return {CONF_HOST: host, CONF_USERNAME: username or "", CONF_PASSWORD: password or ""}
 
 
-async def get_existing_fritz_config(hass: HomeAssistant) -> Optional[Dict[str, Any]]:
+async def get_existing_fritz_config(hass: HomeAssistant) -> dict[str, Any] | None:
     """Config from existing Fritz/FritzBox Tools integration if available. Repeaters excluded."""
     excluded_states = (
         config_entries.ConfigEntryState.FAILED_UNLOAD,

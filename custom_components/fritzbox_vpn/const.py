@@ -1,6 +1,7 @@
 """Constants for FritzBox VPN integration."""
 
-from typing import Any, Mapping, Optional
+from collections.abc import Mapping
+from typing import Any
 
 from homeassistant.const import CONF_HOST, CONF_PASSWORD
 
@@ -142,14 +143,14 @@ def mask_config_for_log(data: dict) -> dict:
     return {k: "***" if k in SENSITIVE_CONFIG_KEYS else v for k, v in data.items()}
 
 
-def password_from_source(source: Optional[Mapping[str, Any]]) -> str:
+def password_from_source(source: Mapping[str, Any] | None) -> str:
     """Return password from one dict (CONF_PASSWORD, 'password', or 'pass'), or empty string."""
     if not source:
         return ""
     return str(source.get(CONF_PASSWORD) or source.get("password") or source.get("pass") or "")
 
 
-def password_from_sources(*sources: Optional[Mapping[str, Any]]) -> str:
+def password_from_sources(*sources: Mapping[str, Any] | None) -> str:
     """Return first non-empty password from any of the given dicts."""
     for src in sources:
         p = password_from_source(src)

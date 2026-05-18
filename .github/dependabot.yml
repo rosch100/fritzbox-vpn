@@ -1,0 +1,25 @@
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    groups:
+      github-actions:
+        patterns:
+          - "*"
+
+  - package-ecosystem: pip
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    files:
+      - /scripts/requirements-test.txt
+    groups:
+      pytest:
+        patterns:
+          - "pytest*"
+          - "homeassistant"
+          - "pytest-homeassistant-custom-component"

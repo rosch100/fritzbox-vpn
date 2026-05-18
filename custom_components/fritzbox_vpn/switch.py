@@ -2,7 +2,7 @@
 
 import asyncio
 import logging
-from typing import Any, Dict, Set
+from typing import Any
 
 from homeassistant.components.switch import SwitchEntity
 from homeassistant.config_entries import ConfigEntry
@@ -12,20 +12,20 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import (
-    DOMAIN,
+    API_KEY_ACTIVE,
+    API_KEY_CONNECTED,
+    API_KEY_NAME,
+    API_KEY_UID,
+    ATTR_STATUS,
+    ATTR_UID,
+    ATTR_VPN_UID,
     DATA_COORDINATOR,
     DATA_KNOWN_UIDS_SWITCH,
     DATA_LOCK_ADD_ENTITIES_SWITCH,
+    DEFAULT_NAME_UNKNOWN,
+    DOMAIN,
     MANUFACTURER_AVM,
     MODEL_WIREGUARD_VPN,
-    DEFAULT_NAME_UNKNOWN,
-    API_KEY_NAME,
-    API_KEY_UID,
-    API_KEY_ACTIVE,
-    API_KEY_CONNECTED,
-    ATTR_UID,
-    ATTR_VPN_UID,
-    ATTR_STATUS,
     UNIQUE_ID_PREFIX,
     UNIQUE_ID_SUFFIX_SWITCH,
 )
@@ -45,7 +45,7 @@ async def async_setup_entry(
         DATA_KNOWN_UIDS_SWITCH, set()
     )
 
-    def _create_switch_entities(uids: Set[str]):
+    def _create_switch_entities(uids: set[str]):
         """Create switch entities for UIDs present in coordinator.data."""
         if not coordinator.data:
             return []
@@ -100,7 +100,7 @@ class FritzBoxVPNSwitch(CoordinatorEntity, SwitchEntity):
         coordinator: FritzBoxVPNCoordinator,
         entry: ConfigEntry,
         connection_uid: str,
-        connection_data: Dict[str, Any],
+        connection_data: dict[str, Any],
     ) -> None:
         super().__init__(coordinator)
         self._entry = entry
@@ -134,7 +134,7 @@ class FritzBoxVPNSwitch(CoordinatorEntity, SwitchEntity):
         return False
 
     @property
-    def extra_state_attributes(self) -> Dict[str, Any]:
+    def extra_state_attributes(self) -> dict[str, Any]:
         """Additional state attributes."""
         if self.coordinator.data and self._connection_uid in self.coordinator.data:
             conn = self.coordinator.data[self._connection_uid]

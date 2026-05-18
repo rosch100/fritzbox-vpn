@@ -1,4 +1,5 @@
 # Python
+.ruff_cache/
 .coverage
 htmlcov/
 __pycache__/

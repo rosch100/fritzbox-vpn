@@ -2,7 +2,7 @@
 
 import asyncio
 import logging
-from typing import Any, Dict, Optional, Set
+from typing import Any
 
 from homeassistant.components.sensor import SensorEntity
 from homeassistant.config_entries import ConfigEntry
@@ -12,16 +12,15 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import (
-    DOMAIN,
+    API_KEY_NAME,
+    API_KEY_UID,
     DATA_COORDINATOR,
     DATA_KNOWN_UIDS_SENSOR,
     DATA_LOCK_ADD_ENTITIES_SENSOR,
-    STATUS_UNKNOWN,
+    DEFAULT_NAME_UNKNOWN,
+    DOMAIN,
     MANUFACTURER_AVM,
     MODEL_WIREGUARD_VPN,
-    DEFAULT_NAME_UNKNOWN,
-    API_KEY_NAME,
-    API_KEY_UID,
     UNIQUE_ID_PREFIX,
     UNIQUE_ID_SUFFIX_STATUS,
     UNIQUE_ID_SUFFIX_UID,
@@ -43,7 +42,7 @@ async def async_setup_entry(
         DATA_KNOWN_UIDS_SENSOR, set()
     )
 
-    def _create_sensor_entities(uids: Set[str]):
+    def _create_sensor_entities(uids: set[str]):
         """Create status/uid/vpn_uid sensors for UIDs present in coordinator.data."""
         if not coordinator.data:
             return []
@@ -101,7 +100,7 @@ class FritzBoxVPNStatusSensor(CoordinatorEntity, SensorEntity):
         coordinator: FritzBoxVPNCoordinator,
         entry: ConfigEntry,
         connection_uid: str,
-        connection_data: Dict[str, Any],
+        connection_data: dict[str, Any],
     ) -> None:
         super().__init__(coordinator)
         self._entry = entry
@@ -133,7 +132,7 @@ class FritzBoxVPNStatusSensor(CoordinatorEntity, SensorEntity):
         return self.coordinator.get_vpn_status(self._connection_uid)
 
     @property
-    def native_unit_of_measurement(self) -> Optional[str]:
+    def native_unit_of_measurement(self) -> str | None:
         """Unit of measurement (none for status text)."""
         return None
 
@@ -148,7 +147,7 @@ class FritzBoxVPNUIDSensor(CoordinatorEntity, SensorEntity):
         coordinator: FritzBoxVPNCoordinator,
         entry: ConfigEntry,
         connection_uid: str,
-        connection_data: Dict[str, Any],
+        connection_data: dict[str, Any],
     ) -> None:
         super().__init__(coordinator)
         self._entry = entry
@@ -180,7 +179,7 @@ class FritzBoxVPNUIDSensor(CoordinatorEntity, SensorEntity):
         return self._connection_uid
 
     @property
-    def native_unit_of_measurement(self) -> Optional[str]:
+    def native_unit_of_measurement(self) -> str | None:
         """Unit of measurement (none for identifier)."""
         return None
 
@@ -195,7 +194,7 @@ class FritzBoxVPNVPNUIDSensor(CoordinatorEntity, SensorEntity):
         coordinator: FritzBoxVPNCoordinator,
         entry: ConfigEntry,
         connection_uid: str,
-        connection_data: Dict[str, Any],
+        connection_data: dict[str, Any],
     ) -> None:
         super().__init__(coordinator)
         self._entry = entry
@@ -229,6 +228,6 @@ class FritzBoxVPNVPNUIDSensor(CoordinatorEntity, SensorEntity):
         return ''
 
     @property
-    def native_unit_of_measurement(self) -> Optional[str]:
+    def native_unit_of_measurement(self) -> str | None:
         """Unit of measurement (none for VPN UID)."""
         return None

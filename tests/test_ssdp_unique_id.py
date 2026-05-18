@@ -1,11 +1,6 @@
 """Tests for SSDP helpers."""
 
 from unittest.mock import patch
-from homeassistant.helpers.service_info.ssdp import (
-    ATTR_UPNP_FRIENDLY_NAME,
-    ATTR_UPNP_UDN,
-    SsdpServiceInfo,
-)
 
 from custom_components.fritzbox_vpn.ssdp_unique_id import (
     host_from_ssdp,
@@ -15,6 +10,11 @@ from custom_components.fritzbox_vpn.ssdp_unique_id import (
     uuid_from_discovery,
     uuid_from_ssdp_usn,
     uuid_from_upnp_udn,
+)
+from homeassistant.helpers.service_info.ssdp import (
+    ATTR_UPNP_FRIENDLY_NAME,
+    ATTR_UPNP_UDN,
+    SsdpServiceInfo,
 )
 
 MOCK_DEVICE_UUID = "2f402f80-da79-4e15-8e7b-4b6b6b6b6b6b"

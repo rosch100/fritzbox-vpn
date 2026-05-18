@@ -5,83 +5,83 @@ import hashlib
 import json
 import logging
 import xml.etree.ElementTree as ET
-from urllib.parse import urlsplit
+from collections.abc import Callable
 from datetime import timedelta
-from typing import Any, Callable, Dict, Optional, Set
-from aiohttp import ClientSession, ClientTimeout, ClientConnectorError
+from typing import Any
+from urllib.parse import urlsplit
 
-from homeassistant.core import HomeAssistant
-from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
-from homeassistant.const import CONF_USERNAME, CONF_PASSWORD
+from aiohttp import ClientConnectorError, ClientSession, ClientTimeout
 from homeassistant.components import persistent_notification
+from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
+from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.translation import async_get_translations
+from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .const import (
-    DOMAIN,
-    DEFAULT_UPDATE_INTERVAL,
-    CONF_UPDATE_INTERVAL,
-    UPDATE_INTERVAL_MIN,
-    UPDATE_INTERVAL_MAX,
-    DEFAULT_TIMEOUT,
-    DEFAULT_PROTOCOL,
-    VERIFICATION_DELAY,
-    RETRY_AFTER_SECONDS,
-    API_LOGIN,
+    ACTIVE_STATE_STRINGS_TRUE,
     API_DATA,
-    host_from_config,
-    API_VPN_CONNECTION,
-    API_PAGE_SHAREWIREGUARD,
+    API_KEY_ACTIVATED,
+    API_KEY_ACTIVE,
+    API_KEY_BOX_CONNECTIONS,
+    API_KEY_CONNECTED,
     API_KEY_DATA,
     API_KEY_INIT,
-    API_KEY_BOX_CONNECTIONS,
-    API_KEY_UID,
-    API_KEY_ACTIVE,
-    API_KEY_ACTIVATED,
-    API_KEY_CONNECTED,
     API_KEY_NAME,
+    API_KEY_UID,
+    API_LOGIN,
+    API_PAGE_SHAREWIREGUARD,
+    API_VPN_CONNECTION,
+    AUTH_HEADER_PREFIX,
+    AUTH_INDICATORS,
+    CONF_UPDATE_INTERVAL,
+    CONFIG_URL_INTEGRATIONS,
+    CONTENT_TYPE_JSON,
+    DEFAULT_NAME_UNKNOWN,
+    DEFAULT_PROTOCOL,
+    DEFAULT_TIMEOUT,
+    DEFAULT_UPDATE_INTERVAL,
+    DOMAIN,
     ERROR_MSG_INVALID_SID,
     ERROR_MSG_INVALID_SID_403,
     ERROR_MSG_INVALID_SID_HTML,
     ERROR_MSG_LOGIN_FAILED_SID,
-    CONTENT_TYPE_JSON,
-    PROTOCOLS_ALLOWED,
-    PROTOCOL_HTTP,
-    PROTOCOL_HTTPS,
-    HTTP_STATUS_OK,
+    HEADER_VALUE_APPLICATION_JSON,
     HTTP_STATUS_FORBIDDEN,
+    HTTP_STATUS_OK,
     HTTPS_FALLBACK_STATUS_CODES,
-    LOGIN_TAG_CHALLENGE,
-    LOGIN_TAG_SID,
-    LOGIN_TAG_BLOCKTIME,
-    LOGIN_FORM_USERNAME,
-    LOGIN_FORM_RESPONSE,
+    INTEGRATION_TITLE,
     INVALID_SID_VALUE,
-    AUTH_HEADER_PREFIX,
     LOG_LABEL_ACTIVATED,
     LOG_LABEL_DEACTIVATED,
-    ACTIVE_STATE_STRINGS_TRUE,
-    HEADER_VALUE_APPLICATION_JSON,
     LOG_MSG_VPN_CONNECTIONS_REMOVED,
     LOG_MSG_VPN_CONNECTIONS_REMOVED_HINT,
-    STATUS_CONNECTED,
-    STATUS_ENABLED,
-    STATUS_DISABLED,
-    STATUS_UNKNOWN,
-    AUTH_INDICATORS,
-    DEFAULT_NAME_UNKNOWN,
-    INTEGRATION_TITLE,
+    LOGIN_FORM_RESPONSE,
+    LOGIN_FORM_USERNAME,
+    LOGIN_TAG_BLOCKTIME,
+    LOGIN_TAG_CHALLENGE,
+    LOGIN_TAG_SID,
     NAME_FRITZBOX,
     NOTIFICATION_TITLE_AUTH_ERROR,
-    CONFIG_URL_INTEGRATIONS,
+    PROTOCOL_HTTP,
+    PROTOCOL_HTTPS,
+    PROTOCOLS_ALLOWED,
+    RETRY_AFTER_SECONDS,
+    STATUS_CONNECTED,
+    STATUS_DISABLED,
+    STATUS_ENABLED,
+    STATUS_UNKNOWN,
+    UPDATE_INTERVAL_MAX,
+    UPDATE_INTERVAL_MIN,
+    VERIFICATION_DELAY,
     auth_error_notification_id,
-    mask_config_for_log,
+    host_from_config,
 )
 
 _LOGGER = logging.getLogger(__name__)
 
 
-def _connection_active_from_api(conn: Dict[str, Any]) -> bool:
+def _connection_active_from_api(conn: dict[str, Any]) -> bool:
     """Active state from API (active/activated, int/str/bool)."""
     raw = conn.get(API_KEY_ACTIVE)
     if raw is None:
@@ -97,7 +97,7 @@ def _connection_active_from_api(conn: Dict[str, Any]) -> bool:
     return False
 
 
-def _normalize_connection_uid(raw_uid: Any) -> Optional[str]:
+def _normalize_connection_uid(raw_uid: Any) -> str | None:
     """Normalize a connection uid to a stable canonical string."""
     if raw_uid is None:
         return None
@@ -107,9 +107,9 @@ def _normalize_connection_uid(raw_uid: Any) -> Optional[str]:
     return uid
 
 
-def _normalize_box_connections(box: Any) -> Dict[str, Any]:
+def _normalize_box_connections(box: Any) -> dict[str, Any]:
     """API boxConnections (list or dict) → dict keyed by uid with normalized active."""
-    result: Dict[str, Any] = {}
+    result: dict[str, Any] = {}
     if isinstance(box, dict):
         items_with_keys = box.items()
     elif isinstance(box, list):
@@ -145,7 +145,7 @@ def _normalize_box_connections(box: Any) -> Dict[str, Any]:
     return result
 
 
-def _parse_challenge_from_login_xml(content: str) -> Optional[str]:
+def _parse_challenge_from_login_xml(content: str) -> str | None:
     """Challenge from login_sid.lua XML; None if missing or parse error."""
     if not (content and content.strip()):
         return None
@@ -156,7 +156,7 @@ def _parse_challenge_from_login_xml(content: str) -> Optional[str]:
         return None
 
 
-def _parse_sid_from_login_response(content: str) -> Optional[str]:
+def _parse_sid_from_login_response(content: str) -> str | None:
     """SID from login response XML; None on parse error."""
     if not (content and content.strip()):
         return None
@@ -167,7 +167,7 @@ def _parse_sid_from_login_response(content: str) -> Optional[str]:
         return None
 
 
-def _parse_blocktime_from_login_xml(content: str) -> Optional[int]:
+def _parse_blocktime_from_login_xml(content: str) -> int | None:
     """BlockTime from login_sid.lua XML; None if missing or parse error."""
     if not (content and content.strip()):
         return None
@@ -181,7 +181,7 @@ def _parse_blocktime_from_login_xml(content: str) -> Optional[int]:
         return None
 
 
-def _describe_json_value(value: Any, *, max_keys: int = 20) -> Dict[str, Any]:
+def _describe_json_value(value: Any, *, max_keys: int = 20) -> dict[str, Any]:
     """Return a small summary for debug logs (no full payload)."""
     if isinstance(value, dict):
         keys = list(value.keys())
@@ -196,7 +196,7 @@ def _describe_json_value(value: Any, *, max_keys: int = 20) -> Dict[str, Any]:
 
 
 def _extract_box_connections_from_data(
-    data: Dict[str, Any], page: str
+    data: dict[str, Any], page: str
 ) -> Any:
     """Extract boxConnections from data.lua JSON (WireGuard page).
 
@@ -285,8 +285,8 @@ def normalize_update_interval(value: Any) -> int:
 
 
 def _resolve_update_interval_seconds(
-    config: Dict[str, Any],
-    options: Optional[Dict[str, Any]],
+    config: dict[str, Any],
+    options: dict[str, Any] | None,
 ) -> int:
     """Resolve update interval from options, then config, then default."""
     options_dict = options or {}
@@ -303,7 +303,7 @@ class FritzBoxVPNSession:
         self.username = username
         self.password = password
         self.protocol = protocol if protocol in PROTOCOLS_ALLOWED else DEFAULT_PROTOCOL
-        self.sid: Optional[str] = None
+        self.sid: str | None = None
 
     async def async_get_session(self) -> tuple[ClientSession, str]:
         """Return session and SID; reuse cached SID if valid."""
@@ -366,7 +366,7 @@ class FritzBoxVPNSession:
         self.sid = sid
         return self.session, self.sid
 
-    async def _try_get_session_via_pbkdf2(self, timeout: ClientTimeout) -> Optional[str]:
+    async def _try_get_session_via_pbkdf2(self, timeout: ClientTimeout) -> str | None:
         """Return valid SID via pbkdf2 challenge-response, or None if unsupported."""
         _LOGGER.debug("Trying PBKDF2 login flow (login_sid.lua?version=2).")
         login_url_get = f"{self.protocol}://{self.host}{API_LOGIN}?version=2"
@@ -427,7 +427,7 @@ class FritzBoxVPNSession:
         # Response = salt2 + "$" + hex(hash2)
         return f"{salt2_hex}${hash2.hex()}"
 
-    async def _fetch_login_page(self, login_url: str, timeout: ClientTimeout) -> Optional[str]:
+    async def _fetch_login_page(self, login_url: str, timeout: ClientTimeout) -> str | None:
         """GET login page; HTTPS→HTTP fallback. Returns content or None."""
         parsed = urlsplit(login_url)
         api_path = parsed.path
@@ -473,7 +473,7 @@ class FritzBoxVPNSession:
                     ) from err
                 return await response.text()
 
-    async def _fetch_vpn_connections_once(self) -> Dict[str, Any]:
+    async def _fetch_vpn_connections_once(self) -> dict[str, Any]:
         """Single VPN connections request; {} on non-auth errors."""
         session, sid = await self.async_get_session()
         data_url = f"{self.protocol}://{self.host}{API_DATA}"
@@ -506,7 +506,7 @@ class FritzBoxVPNSession:
                 return _normalize_box_connections(box)
             return {}
 
-    async def async_get_vpn_connections(self) -> Dict[str, Any]:
+    async def async_get_vpn_connections(self) -> dict[str, Any]:
         """WireGuard VPN connections; cached session, retry once on SID expiry."""
         try:
             return await self._fetch_vpn_connections_once()
@@ -515,7 +515,7 @@ class FritzBoxVPNSession:
                 self.invalidate_session()
                 return await self._fetch_vpn_connections_once()
             raise
-        except asyncio.TimeoutError as err:
+        except TimeoutError as err:
             _LOGGER.error("Timeout getting VPN connections: %s", err)
             raise
         except Exception as err:
@@ -599,10 +599,10 @@ class FritzBoxVPNSession:
                     new_active,
                 )
                 return False
-        except asyncio.TimeoutError as err:
+        except TimeoutError as err:
             _LOGGER.error("Timeout toggling VPN: %s", err)
             return False
-        except Exception as err:
+        except Exception:
             _LOGGER.exception("Error toggling VPN")
             return False
 
@@ -621,10 +621,10 @@ class FritzBoxVPNCoordinator(DataUpdateCoordinator):
     def __init__(
         self,
         hass: HomeAssistant,
-        config: Dict[str, Any],
-        options: Optional[Dict[str, Any]] = None,
-        entry_id: Optional[str] = None,
-        on_orphaned_removed: Optional[Callable[[str, Set[str]], None]] = None,
+        config: dict[str, Any],
+        options: dict[str, Any] | None = None,
+        entry_id: str | None = None,
+        on_orphaned_removed: Callable[[str, set[str]], None] | None = None,
     ):
         update_interval_seconds = _resolve_update_interval_seconds(config, options)
 
@@ -727,7 +727,7 @@ class FritzBoxVPNCoordinator(DataUpdateCoordinator):
         self._auth_error_notified = True
         _LOGGER.warning("Auth error; notification shown. Entry ID: %s", self.entry_id)
 
-    async def _async_update_data(self) -> Dict[str, Any]:
+    async def _async_update_data(self) -> dict[str, Any]:
         """Fetch latest VPN data from Fritz!Box."""
         previous_uids = set(self.data.keys()) if self.data else set()
         try:
@@ -762,7 +762,7 @@ class FritzBoxVPNCoordinator(DataUpdateCoordinator):
                 f"Error fetching VPN data: {err}",
                 retry_after=RETRY_AFTER_SECONDS,
             ) from err
-        except asyncio.TimeoutError as err:
+        except TimeoutError as err:
             raise UpdateFailed(
                 f"Error fetching VPN data: {err}",
                 retry_after=RETRY_AFTER_SECONDS,

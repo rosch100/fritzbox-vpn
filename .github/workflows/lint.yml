@@ -1,4 +1,4 @@
-name: Hassfest
+name: Lint
 
 on:
   push:
@@ -6,31 +6,34 @@ on:
       - main
     paths:
       - "custom_components/**"
-      - ".github/workflows/hassfest.yml"
+      - "tests/**"
+      - "pyproject.toml"
+      - ".github/workflows/lint.yml"
   pull_request:
     paths:
       - "custom_components/**"
-      - ".github/workflows/hassfest.yml"
-  schedule:
-    - cron: "0 0 * * *"
+      - "tests/**"
+      - "pyproject.toml"
+      - ".github/workflows/lint.yml"
   workflow_dispatch:
 
 concurrency:
-  group: hassfest-${{ github.workflow }}-${{ github.ref }}
+  group: lint-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 permissions:
   contents: read
 
 jobs:
-  validate:
-    name: hassfest
+  ruff:
+    name: Ruff
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - name: Check out repository
         uses: actions/checkout@v6
 
-      - name: Run hassfest
-        uses: home-assistant/actions/hassfest@master
-
+      - name: Run Ruff
+        uses: astral-sh/ruff-action@v3
+        with:
+          src: custom_components tests

@@ -1,13 +1,11 @@
 """The FritzBox VPN integration."""
 
 import logging
-from typing import Set
 
 import voluptuous as vol
-
 from homeassistant.components import persistent_notification
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import CONF_PASSWORD, Platform
+from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.exceptions import ConfigEntryNotReady
 from homeassistant.helpers import device_registry as dr
@@ -23,13 +21,13 @@ from .const import (
     DATA_COORDINATOR,
     DOMAIN,
     ERROR_INDICATOR_AUTH,
-    host_from_config,
     MANUFACTURER_AVM,
     MODEL_FRITZBOX,
     NAME_FRITZBOX,
     SERVICE_REMOVE_UNAVAILABLE_ENTITIES,
     SERVICE_REPAIR_ENTITY_ID_SUFFIXES,
     auth_error_notification_id,
+    host_from_config,
 )
 from .coordinator import FritzBoxVPNCoordinator
 
@@ -83,7 +81,7 @@ async def _async_repair_entity_id_suffixes(hass: HomeAssistant, call: ServiceCal
             _LOGGER.info("repair_entity_id_suffixes: repaired %d entities for entry %s", count, entry_id)
 
 
-def _apply_auto_cleanup(hass: HomeAssistant, entry_id: str, current_uids: Set[str]) -> None:
+def _apply_auto_cleanup(hass: HomeAssistant, entry_id: str, current_uids: set[str]) -> None:
     """Clear known_uids for UIDs no longer present; do not remove from registry so entity_id stays stable."""
     to_remove, err = _get_orphaned_entity_entries(hass, entry_id, current_uids=current_uids)
     if err or not to_remove:

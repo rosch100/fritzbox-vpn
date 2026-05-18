@@ -1,7 +1,7 @@
 """SSDP helpers (aligned with homeassistant/components/fritz/config_flow)."""
 
-from uuid import UUID
 from urllib.parse import urlparse
+from uuid import UUID
 
 from homeassistant.helpers.service_info.ssdp import ATTR_UPNP_UDN, SsdpServiceInfo
 
@@ -31,12 +31,13 @@ def uuid_from_ssdp_usn(usn: str) -> str | None:
 
 def uuid_from_discovery(discovery_info: SsdpServiceInfo) -> str | None:
     """Device UUID from UPnP UDN or SSDP USN."""
-    if raw_udn := discovery_info.upnp.get(ATTR_UPNP_UDN):
-        if device_uuid := uuid_from_upnp_udn(raw_udn):
-            return device_uuid
-    if discovery_info.ssdp_usn:
-        if device_uuid := uuid_from_ssdp_usn(discovery_info.ssdp_usn):
-            return device_uuid
+    raw_udn = discovery_info.upnp.get(ATTR_UPNP_UDN)
+    if raw_udn and (device_uuid := uuid_from_upnp_udn(raw_udn)):
+        return device_uuid
+    if discovery_info.ssdp_usn and (
+        device_uuid := uuid_from_ssdp_usn(discovery_info.ssdp_usn)
+    ):
+        return device_uuid
     return None
 
 

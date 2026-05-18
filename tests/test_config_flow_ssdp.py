@@ -3,6 +3,8 @@
 from unittest.mock import AsyncMock, patch
 
 import pytest
+from custom_components.fritzbox_vpn.config_flow import ConfigFlow
+from custom_components.fritzbox_vpn.const import DOMAIN
 from homeassistant.config_entries import SOURCE_SSDP
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
@@ -11,9 +13,6 @@ from homeassistant.helpers.service_info.ssdp import (
     ATTR_UPNP_UDN,
     SsdpServiceInfo,
 )
-
-from custom_components.fritzbox_vpn.config_flow import ConfigFlow
-from custom_components.fritzbox_vpn.const import DOMAIN
 
 MOCK_DEVICE_UUID = "2f402f80-da79-4e15-8e7b-4b6b6b6b6b6b"
 MOCK_UDN = f"uuid:{MOCK_DEVICE_UUID}"

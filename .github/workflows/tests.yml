@@ -10,6 +10,7 @@ on:
       - "scripts/requirements-test.txt"
       - "pytest.ini"
       - ".coveragerc"
+      - "pyproject.toml"
       - ".github/workflows/tests.yml"
   pull_request:
     paths:
@@ -18,6 +19,7 @@ on:
       - "scripts/requirements-test.txt"
       - "pytest.ini"
       - ".coveragerc"
+      - "pyproject.toml"
       - ".github/workflows/tests.yml"
   workflow_dispatch:
 
