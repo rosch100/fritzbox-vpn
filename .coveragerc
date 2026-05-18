@@ -1,0 +1,8 @@
+[run]
+source = custom_components/fritzbox_vpn
+
+[report]
+include =
+    */ssdp_unique_id.py
+fail_under = 95
+show_missing = true

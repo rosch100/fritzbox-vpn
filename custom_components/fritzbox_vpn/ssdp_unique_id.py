@@ -1,9 +1,11 @@
 """SSDP helpers (aligned with homeassistant/components/fritz/config_flow)."""
 
-import uuid as uuid_pkg
+from uuid import UUID
 from urllib.parse import urlparse
 
 from homeassistant.helpers.service_info.ssdp import ATTR_UPNP_UDN, SsdpServiceInfo
+
+from .const import FRITZBOX_SSDP_INDICATORS, REPEATER_INDICATORS
 
 
 def parse_device_uuid(value: str) -> str | None:
@@ -12,7 +14,7 @@ def parse_device_uuid(value: str) -> str | None:
     if not value:
         return None
     try:
-        return str(uuid_pkg.UUID(value))
+        return str(UUID(value))
     except ValueError:
         return None
 
@@ -62,3 +64,29 @@ def host_from_ssdp(discovery_info: SsdpServiceInfo) -> str | None:
     if discovery_info.ssdp_usn and "fritz.box" in discovery_info.ssdp_usn.lower():
         return "fritz.box"
     return None
+
+
+def is_fritzbox_router_discovery(discovery_info: SsdpServiceInfo) -> bool:
+    """Return True if SSDP data looks like a FRITZ!Box router (not a repeater)."""
+    st = discovery_info.ssdp_st or ""
+    usn = discovery_info.ssdp_usn or ""
+    server = discovery_info.ssdp_server or ""
+    location = discovery_info.ssdp_location or ""
+
+    combined = f"{st} {usn} {server} {location}".lower()
+    if discovery_info.ssdp_headers:
+        headers_str = " ".join(
+            str(value) for value in discovery_info.ssdp_headers.values()
+        ).lower()
+        combined += f" {headers_str}"
+
+    if not any(indicator in combined for indicator in FRITZBOX_SSDP_INDICATORS):
+        return False
+
+    if any(indicator in combined for indicator in REPEATER_INDICATORS):
+        return False
+
+    has_igd = "internetgatewaydevice" in combined or "igd" in combined
+    if not has_igd:
+        return "fritz!box" in combined
+    return True

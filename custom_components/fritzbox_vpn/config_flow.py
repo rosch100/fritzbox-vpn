@@ -31,8 +31,6 @@ from .const import (
     UNIQUE_ID_SUFFIXES,
     UPDATE_INTERVAL_MIN,
     UPDATE_INTERVAL_MAX,
-    REPEATER_INDICATORS,
-    FRITZBOX_SSDP_INDICATORS,
     ERROR_INDICATOR_AUTH,
     ERROR_INDICATOR_CONNECT,
     ERROR_KEY_UNKNOWN,
@@ -44,7 +42,11 @@ from .const import (
 )
 from .coordinator import FritzBoxVPNSession, normalize_update_interval
 from .fritz_config_source import get_existing_fritz_config
-from .ssdp_unique_id import host_from_ssdp, unique_id_for_discovery
+from .ssdp_unique_id import (
+    host_from_ssdp,
+    is_fritzbox_router_discovery,
+    unique_id_for_discovery,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -501,7 +503,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         if existing_config:
             return self.async_abort(reason="already_configured")
 
-        if not self._is_fritzbox_device(discovery_info):
+        if not is_fritzbox_router_discovery(discovery_info):
             return self.async_abort(reason="not_fritzbox")
 
         host = host_from_ssdp(discovery_info)
@@ -571,36 +573,6 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             ),
             errors=errors,
         )
-
-    @staticmethod
-    def _is_fritzbox_device(discovery_info: SsdpServiceInfo) -> bool:
-        """Check if the discovered device is a FritzBox router (not a repeater)."""
-        st = discovery_info.ssdp_st or ""
-        usn = discovery_info.ssdp_usn or ""
-        server = discovery_info.ssdp_server or ""
-        location = discovery_info.ssdp_location or ""
-        
-        combined = f"{st} {usn} {server} {location}".lower()
-        if hasattr(discovery_info, "ssdp_headers") and discovery_info.ssdp_headers:
-            headers_str = " ".join(str(v) for v in discovery_info.ssdp_headers.values()).lower()
-            combined += f" {headers_str}"
-        is_fritzbox = any(ind in combined for ind in FRITZBOX_SSDP_INDICATORS)
-
-        if not is_fritzbox:
-            return False
-
-        is_repeater = any(ind in combined for ind in REPEATER_INDICATORS)
-        if is_repeater:
-            return False
-
-        has_igd = "internetgatewaydevice" in combined or "igd" in combined
-
-        if not has_igd:
-            if "fritz!box" in combined:
-                return True
-            return False
-
-        return True
 
     @staticmethod
     @callback
