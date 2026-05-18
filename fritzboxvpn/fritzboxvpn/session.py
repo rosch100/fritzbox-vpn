@@ -116,7 +116,8 @@ class FritzBoxVPNSession:
         _LOGGER.debug("Using legacy MD5 login flow for session generation.")
 
         md5_input = f"{challenge}-{self.password}".encode("utf-16le")
-        response_hash = hashlib.md5(md5_input).hexdigest()  # codeql[py/weak-sensitive-data-hashing]
+        # codeql[py/weak-sensitive-data-hashing]: FRITZ!Box legacy login protocol requires MD5 challenge-response.
+        response_hash = hashlib.md5(md5_input).hexdigest()
         login_data = {
             LOGIN_FORM_USERNAME: self.username,
             LOGIN_FORM_RESPONSE: f"{challenge}-{response_hash}",
