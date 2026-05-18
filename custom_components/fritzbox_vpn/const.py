@@ -164,6 +164,13 @@ STATUS_ENABLED = "enabled"
 STATUS_DISABLED = "disabled"
 STATUS_UNKNOWN = "unknown"
 
+VPN_STATUS_OPTIONS = (
+    STATUS_CONNECTED,
+    STATUS_ENABLED,
+    STATUS_DISABLED,
+    STATUS_UNKNOWN,
+)
+
 FRITZBOX_SSDP_INDICATORS = (
     "fritz.box",
     "fritzbox",

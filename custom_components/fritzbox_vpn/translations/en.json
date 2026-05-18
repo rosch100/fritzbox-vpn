@@ -13,6 +13,10 @@
       "confirm": {
         "title": "Fritz!Box VPN Found",
         "description": "A FritzBox was automatically discovered: {host}. Please confirm the configuration."
+      },
+      "reauth_confirm": {
+        "title": "Reauthenticate Fritz!Box VPN",
+        "description": "Authentication failed for {host}. Enter valid credentials."
       }
     },
     "error": {
@@ -72,6 +76,40 @@
       "coordinator_not_ready": "Data is still loading. Please wait a moment and try again."
     }
   },
+  "entity": {
+    "switch": {
+      "vpn": {
+        "name": "VPN"
+      }
+    },
+    "binary_sensor": {
+      "connected": {
+        "name": "Connected"
+      }
+    },
+    "sensor": {
+      "status": {
+        "name": "Status",
+        "state": {
+          "connected": "Connected",
+          "enabled": "Enabled",
+          "disabled": "Disabled",
+          "unknown": "Unknown"
+        }
+      },
+      "connection_uid": {
+        "name": "Connection UID"
+      },
+      "vpn_uid": {
+        "name": "VPN UID"
+      }
+    }
+  },
+  "exceptions": {
+    "toggle_failed": {
+      "message": "Failed to change VPN connection {name}.{error}"
+    }
+  },
   "services": {
     "remove_unavailable_entities": {
       "name": "Remove unavailable entities",
@@ -93,11 +131,5 @@
         }
       }
     }
-  },
-  "common": {
-    "auth_error_notification_title": "Fritz!Box VPN: Authentication Error",
-    "auth_error_notification_message": "The Fritz!Box VPN integration cannot access the Fritz!Box.\n\n**Host:** {host}\n\n**Error:** {error}\n\n**Possible causes:**\n- The Fritz!Box password was changed\n- The username is incorrect\n- The Fritz!Box is not reachable\n\nPlease check the integration configuration and update credentials if necessary.{config_link}",
-    "auth_error_notification_config_link": "**→ [Open configuration]({url})**\n\n*{hint}*",
-    "auth_error_notification_config_hint": "Go to Settings > Devices & Services and search for \"{title}\""
   }
 }

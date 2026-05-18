@@ -1,8 +1,9 @@
 """Config flow for FritzBox VPN integration."""
 
+from __future__ import annotations
+
 import ipaddress
 import logging
-import re
 from collections.abc import Mapping
 from typing import Any
 
@@ -11,37 +12,45 @@ from homeassistant import config_entries
 from homeassistant.const import CONF_HOST, CONF_PASSWORD, CONF_USERNAME
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.data_entry_flow import FlowResult
-from homeassistant.exceptions import HomeAssistantError
-from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
-from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.service_info.ssdp import SsdpServiceInfo
 
 from .const import (
     CONF_UPDATE_INTERVAL,
-    DATA_COORDINATOR,
-    DATA_KNOWN_UIDS_KEYS,
     DEFAULT_HOST,
     DEFAULT_UPDATE_INTERVAL,
     DOMAIN,
-    ERROR_INDICATOR_AUTH,
-    ERROR_INDICATOR_CONNECT,
     ERROR_KEY_CANNOT_CONNECT,
     ERROR_KEY_CONFIG_ENTRY_NOT_FOUND,
     ERROR_KEY_INVALID_AUTH,
-    ERROR_KEY_INVALID_HOST,
     ERROR_KEY_UNKNOWN,
-    INTEGRATION_TITLE,
     OPTIONS_ACTION_CLEANUP,
     OPTIONS_ACTION_CONFIGURE,
     OPTIONS_ACTION_REPAIR_ENTITY_IDS,
-    UNIQUE_ID_PREFIX,
-    UNIQUE_ID_SUFFIXES,
-    UPDATE_INTERVAL_MAX,
-    UPDATE_INTERVAL_MIN,
+    host_from_config,
     password_from_sources,
 )
-from .coordinator import FritzBoxVPNSession, normalize_update_interval
+from .coordinator import normalize_update_interval
+from .entity_registry import (
+    get_entity_id_suffix_repairs,
+    get_orphaned_entity_entries,
+    remove_orphaned_entities,
+    repair_entity_id_suffixes,
+)
+from .flow_forms import (
+    CannotConnect,
+    InvalidAuth,
+    configure_schema,
+    confirm_checkbox_schema,
+    confirm_schema,
+    credentials_defaults,
+    credentials_schema,
+    fill_password_if_missing,
+    reauth_schema,
+    set_validation_error,
+    validate_host_on_submit,
+    validate_input,
+)
 from .fritz_config_source import get_existing_fritz_config
 from .ssdp_unique_id import (
     host_from_ssdp,
@@ -51,394 +60,33 @@ from .ssdp_unique_id import (
 
 _LOGGER = logging.getLogger(__name__)
 
-OPTIONS_LABEL_CONFIGURE = (
-    "Configure (host, user, update interval)"
-)
-OPTIONS_LABEL_CLEANUP = (
-    "Remove unavailable entities"
-)
-OPTIONS_LABEL_REPAIR_ENTITY_IDS = (
-    "Repair entity IDs"
-)
+OPTIONS_LABEL_CONFIGURE = "Configure (host, user, update interval)"
+OPTIONS_LABEL_CLEANUP = "Remove unavailable entities"
+OPTIONS_LABEL_REPAIR_ENTITY_IDS = "Repair entity IDs"
 
 
-def _connection_uid_from_entity_unique_id(unique_id: str) -> str | None:
-    """Connection UID from entity unique_id; None if not our format."""
-    if not unique_id or not unique_id.startswith(UNIQUE_ID_PREFIX):
-        return None
-    rest = unique_id[len(UNIQUE_ID_PREFIX) :]
-    for suffix in UNIQUE_ID_SUFFIXES:
-        if rest.endswith("_" + suffix):
-            return rest[: -len(suffix) - 1]
-    return None
-
-
-def _resolve_current_uids(
-    hass: HomeAssistant, entry_id: str
-) -> tuple[set[str] | None, str | None]:
-    """Current VPN UIDs from coordinator.data. Returns (uids, None) or (None, error_key)."""
-    if DOMAIN not in hass.data or entry_id not in hass.data[DOMAIN]:
-        return (None, "integration_not_loaded")
-    coordinator = hass.data[DOMAIN][entry_id].get(DATA_COORDINATOR)
-    if not coordinator or not hasattr(coordinator, "data"):
-        return (None, "coordinator_not_ready")
-    current_uids = set(coordinator.data.keys()) if coordinator.data else set()
-    return (current_uids, None)
-
-
-def _get_orphaned_entity_entries(
+async def _try_create_entry_from_credentials(
+    flow: config_entries.ConfigFlow,
     hass: HomeAssistant,
-    entry_id: str,
-    current_uids: set[str] | None = None,
-) -> tuple[list[er.RegistryEntry] | None, str | None]:
-    """Orphaned entity entries for this entry (VPN no longer present). Returns (entries, None) or (None, error_key)."""
-    if current_uids is None:
-        current_uids, error_key = _resolve_current_uids(hass, entry_id)
-        if error_key is not None:
-            return (None, error_key)
-    registry = er.async_get(hass)
-    to_remove = []
-    for entry in er.async_entries_for_config_entry(registry, entry_id):
-        uid = _connection_uid_from_entity_unique_id(entry.unique_id or "")
-        if uid is not None and uid not in current_uids:
-            to_remove.append(entry)
-    return (to_remove, None)
-
-
-def _uids_from_entries(entries: list[er.RegistryEntry]) -> set[str]:
-    """Connection UIDs from entity registry entries."""
-    uids: set[str] = set()
-    for e in entries:
-        uid = _connection_uid_from_entity_unique_id(e.unique_id or "")
-        if uid is not None:
-            uids.add(uid)
-    return uids
-
-
-_ENTITY_ID_OBJECT_ID_SUFFIX_RE = re.compile(r"^(.+)_(\d+)$")
-
-
-def _entity_id_base(entity_id: str) -> str | None:
-    """Base entity_id when object_id has numeric suffix (_2, _3, …), else None."""
-    if not entity_id or "." not in entity_id:
-        return None
-    domain, object_id = entity_id.split(".", 1)
-    match = _ENTITY_ID_OBJECT_ID_SUFFIX_RE.match(object_id)
-    if not match:
-        return None
-    return f"{domain}.{match.group(1)}"
-
-
-def _entity_id_suffix_number(entity_id: str) -> int | None:
-    """Numeric suffix from entity_id object_id (_2, _3, ...), else None."""
-    if not entity_id or "." not in entity_id:
-        return None
-    _, object_id = entity_id.split(".", 1)
-    match = _ENTITY_ID_OBJECT_ID_SUFFIX_RE.match(object_id)
-    if not match:
+    user_input: dict[str, Any],
+    errors: dict[str, str],
+    *,
+    password_sources: tuple[Mapping[str, Any] | None, ...],
+    unique_id: str | None,
+    log_unknown_details: bool,
+) -> FlowResult | None:
+    """Validate credentials and create entry; None if the form should be shown again."""
+    fill_password_if_missing(user_input, *password_sources)
+    if not validate_host_on_submit(user_input, errors):
         return None
     try:
-        return int(match.group(2))
-    except (TypeError, ValueError):
-        return None
-
-
-def _get_entity_id_suffix_repairs(
-    registry: er.EntityRegistry, entry_id: str
-) -> list[tuple[er.RegistryEntry, str, bool]]:
-    """Repair operations as (suffixed entry, base_entity_id, remove_base_first)."""
-    all_entries = er.async_entries_for_config_entry(registry, entry_id)
-    by_entity_id = {e.entity_id: e for e in all_entries}
-    suffixed_by_base: dict[str, list[er.RegistryEntry]] = {}
-
-    for entry in all_entries:
-        base = _entity_id_base(entry.entity_id)
-        if not base:
-            continue
-        suffixed_by_base.setdefault(base, []).append(entry)
-
-    result: list[tuple[er.RegistryEntry, str, bool]] = []
-    for base_entity_id, suffixed_entries in suffixed_by_base.items():
-        preferred = sorted(
-            suffixed_entries,
-            key=lambda e: (_entity_id_suffix_number(e.entity_id) or 10_000, e.entity_id),
-        )[0]
-        base_entry = by_entity_id.get(base_entity_id)
-        if base_entry and base_entry.id == preferred.id:
-            continue
-
-        # Base ID is free globally: rename preferred suffixed entity directly.
-        if not base_entry and registry.async_get(base_entity_id) is None:
-            result.append((preferred, base_entity_id, False))
-            continue
-
-        # Stale base from same config entry exists: replace it with preferred suffix.
-        if base_entry and base_entry.config_entry_id == entry_id:
-            result.append((preferred, base_entity_id, True))
-
-    return result
-
-
-def repair_entity_id_suffixes(
-    hass: HomeAssistant, entry_id: str
-) -> tuple[int, list[str]]:
-    """Repair suffixed entity IDs (_2, _3, ...) to base IDs. Returns (count, messages)."""
-    registry = er.async_get(hass)
-    repairs = _get_entity_id_suffix_repairs(registry, entry_id)
-    messages: list[str] = []
-    for suffixed_entry, base_entity_id, remove_base_first in repairs:
-        try:
-            if remove_base_first:
-                registry.async_remove(base_entity_id)
-            registry.async_update_entity(suffixed_entry.entity_id, new_entity_id=base_entity_id)
-            messages.append(f"{suffixed_entry.entity_id} → {base_entity_id}")
-            _LOGGER.info("Repaired entity ID: %s → %s", suffixed_entry.entity_id, base_entity_id)
-        except Exception as err:
-            _LOGGER.warning("Failed to repair %s → %s: %s", suffixed_entry.entity_id, base_entity_id, err)
-    return (len(messages), messages)
-
-
-def _remove_orphaned_entities_and_clear_known_uids(
-    hass: HomeAssistant,
-    entry_id: str,
-    entries: list[er.RegistryEntry],
-    remove_from_registry: bool = True,
-) -> None:
-    """Clear known_uids for UIDs no longer present; optionally remove from entity/device registry."""
-    if not entries:
-        return
-
-    uids_removed = _uids_from_entries(entries)
-
-    if remove_from_registry:
-        entity_registry = er.async_get(hass)
-        device_ids_affected = set()
-        for entry in entries:
-            if entry.device_id:
-                device_ids_affected.add(entry.device_id)
-            entity_registry.async_remove(entry.entity_id)
-            _LOGGER.info("Removed unavailable entity: %s (%s)", entry.entity_id, entry.unique_id)
-
-        device_registry = dr.async_get(hass)
-        for uid in uids_removed:
-            device = device_registry.async_get_device(
-                identifiers={(DOMAIN, entry_id, uid)}
-            )
-            if device:
-                device_registry.async_remove_device(device.id)
-                _LOGGER.info(
-                    "Removed unavailable device for connection UID: %s (device_id: %s)",
-                    uid,
-                    device.id,
-                )
-                device_ids_affected.discard(device.id)
-
-        for dev_id in device_ids_affected:
-            device = device_registry.async_get(dev_id)
-            if not device:
-                continue
-            if not er.async_entries_for_device(entity_registry, dev_id):
-                device_registry.async_remove_device(dev_id)
-                _LOGGER.info(
-                    "Removed empty device (no entities left): %s (device_id: %s)",
-                    device.name_by_user or device.name,
-                    dev_id,
-                )
-
-    if not uids_removed or entry_id not in hass.data.get(DOMAIN, {}):
-        return
-    store = hass.data[DOMAIN][entry_id]
-    for key in DATA_KNOWN_UIDS_KEYS:
-        if key in store and isinstance(store[key], set):
-            store[key] -= uids_removed
-
-
-def _build_configure_schema(
-    current_data: dict[str, Any], current_options: dict[str, Any]
-) -> vol.Schema:
-    """Configure step schema with defaults from current config/options."""
-    host_default, username_default, _ = _credentials_defaults_from_config(current_data)
-    try:
-        host_default = validate_host(host_default)
-    except vol.Invalid:
-        _LOGGER.warning(
-            "Invalid host in config entry for options form. Falling back to default host.",
-        )
-        host_default = DEFAULT_HOST
-    # Do not prefill passwords in options forms.
-    password_default = ""
-    default_update_interval = normalize_update_interval(
-        current_options.get(CONF_UPDATE_INTERVAL, DEFAULT_UPDATE_INTERVAL)
-    )
-    return vol.Schema({
-        **_configure_schema_keys(host_default, username_default, password_default),
-        vol.Required(CONF_UPDATE_INTERVAL, default=default_update_interval): vol.All(
-            vol.Coerce(int),
-            vol.Range(min=UPDATE_INTERVAL_MIN, max=UPDATE_INTERVAL_MAX),
-        ),
-    })
-
-
-def _validation_error_to_error_key(error_msg: str) -> str:
-    """Map validation exception message to config flow error key."""
-    msg_lower = error_msg.lower()
-    if any(ind in msg_lower for ind in ERROR_INDICATOR_AUTH):
-        return ERROR_KEY_INVALID_AUTH
-    if any(ind in msg_lower for ind in ERROR_INDICATOR_CONNECT):
-        return ERROR_KEY_CANNOT_CONNECT
-    return ERROR_KEY_UNKNOWN
-
-
-def _set_validation_error(
-    errors: dict[str, str], err: Exception, *, log_unknown_details: bool
-) -> None:
-    """Set config-flow error key from validation exception."""
-    if isinstance(err, CannotConnect):
-        errors["base"] = ERROR_KEY_CANNOT_CONNECT
-        return
-    if isinstance(err, InvalidAuth):
-        errors["base"] = ERROR_KEY_INVALID_AUTH
-        return
-
-    error_msg = str(err)
-    _LOGGER.exception(
-        "Unexpected exception during validation (%s)",
-        type(err).__name__,
-    )
-    errors["base"] = _validation_error_to_error_key(error_msg)
-    if log_unknown_details and errors["base"] == ERROR_KEY_UNKNOWN:
-        _LOGGER.error(
-            "Unknown error details during validation (%s)",
-            type(err).__name__,
-        )
-
-
-def _fill_password_if_missing(
-    user_input: dict[str, Any], *sources: Mapping[str, Any] | None
-) -> None:
-    """Set user_input password from first non-empty source if missing."""
-    if user_input.get(CONF_PASSWORD):
-        return
-    user_input[CONF_PASSWORD] = password_from_sources(*sources)
-
-
-def validate_host(host: str) -> str:
-    """Validate host is a valid IP address or hostname."""
-    if not host or not isinstance(host, str):
-        raise vol.Invalid("Host must be a non-empty string")
-
-    try:
-        ipaddress.ip_address(host)
-        return host
-    except ValueError:
-        pass
-
-    if len(host) > 253:
-        raise vol.Invalid("Hostname too long (max 253 characters)")
-
-    if not all(c.isalnum() or c in ('.', '-') for c in host):
-        raise vol.Invalid("Invalid hostname format")
-
-    if host.startswith('.') or host.endswith('.') or host.startswith('-') or host.endswith('-'):
-        raise vol.Invalid("Hostname cannot start or end with dot or hyphen")
-
-    return host
-
-
-def _credentials_schema(
-    host_default: str, username_default: str, password_default: str
-) -> vol.Schema:
-    """Credentials form (host, username, password) with given defaults."""
-    return vol.Schema(_credentials_schema_keys(host_default, username_default, password_default))
-
-
-def _build_confirm_schema(
-    existing_config: Mapping[str, Any] | None,
-    discovered_host: str | None,
-    current_input: Mapping[str, Any] | None = None,
-) -> vol.Schema:
-    """Schema for SSDP confirm step from existing config or current form input."""
-    host_fallback = discovered_host or DEFAULT_HOST
-    source = current_input if current_input is not None else existing_config
-    extra_password_sources = (existing_config,) if current_input is not None else ()
-    host_default, username_default, password_default = _credentials_defaults_from_config(
-        source,
-        host_fallback,
-        extra_password_sources,
-    )
-    return _credentials_schema(host_default, username_default, password_default)
-
-
-def _credentials_defaults_from_config(
-    config: Mapping[str, Any] | None,
-    host_fallback: str = DEFAULT_HOST,
-    extra_password_sources: tuple[Mapping[str, Any] | None, ...] = (),
-) -> tuple[str, str, str]:
-    """(host, username, password) for credential form from config or fallbacks."""
-    if not config:
-        return (host_fallback, "", "")
-    host = config.get(CONF_HOST) or host_fallback
-    username = config.get(CONF_USERNAME) or ""
-    password = password_from_sources(config, *extra_password_sources)
-    return (host, username, password)
-
-
-def _credentials_schema_keys(
-    host_default: str, username_default: str, password_default: str
-) -> dict[Any, Any]:
-    """Vol schema keys for host, username, password."""
-    return {
-        # Keep schema serializable for HA UI; host validation runs on submit.
-        vol.Required(CONF_HOST, default=host_default): str,
-        vol.Required(CONF_USERNAME, default=username_default): str,
-        vol.Required(CONF_PASSWORD, default=password_default): str,
-    }
-
-
-def _configure_schema_keys(
-    host_default: str, username_default: str, password_default: str
-) -> dict[Any, Any]:
-    """Vol schema keys for options configure form (password optional)."""
-    return {
-        vol.Required(CONF_HOST, default=host_default): str,
-        vol.Required(CONF_USERNAME, default=username_default): str,
-        vol.Optional(CONF_PASSWORD, default=password_default): str,
-    }
-
-
-def _validate_host_on_submit(user_input: dict[str, Any], errors: dict[str, str]) -> bool:
-    """Validate host from submitted user_input and set form field error."""
-    try:
-        validate_host(str(user_input.get(CONF_HOST, "")))
-    except vol.Invalid:
-        errors[CONF_HOST] = ERROR_KEY_INVALID_HOST
-        return False
-    return True
-
-
-async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> dict[str, Any]:
-    """Validate that we can connect to the FritzBox. VPN connections are discovered during setup."""
-    session = FritzBoxVPNSession(
-        async_get_clientsession(hass),
-        data[CONF_HOST],
-        data[CONF_USERNAME],
-        password_from_sources(data),
-    )
-
-    try:
-        await session.async_get_session()
-        await session.async_close()
-
-        return {"title": f"{INTEGRATION_TITLE} ({data[CONF_HOST]})"}
+        info = await validate_input(hass, user_input)
     except Exception as err:
-        error_msg = str(err)
-        if any(ind in error_msg.lower() for ind in ERROR_INDICATOR_AUTH):
-            _LOGGER.warning("Authentication failed (check credentials and TR-064). Error: %s", error_msg)
-            raise InvalidAuth from err
-        _LOGGER.exception("Error validating input: %s", err)
-        if any(ind in error_msg.lower() for ind in ERROR_INDICATOR_CONNECT):
-            raise CannotConnect from err
-        raise CannotConnect from err
+        set_validation_error(errors, err, log_unknown_details=log_unknown_details)
+        return None
+    await flow.async_set_unique_id(unique_id or user_input.get(CONF_HOST))
+    flow._abort_if_unique_id_configured()
+    return flow.async_create_entry(title=info["title"], data=user_input)
 
 
 class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
@@ -446,7 +94,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     VERSION = 1
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._discovered_host: str | None = None
         self._discovered_unique_id: str | None = None
         self._existing_config: dict[str, Any] | None = None
@@ -468,34 +116,41 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         host = self._existing_config.get(CONF_HOST)
                         await self.async_set_unique_id(host)
                         self._abort_if_unique_id_configured()
-                        return self.async_create_entry(title=info["title"], data=self._existing_config)
+                        return self.async_create_entry(
+                            title=info["title"], data=self._existing_config
+                        )
                     except CannotConnect:
-                        _LOGGER.warning("Autoconfiguration connection test failed: %s", ERROR_KEY_CANNOT_CONNECT)
+                        _LOGGER.warning(
+                            "Autoconfiguration connection test failed: %s",
+                            ERROR_KEY_CANNOT_CONNECT,
+                        )
                         errors["base"] = ERROR_KEY_CANNOT_CONNECT
                     except InvalidAuth:
-                        _LOGGER.warning("Autoconfiguration connection test failed: %s", ERROR_KEY_INVALID_AUTH)
+                        _LOGGER.warning(
+                            "Autoconfiguration connection test failed: %s",
+                            ERROR_KEY_INVALID_AUTH,
+                        )
                         errors["base"] = ERROR_KEY_INVALID_AUTH
                     except Exception as err:
-                        _LOGGER.warning("Autoconfiguration connection test failed: %s", err)
+                        _LOGGER.warning(
+                            "Autoconfiguration connection test failed: %s", err
+                        )
                         errors["base"] = ERROR_KEY_UNKNOWN
-            schema = _credentials_schema(*_credentials_defaults_from_config(self._existing_config))
+            schema = credentials_schema(*credentials_defaults(self._existing_config))
             return self.async_show_form(step_id="user", data_schema=schema, errors=errors)
 
-        _fill_password_if_missing(user_input, self._existing_config)
-        if not _validate_host_on_submit(user_input, errors):
-            schema = _credentials_schema(*_credentials_defaults_from_config(user_input))
-            return self.async_show_form(step_id="user", data_schema=schema, errors=errors)
-        try:
-            info = await validate_input(self.hass, user_input)
-        except Exception as err:
-            _set_validation_error(errors, err, log_unknown_details=True)
-        else:
-            host = user_input.get(CONF_HOST)
-            await self.async_set_unique_id(host)
-            self._abort_if_unique_id_configured()
-            return self.async_create_entry(title=info["title"], data=user_input)
-
-        schema = _credentials_schema(*_credentials_defaults_from_config(user_input))
+        result = await _try_create_entry_from_credentials(
+            self,
+            self.hass,
+            user_input,
+            errors,
+            password_sources=(self._existing_config,),
+            unique_id=user_input.get(CONF_HOST),
+            log_unknown_details=True,
+        )
+        if result is not None:
+            return result
+        schema = credentials_schema(*credentials_defaults(user_input))
         return self.async_show_form(step_id="user", data_schema=schema, errors=errors)
 
     async def async_step_ssdp(self, discovery_info: SsdpServiceInfo) -> FlowResult:
@@ -523,7 +178,6 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         self._discovered_host = host
         self._discovered_unique_id = unique_id
         self.context["title_placeholders"] = {"host": host}
-
         self._existing_config = await get_existing_fritz_config(self.hass)
         return await self.async_step_confirm()
 
@@ -535,43 +189,80 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         if user_input is None:
             return self.async_show_form(
                 step_id="confirm",
-                data_schema=_build_confirm_schema(
-                    self._existing_config, self._discovered_host
-                ),
-                description_placeholders={
-                    "host": self._discovered_host or DEFAULT_HOST
-                },
+                data_schema=confirm_schema(self._existing_config, self._discovered_host),
+                description_placeholders={"host": self._discovered_host or DEFAULT_HOST},
             )
 
-        _fill_password_if_missing(user_input, self._existing_config)
-        if not _validate_host_on_submit(user_input, errors):
-            return self.async_show_form(
-                step_id="confirm",
-                data_schema=_build_confirm_schema(
-                    self._existing_config,
-                    self._discovered_host,
-                    current_input=user_input,
-                ),
-                errors=errors,
-            )
-
-        try:
-            info = await validate_input(self.hass, user_input)
-        except Exception as err:
-            _set_validation_error(errors, err, log_unknown_details=False)
-        else:
-            unique_id = self._discovered_unique_id or user_input.get(CONF_HOST)
-            await self.async_set_unique_id(unique_id)
-            self._abort_if_unique_id_configured()
-            return self.async_create_entry(title=info["title"], data=user_input)
-
+        result = await _try_create_entry_from_credentials(
+            self,
+            self.hass,
+            user_input,
+            errors,
+            password_sources=(self._existing_config,),
+            unique_id=self._discovered_unique_id,
+            log_unknown_details=False,
+        )
+        if result is not None:
+            return result
         return self.async_show_form(
             step_id="confirm",
-            data_schema=_build_confirm_schema(
+            data_schema=confirm_schema(
                 self._existing_config,
                 self._discovered_host,
                 current_input=user_input,
             ),
+            errors=errors,
+        )
+
+    async def async_step_reauth(
+        self, entry_data: Mapping[str, Any]
+    ) -> FlowResult:
+        """Handle reauthentication after invalid credentials."""
+        return await self.async_step_reauth_confirm()
+
+    async def async_step_reauth_confirm(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Update credentials after authentication failure."""
+        reauth_entry = self._get_reauth_entry()
+        errors: dict[str, str] = {}
+        host = host_from_config(reauth_entry.data)
+        username_default = reauth_entry.data.get(CONF_USERNAME, "")
+
+        if user_input is None:
+            return self.async_show_form(
+                step_id="reauth_confirm",
+                data_schema=reauth_schema(username_default),
+                description_placeholders={"host": host},
+                errors=errors,
+            )
+
+        credentials = {
+            CONF_HOST: host,
+            CONF_USERNAME: user_input[CONF_USERNAME],
+            CONF_PASSWORD: user_input[CONF_PASSWORD],
+        }
+        try:
+            await validate_input(self.hass, credentials)
+        except Exception as err:
+            set_validation_error(errors, err, log_unknown_details=True)
+        else:
+            return self.async_update_reload_and_abort(
+                reauth_entry,
+                data={
+                    **reauth_entry.data,
+                    CONF_HOST: host,
+                    CONF_USERNAME: user_input[CONF_USERNAME],
+                    CONF_PASSWORD: user_input[CONF_PASSWORD],
+                },
+            )
+
+        return self.async_show_form(
+            step_id="reauth_confirm",
+            data_schema=reauth_schema(
+                user_input.get(CONF_USERNAME, username_default)
+            ),
+            description_placeholders={"host": host},
             errors=errors,
         )
 
@@ -591,17 +282,18 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
         self._config_entry = config_entry
 
     def _get_current_entry(self) -> config_entries.ConfigEntry | None:
-        """Current config entry or None if removed."""
         return self.hass.config_entries.async_get_entry(self._config_entry.entry_id)
 
     def _get_available_actions(self) -> tuple[bool, bool, int]:
-        """Return (has_cleanup_action, has_repair_action, repair_count) safely."""
+        """Return (has_cleanup_action, has_repair_action, repair_count)."""
         try:
-            to_remove, error_key = _get_orphaned_entity_entries(
+            to_remove, error_key = get_orphaned_entity_entries(
                 self.hass, self._config_entry.entry_id
             )
             registry = er.async_get(self.hass)
-            repairs = _get_entity_id_suffix_repairs(registry, self._config_entry.entry_id)
+            repairs = get_entity_id_suffix_repairs(
+                registry, self._config_entry.entry_id
+            )
             has_cleanup_action = error_key is None and bool(to_remove)
             has_repair_action = bool(repairs)
             return (has_cleanup_action, has_repair_action, len(repairs))
@@ -630,19 +322,47 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                 return await self.async_step_repair_entity_ids_confirm()
             return await self.async_step_configure()
 
-        choices = {
-            OPTIONS_ACTION_CONFIGURE: OPTIONS_LABEL_CONFIGURE,
-        }
+        choices = {OPTIONS_ACTION_CONFIGURE: OPTIONS_LABEL_CONFIGURE}
         if has_cleanup_action:
             choices[OPTIONS_ACTION_CLEANUP] = OPTIONS_LABEL_CLEANUP
         if has_repair_action:
             choices[OPTIONS_ACTION_REPAIR_ENTITY_IDS] = OPTIONS_LABEL_REPAIR_ENTITY_IDS
-        schema = vol.Schema(
-            {
-                vol.Required("action", default=OPTIONS_ACTION_CONFIGURE): vol.In(choices),
-            }
+        return self.async_show_form(
+            step_id="init",
+            data_schema=vol.Schema(
+                {
+                    vol.Required("action", default=OPTIONS_ACTION_CONFIGURE): vol.In(
+                        choices
+                    ),
+                }
+            ),
         )
-        return self.async_show_form(step_id="init", data_schema=schema)
+
+    async def _confirm_options_action(
+        self,
+        *,
+        step_id: str,
+        entry_id: str,
+        user_input: dict[str, Any] | None,
+        pending: list[Any],
+        on_confirm,
+    ) -> FlowResult:
+        """Shared confirm step for cleanup and entity-ID repair."""
+        config_entry = self._get_current_entry()
+        if not config_entry:
+            return self.async_abort(reason=ERROR_KEY_CONFIG_ENTRY_NOT_FOUND)
+
+        if user_input is not None and user_input.get("confirm") and pending:
+            await on_confirm(entry_id)
+            return self.async_create_entry(title="", data=config_entry.options or {})
+
+        if user_input is not None or not pending:
+            return self.async_create_entry(title="", data=config_entry.options or {})
+
+        return self.async_show_form(
+            step_id=step_id,
+            data_schema=confirm_checkbox_schema(),
+        )
 
     async def async_step_cleanup_confirm(
         self, user_input: dict[str, Any] | None = None
@@ -652,25 +372,24 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
         if not config_entry:
             return self.async_abort(reason=ERROR_KEY_CONFIG_ENTRY_NOT_FOUND)
         entry_id = config_entry.entry_id
-        to_remove, error_key = _get_orphaned_entity_entries(self.hass, entry_id)
+        to_remove, error_key = get_orphaned_entity_entries(self.hass, entry_id)
         if error_key is not None:
             return self.async_show_form(
                 step_id="cleanup_confirm",
                 data_schema=vol.Schema({}),
                 errors={"base": error_key},
             )
-        if user_input is not None and user_input.get("confirm") and to_remove:
-            _remove_orphaned_entities_and_clear_known_uids(self.hass, entry_id, to_remove)
-            await self.hass.config_entries.async_reload(entry_id)
-        if user_input is not None or not to_remove:
-            return self.async_create_entry(
-                title="",
-                data=config_entry.options or {},
-            )
-        schema = vol.Schema({vol.Required("confirm", default=False): bool})
-        return self.async_show_form(
+
+        async def on_cleanup(confirmed_entry_id: str) -> None:
+            remove_orphaned_entities(self.hass, confirmed_entry_id, to_remove or [])
+            await self.hass.config_entries.async_reload(confirmed_entry_id)
+
+        return await self._confirm_options_action(
             step_id="cleanup_confirm",
-            data_schema=schema,
+            entry_id=entry_id,
+            user_input=user_input,
+            pending=to_remove or [],
+            on_confirm=on_cleanup,
         )
 
     async def async_step_repair_entity_ids_confirm(
@@ -682,18 +401,19 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
             return self.async_abort(reason=ERROR_KEY_CONFIG_ENTRY_NOT_FOUND)
         entry_id = config_entry.entry_id
         registry = er.async_get(self.hass)
-        repairs = _get_entity_id_suffix_repairs(registry, entry_id)
-        if user_input is not None and user_input.get("confirm") and repairs:
-            count, messages = repair_entity_id_suffixes(self.hass, entry_id)
+        repairs = get_entity_id_suffix_repairs(registry, entry_id)
+
+        async def on_repair(confirmed_entry_id: str) -> None:
+            count, _ = repair_entity_id_suffixes(self.hass, confirmed_entry_id)
             if count:
-                await self.hass.config_entries.async_reload(entry_id)
-            return self.async_create_entry(title="", data=config_entry.options or {})
-        if not repairs:
-            return self.async_create_entry(title="", data=config_entry.options or {})
-        schema = vol.Schema({vol.Required("confirm", default=False): bool})
-        return self.async_show_form(
+                await self.hass.config_entries.async_reload(confirmed_entry_id)
+
+        return await self._confirm_options_action(
             step_id="repair_entity_ids_confirm",
-            data_schema=schema,
+            entry_id=entry_id,
+            user_input=user_input,
+            pending=repairs,
+            on_confirm=on_repair,
         )
 
     async def async_step_configure(
@@ -705,23 +425,21 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
             return self.async_abort(reason=ERROR_KEY_CONFIG_ENTRY_NOT_FOUND)
 
         if user_input is not None:
-            # Ignore stale action payload from init step when opening configure directly.
             user_input = dict(user_input)
             user_input.pop("action", None)
-            _fill_password_if_missing(user_input, config_entry.data or {})
-            if not _validate_host_on_submit(user_input, errors):
-                current_options = config_entry.options or {}
-                schema = _build_configure_schema(user_input, current_options)
+            fill_password_if_missing(user_input, config_entry.data or {})
+            if not validate_host_on_submit(user_input, errors):
                 return self.async_show_form(
                     step_id="configure",
-                    data_schema=schema,
+                    data_schema=configure_schema(
+                        user_input, config_entry.options or {}
+                    ),
                     errors=errors,
                 )
-
             try:
                 await validate_input(self.hass, user_input)
             except Exception as err:
-                _set_validation_error(errors, err, log_unknown_details=True)
+                set_validation_error(errors, err, log_unknown_details=True)
             else:
                 config_data = {
                     CONF_HOST: user_input[CONF_HOST],
@@ -732,30 +450,19 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                     user_input.get(CONF_UPDATE_INTERVAL, DEFAULT_UPDATE_INTERVAL)
                 )
                 options_data = {CONF_UPDATE_INTERVAL: update_interval}
-
                 self.hass.config_entries.async_update_entry(
                     config_entry,
                     data=config_data,
                     options=options_data,
                 )
-
                 result = self.async_create_entry(title="", data=options_data)
                 await self.hass.config_entries.async_reload(config_entry.entry_id)
                 return result
 
-        current_data = config_entry.data or {}
-        current_options = config_entry.options or {}
-        schema = _build_configure_schema(current_data, current_options)
         return self.async_show_form(
             step_id="configure",
-            data_schema=schema,
+            data_schema=configure_schema(
+                config_entry.data or {}, config_entry.options or {}
+            ),
             errors=errors,
         )
-
-
-class CannotConnect(HomeAssistantError):
-    """Error to indicate we cannot connect."""
-
-
-class InvalidAuth(HomeAssistantError):
-    """Error to indicate there is invalid auth."""

@@ -1,7 +1,5 @@
 """Binary sensor platform for FritzBox VPN integration."""
 
-import asyncio
-import logging
 from typing import Any
 
 from homeassistant.components.binary_sensor import (
@@ -10,26 +8,18 @@ from homeassistant.components.binary_sensor import (
 )
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import (
     API_KEY_CONNECTED,
-    API_KEY_NAME,
     DATA_COORDINATOR,
     DATA_KNOWN_UIDS_BINARY_SENSOR,
     DATA_LOCK_ADD_ENTITIES_BINARY_SENSOR,
-    DEFAULT_NAME_UNKNOWN,
     DOMAIN,
-    MANUFACTURER_AVM,
-    MODEL_WIREGUARD_VPN,
-    UNIQUE_ID_PREFIX,
     UNIQUE_ID_SUFFIX_CONNECTED,
 )
 from .coordinator import FritzBoxVPNCoordinator
-
-_LOGGER = logging.getLogger(__name__)
+from .entity import FritzBoxVPNEntity, setup_vpn_platform
 
 
 async def async_setup_entry(
@@ -37,14 +27,12 @@ async def async_setup_entry(
     entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    """Set up FritzBox VPN binary sensor entities. Adds new entities when new VPN connections appear."""
-    coordinator: FritzBoxVPNCoordinator = hass.data[DOMAIN][entry.entry_id][DATA_COORDINATOR]
-    known_uids: set = hass.data[DOMAIN][entry.entry_id].setdefault(
-        DATA_KNOWN_UIDS_BINARY_SENSOR, set()
-    )
+    """Set up FritzBox VPN binary sensor entities."""
+    coordinator: FritzBoxVPNCoordinator = hass.data[DOMAIN][entry.entry_id][
+        DATA_COORDINATOR
+    ]
 
-    def _create_binary_sensor_entities(uids: set[str]):
-        """Create connected binary sensors for UIDs present in coordinator.data."""
+    def _create_entities(uids: set[str]) -> list[FritzBoxVPNConnectedBinarySensor]:
         if not coordinator.data:
             return []
         return [
@@ -53,43 +41,18 @@ async def async_setup_entry(
             if uid in coordinator.data
         ]
 
-    if coordinator.data:
-        initial_uids = set(coordinator.data.keys())
-        known_uids.update(initial_uids)
-        entities = _create_binary_sensor_entities(initial_uids)
-        _LOGGER.info("Found %d VPN connections, creating %d binary sensor entities", len(initial_uids), len(entities))
-    else:
-        entities = []
-        _LOGGER.warning("No VPN connections found in coordinator data")
-
-    async_add_entities(entities, update_before_add=True)
-
-    async def _add_new_binary_sensor_entities() -> None:
-        lock = hass.data[DOMAIN][entry.entry_id].setdefault(
-            DATA_LOCK_ADD_ENTITIES_BINARY_SENSOR, asyncio.Lock()
-        )
-        async with lock:
-            current = set(coordinator.data.keys()) if coordinator.data else set()
-            new_uids = current - known_uids
-            if not new_uids:
-                return
-            new_entities = _create_binary_sensor_entities(new_uids)
-            if not new_entities:
-                return
-            known_uids.update(new_uids)
-            async_add_entities(new_entities)
-            _LOGGER.info(
-                "New VPN connection(s) detected, added %d binary sensor entities",
-                len(new_entities),
-            )
-
-    def _on_coordinator_update() -> None:
-        hass.async_create_task(_add_new_binary_sensor_entities())
-
-    entry.async_on_unload(coordinator.async_add_listener(_on_coordinator_update))
+    await setup_vpn_platform(
+        hass,
+        entry,
+        async_add_entities,
+        platform_label="binary_sensor",
+        known_uids_key=DATA_KNOWN_UIDS_BINARY_SENSOR,
+        lock_key=DATA_LOCK_ADD_ENTITIES_BINARY_SENSOR,
+        create_entities=_create_entities,
+    )
 
 
-class FritzBoxVPNConnectedBinarySensor(CoordinatorEntity, BinarySensorEntity):
+class FritzBoxVPNConnectedBinarySensor(FritzBoxVPNEntity, BinarySensorEntity):
     """Binary sensor entity for VPN connection status."""
 
     def __init__(
@@ -99,35 +62,20 @@ class FritzBoxVPNConnectedBinarySensor(CoordinatorEntity, BinarySensorEntity):
         connection_uid: str,
         connection_data: dict[str, Any],
     ) -> None:
-        super().__init__(coordinator)
-        self._entry = entry
-        self._connection_uid = connection_uid
-        self._connection_data = connection_data
-        vpn_name = connection_data.get(API_KEY_NAME, DEFAULT_NAME_UNKNOWN)
-        self._attr_unique_id = f"{UNIQUE_ID_PREFIX}{connection_uid}_{UNIQUE_ID_SUFFIX_CONNECTED}"
-        self._attr_name = "Connected"
-        self._attr_icon = "mdi:connection"
-        self._attr_has_entity_name = True
-        self._attr_device_class = BinarySensorDeviceClass.CONNECTIVITY
-        self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, entry.entry_id, connection_uid)},
-            name=vpn_name,
-            manufacturer=MANUFACTURER_AVM,
-            model=MODEL_WIREGUARD_VPN,
-            via_device=(DOMAIN, entry.entry_id),
+        super().__init__(
+            coordinator,
+            entry,
+            connection_uid,
+            connection_data,
+            unique_id_suffix=UNIQUE_ID_SUFFIX_CONNECTED,
         )
-
-    @property
-    def available(self) -> bool:
-        """True if coordinator has valid data and this connection is present."""
-        if not self.coordinator.last_update_success or not self.coordinator.data:
-            return False
-        return self._connection_uid in self.coordinator.data
+        self._attr_translation_key = "connected"
+        self._attr_device_class = BinarySensorDeviceClass.CONNECTIVITY
 
     @property
     def is_on(self) -> bool:
         """True if the VPN connection is connected."""
-        if self.coordinator.data and self._connection_uid in self.coordinator.data:
-            return self.coordinator.data[self._connection_uid].get(API_KEY_CONNECTED, False)
-        return False
-
+        conn = self._vpn_connection()
+        if conn is None:
+            return False
+        return bool(conn.get(API_KEY_CONNECTED, False))

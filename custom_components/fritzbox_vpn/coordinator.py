@@ -11,11 +11,10 @@ from typing import Any
 from urllib.parse import urlsplit
 
 from aiohttp import ClientConnectorError, ClientSession, ClientTimeout
-from homeassistant.components import persistent_notification
+from homeassistant.config_entries import ConfigEntryState
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
-from homeassistant.helpers.translation import async_get_translations
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .const import (
@@ -35,7 +34,6 @@ from .const import (
     AUTH_HEADER_PREFIX,
     AUTH_INDICATORS,
     CONF_UPDATE_INTERVAL,
-    CONFIG_URL_INTEGRATIONS,
     CONTENT_TYPE_JSON,
     DEFAULT_NAME_UNKNOWN,
     DEFAULT_PROTOCOL,
@@ -50,7 +48,6 @@ from .const import (
     HTTP_STATUS_FORBIDDEN,
     HTTP_STATUS_OK,
     HTTPS_FALLBACK_STATUS_CODES,
-    INTEGRATION_TITLE,
     INVALID_SID_VALUE,
     LOG_LABEL_ACTIVATED,
     LOG_LABEL_DEACTIVATED,
@@ -62,7 +59,6 @@ from .const import (
     LOGIN_TAG_CHALLENGE,
     LOGIN_TAG_SID,
     NAME_FRITZBOX,
-    NOTIFICATION_TITLE_AUTH_ERROR,
     PROTOCOL_HTTP,
     PROTOCOL_HTTPS,
     PROTOCOLS_ALLOWED,
@@ -74,7 +70,6 @@ from .const import (
     UPDATE_INTERVAL_MAX,
     UPDATE_INTERVAL_MIN,
     VERIFICATION_DELAY,
-    auth_error_notification_id,
     host_from_config,
 )
 
@@ -642,7 +637,7 @@ class FritzBoxVPNCoordinator(DataUpdateCoordinator):
         )
         self.config = config
         self.entry_id = entry_id
-        self._auth_error_notified = False
+        self._reauth_scheduled = False
         self._on_orphaned_removed = on_orphaned_removed
 
     def get_vpn_status(self, connection_uid: str) -> str:
@@ -660,72 +655,18 @@ class FritzBoxVPNCoordinator(DataUpdateCoordinator):
         """True if error message indicates authentication failure."""
         return any(ind in str(error).lower() for ind in AUTH_INDICATORS)
 
-    def _build_auth_error_fallback_message(self, host: str, error: Exception) -> str:
-        """German fallback when translations unavailable."""
-        config_link = ""
-        if self.entry_id:
-            config_link = (
-                f"\n\n**→ [Zur Konfiguration öffnen]({CONFIG_URL_INTEGRATIONS})**\n\n"
-                f"*Gehen Sie zu Einstellungen > Geräte & Dienste und suchen Sie nach \"{INTEGRATION_TITLE}\"*"
-            )
-        return (
-            f"Die {NAME_FRITZBOX} VPN Integration kann nicht auf die {NAME_FRITZBOX} zugreifen.\n\n"
-            f"**Host:** {host}\n\n"
-            f"**Fehler:** {str(error)}\n\n"
-            f"**Mögliche Ursachen:**\n"
-            f"- Das {NAME_FRITZBOX} Passwort wurde geändert\n"
-            f"- Der Benutzername ist falsch\n"
-            f"- Die {NAME_FRITZBOX} ist nicht erreichbar\n\n"
-            f"Bitte überprüfen Sie die Konfiguration der Integration und aktualisieren Sie die Zugangsdaten falls nötig."
-            f"{config_link}"
-        )
-
-    async def _create_auth_error_notification(self, error: Exception) -> None:
-        """Show persistent notification for authentication errors."""
-        if self._auth_error_notified:
+    def _schedule_reauth(self) -> None:
+        """Start re-authentication flow once per auth failure cycle."""
+        if self._reauth_scheduled or not self.entry_id:
             return
-
-        host = host_from_config(self.config)
-        notification_id = auth_error_notification_id(host)
-        try:
-            trans = await async_get_translations(
-                self.hass, self.hass.config.language, "common", [DOMAIN]
-            )
-            title = trans.get(
-                "auth_error_notification_title", NOTIFICATION_TITLE_AUTH_ERROR
-            )
-            config_link = ""
-            if self.entry_id:
-                link_tpl = trans.get("auth_error_notification_config_link", "")
-                hint_tpl = trans.get(
-                    "auth_error_notification_config_hint",
-                    f'Go to Settings > Devices & Services and search for "{INTEGRATION_TITLE}"',
-                )
-                if link_tpl and hint_tpl:
-                    hint = hint_tpl.format(title=INTEGRATION_TITLE)
-                    config_link = "\n\n" + link_tpl.format(
-                        url=CONFIG_URL_INTEGRATIONS, hint=hint
-                    )
-            msg_tpl = trans.get("auth_error_notification_message", "")
-            if msg_tpl:
-                message = msg_tpl.format(
-                    host=host, error=str(error), config_link=config_link
-                )
-            else:
-                message = self._build_auth_error_fallback_message(host, error)
-        except Exception:
-            title = NOTIFICATION_TITLE_AUTH_ERROR
-            message = self._build_auth_error_fallback_message(host, error)
-
-        persistent_notification.create(
-            self.hass,
-            message,
-            title=title,
-            notification_id=notification_id,
+        entry = self.hass.config_entries.async_get_entry(self.entry_id)
+        if entry is None or entry.state != ConfigEntryState.LOADED:
+            return
+        self._reauth_scheduled = True
+        _LOGGER.warning(
+            "Authentication failed; starting reauth flow for entry %s", self.entry_id
         )
-
-        self._auth_error_notified = True
-        _LOGGER.warning("Auth error; notification shown. Entry ID: %s", self.entry_id)
+        self.hass.async_create_task(entry.async_start_reauth(self.hass))
 
     async def _async_update_data(self) -> dict[str, Any]:
         """Fetch latest VPN data from Fritz!Box."""
@@ -748,15 +689,11 @@ class FritzBoxVPNCoordinator(DataUpdateCoordinator):
                     _LOGGER.info(LOG_MSG_VPN_CONNECTIONS_REMOVED_HINT)
                     if self._on_orphaned_removed and self.entry_id:
                         self._on_orphaned_removed(self.entry_id, current_uids)
-            if self._auth_error_notified:
-                self._auth_error_notified = False
-                persistent_notification.dismiss(
-                    self.hass, auth_error_notification_id(host_from_config(self.config))
-                )
+            self._reauth_scheduled = False
             return connections
         except (ConnectionError, ValueError) as err:
             if self._is_auth_error(err):
-                await self._create_auth_error_notification(err)
+                self._schedule_reauth()
                 raise UpdateFailed(f"Error fetching VPN data: {err}") from err
             raise UpdateFailed(
                 f"Error fetching VPN data: {err}",
@@ -769,7 +706,7 @@ class FritzBoxVPNCoordinator(DataUpdateCoordinator):
             ) from err
         except Exception as err:
             if self._is_auth_error(err):
-                await self._create_auth_error_notification(err)
+                self._schedule_reauth()
                 raise UpdateFailed(f"Unexpected error fetching VPN data: {err}") from err
             _LOGGER.exception("Unexpected error fetching VPN data")
             raise UpdateFailed(
@@ -778,10 +715,10 @@ class FritzBoxVPNCoordinator(DataUpdateCoordinator):
             ) from err
 
     async def toggle_vpn(self, connection_uid: str, enable: bool) -> bool:
-        """Toggle VPN on/off; show auth notification on auth errors."""
+        """Toggle VPN on/off; schedule reauth on authentication errors."""
         try:
             return await self.fritz_session.async_toggle_vpn(connection_uid, enable)
         except Exception as err:
             if self._is_auth_error(err):
-                await self._create_auth_error_notification(err)
+                self._schedule_reauth()
             raise
