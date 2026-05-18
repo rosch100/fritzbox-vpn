@@ -39,6 +39,8 @@ Prefer suggestions over nits for line length in legacy files (Ruff ignores `E501
 
 ## CI expectations
 
-PRs should pass: Tests, Lint (Ruff), HACS, hassfest. CodeQL and Dependency review run on relevant paths.
+PRs should pass the **CI** workflow jobs: `Ruff`, `pytest`, `HACS validate`, `hassfest`.
+
+Also: Actionlint (workflow changes), Dependency review (requirements/manifest), CodeQL via GitHub default setup.
 
 See also `AGENTS.md` and `.github/instructions/*.instructions.md`.

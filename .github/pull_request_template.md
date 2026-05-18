@@ -4,7 +4,7 @@
 
 ## Test plan
 
-- [ ] `pytest tests/ --cov -q` lokal oder CI grün
+- [ ] CI grün (`Ruff`, `pytest`, `HACS validate`, `hassfest`) bzw. lokal: `ruff check` + `pytest tests/ --cov -q`
 - [ ] Bei SSDP/`config_flow`: `tests/test_ssdp_unique_id.py` und `tests/test_config_flow_ssdp.py`
 - [ ] Bei Manifest/Strings: HACS- und hassfest-Workflow beachtet
 

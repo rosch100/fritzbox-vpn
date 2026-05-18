@@ -1,17 +1,19 @@
 # Repository rulesets
 
-## Copilot code review
+## Copilot code review (aktiv)
 
-`copilot-code-review.json` aktiviert automatische **GitHub Copilot Code Reviews** für Pull Requests:
+`copilot-code-review.json` – automatische Copilot-Reviews auf PRs (alle Branches, bei jedem Push).
 
-- alle Branches (`~ALL`)
-- erneut bei jedem Push (`review_on_push`)
-- keine Draft-PRs (`review_draft_pull_requests: false`)
+## Required CI checks (optional)
 
-### Neu importieren
+`required-ci.json` ist **deaktiviert** (`enforcement: disabled`), weil `main` derzeit keinen Branch-Schutz hat.
 
-1. Repository → **Settings** → **Rules** → **Rulesets**
-2. **New ruleset** → **Import a ruleset**
-3. Datei `copilot-code-review.json` wählen und speichern
+Zum Aktivieren:
 
-Das Ruleset ist auf `rosch100/fritzbox-vpn` bereits aktiv (ID in den Repo-Settings sichtbar).
+1. Settings → Rules → Rulesets → Import `required-ci.json`
+2. Enforcement auf **Active** setzen
+3. Prüfen, dass die Check-Namen mit dem **CI**-Workflow übereinstimmen: `Ruff`, `pytest`, `HACS validate`, `hassfest`
+
+## CodeQL
+
+Kein eigener Workflow im Repo – **GitHub CodeQL Default Setup** ist aktiv (Python + Actions, wöclich). Ein zusätzlicher `codeql.yml` würde mit Default Setup kollidieren.

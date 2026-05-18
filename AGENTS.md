@@ -17,15 +17,15 @@ Home-Assistant-Custom-Integration für WireGuard-VPN auf AVM Fritz!Box.
 - **SSDP-Logik nur in `ssdp_unique_id.py`:** UUID aus UDN/USN, Host aus Location, `unique_id_for_discovery`, Router vs. Repeater (`is_fritzbox_router_discovery`). Nicht in `config_flow` duplizieren.
 - **Repeater:** Diese Integration discovert nur **Router**, keine FRITZ!Repeater (anders als `homeassistant.components.fritz` im Core).
 - **Keine stillen Fallbacks:** Fehlende Discovery-Daten explizit behandeln (Abort/Fehler), keine Dummy-`unique_id`.
-- **Home Assistant:** Mindestversion siehe `manifest.json`; Tests mit der Version aus `scripts/requirements-test.txt`.
+- **Home Assistant:** Mindestversion in `hacs.json` und `manifest.json` (2026.1.0); Tests: `scripts/requirements-test.txt`.
 
 ## Tests lokal
 
 ```bash
 python3 -m venv .venv
 .venv/bin/pip install -r scripts/requirements-test.txt
-.venv/bin/pytest tests/ --cov -q
 .venv/bin/ruff check custom_components tests
+.venv/bin/pytest tests/ --cov -q
 ```
 
 `tests/conftest.py` setzt `hass_config_dir` auf das Repo-Root und aktiviert Custom Integrations.
@@ -33,25 +33,25 @@ python3 -m venv .venv
 ## GitHub Copilot Code Review
 
 - **Automatisch:** Ruleset „Copilot code review“ (alle Branches, Review bei jedem Push).
-- **Konfiguration im Repo:** `.github/rulesets/copilot-code-review.json` (Re-Import: Settings → Rules → Rulesets → Import).
-- **Review-Richtlinien:** `.github/copilot-instructions.md`, pfadspezifisch `.github/instructions/*.instructions.md`
-- **Einstellung prüfen:** Repository → Settings → Copilot → Code review → „Use custom instructions when reviewing pull requests“ (Standard: an).
+- **Konfiguration:** `.github/rulesets/copilot-code-review.json`, Richtlinien in `.github/copilot-instructions.md` und `.github/instructions/*.instructions.md`.
+- **Settings:** Repository → Copilot → Code review → Custom Instructions aktiviert lassen.
 
-Voraussetzung: Copilot-Zugang des PR-Autors (Pro/Business/Enterprise); ab Juni 2026 verbrauchen Reviews ggf. Actions-Minuten.
+## CI / Automation (Übersicht)
 
-## CI (GitHub Actions)
+| Workflow | Trigger | Zweck |
+|----------|---------|--------|
+| **ci.yml** | PR/Push (Pfade), nightly, manual | Ruff, pytest, HACS, hassfest |
+| **actionlint.yml** | `.github/**` | Workflow-Syntax |
+| **dependency-review.yml** | PR (Deps) | Sicherheit Abhängigkeiten (fail high+) |
+| **release.yml** | Tags `v*` | GitHub Release + Manifest-Versionscheck |
+| **stale.yml** | täglich | Inaktive Issues/PRs |
+| **Dependabot** | wöchentlich | Actions + pip |
+| **CodeQL** | Default Setup (GitHub) | Python + Actions, kein `codeql.yml` (Konflikt) |
 
-- **tests.yml** – pytest + Coverage (`.coveragerc`, `fail_under` für `ssdp_unique_id.py`)
-- **lint.yml** – Ruff (`pyproject.toml`)
-- **hacs.yml** / **hassfest.yml** – HACS- und Manifest-Validierung
-- **codeql.yml** – Sicherheitsanalyse Python
-- **dependency-review.yml** – PR-Abhängigkeitsprüfung
-- **Dependabot** – wöchentlich Actions + pip
+PR-Checks heißen: `Ruff`, `pytest`, `HACS validate`, `hassfest`.
 
-## Änderungen an Workflows
-
-Path-Filter und `concurrency` mit bestehenden Workflows abgleichen. `checkout@v6`, `setup-python@v6` beibehalten.
+Optional: `.github/rulesets/required-ci.json` importieren und aktivieren für geschütztes `main`.
 
 ## Verwandtes Core-PR
 
-Stabile SSDP-`unique_id` für FRITZ! (inkl. Repeater) liegt in `home-assistant/core` PR #165042 (`fritz/config_flow.py`). Bei SSDP-Änderungen Konzept mit Core abstimmen, Router/Repeater-Filter nur hier.
+Stabile SSDP-`unique_id` für FRITZ! (inkl. Repeater) liegt in `home-assistant/core` PR #165042. Bei SSDP-Änderungen Konzept mit Core abstimmen; Router/Repeater-Filter nur hier.

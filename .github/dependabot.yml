@@ -5,6 +5,7 @@ updates:
     schedule:
       interval: weekly
       day: monday
+    open-pull-requests-limit: 5
     groups:
       github-actions:
         patterns:
@@ -15,11 +16,13 @@ updates:
     schedule:
       interval: weekly
       day: monday
+    open-pull-requests-limit: 5
     files:
       - /scripts/requirements-test.txt
     groups:
-      pytest:
+      test-deps:
         patterns:
           - "pytest*"
           - "homeassistant"
           - "pytest-homeassistant-custom-component"
+          - "aiohttp"

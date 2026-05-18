@@ -1,0 +1,88 @@
+# Unified CI: lint, tests, HACS, hassfest (same triggers, consistent PR checks)
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+    paths: &ci-paths
+      - "custom_components/**"
+      - "tests/**"
+      - "scripts/**"
+      - "hacs.json"
+      - "pytest.ini"
+      - ".coveragerc"
+      - "pyproject.toml"
+      - ".pre-commit-config.yaml"
+      - ".github/workflows/ci.yml"
+  pull_request:
+    paths: *ci-paths
+  schedule:
+    # Nightly HACS/hassfest even without code changes
+    - cron: "0 0 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  ruff:
+    name: Ruff
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: astral-sh/ruff-action@v3
+        with:
+          src: custom_components tests
+
+  pytest:
+    name: pytest
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: scripts/requirements-test.txt
+
+      - name: Install test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r scripts/requirements-test.txt
+
+      - name: Run tests with coverage
+        run: pytest tests/ --cov --cov-report=term-missing -q
+
+  hacs:
+    name: HACS validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: hacs/action@22.5.0
+        with:
+          category: integration
+          repository: rosch100/fritzbox-vpn
+          comment: ${{ github.event_name == 'pull_request' }}
+
+  hassfest:
+    name: hassfest
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: home-assistant/actions/hassfest@master
