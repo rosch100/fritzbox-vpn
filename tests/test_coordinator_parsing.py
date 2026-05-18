@@ -1,12 +1,12 @@
 """Tests for FritzBox VPN coordinator parsing and login helpers."""
 
-from custom_components.fritzbox_vpn.coordinator import (
-    FritzBoxVPNSession,
-    _extract_box_connections_from_data,
-    _parse_blocktime_from_login_xml,
-    _parse_challenge_from_login_xml,
-    _parse_sid_from_login_response,
-    _resolve_update_interval_seconds,
+from custom_components.fritzbox_vpn.coordinator import _resolve_update_interval_seconds
+from fritzboxvpn import FritzBoxVPNSession
+from fritzboxvpn.parsing import (
+    extract_box_connections_from_data,
+    parse_blocktime_from_login_xml,
+    parse_challenge_from_login_xml,
+    parse_sid_from_login_response,
 )
 
 from tests.fixtures import LOGIN_XML_CHALLENGE, LOGIN_XML_SID, MOCK_DATA_LUA_JSON
@@ -14,14 +14,14 @@ from tests.fixtures import LOGIN_XML_CHALLENGE, LOGIN_XML_SID, MOCK_DATA_LUA_JSO
 
 def test_parse_login_xml() -> None:
     """Parse challenge, SID, and blocktime from login XML."""
-    assert _parse_challenge_from_login_xml(LOGIN_XML_CHALLENGE) == "12345"
-    assert _parse_sid_from_login_response(LOGIN_XML_SID) == "deadbeef"
-    assert _parse_blocktime_from_login_xml(LOGIN_XML_SID) is None
+    assert parse_challenge_from_login_xml(LOGIN_XML_CHALLENGE) == "12345"
+    assert parse_sid_from_login_response(LOGIN_XML_SID) == "deadbeef"
+    assert parse_blocktime_from_login_xml(LOGIN_XML_SID) is None
 
 
 def test_extract_box_connections() -> None:
     """Extract boxConnections from data.lua JSON."""
-    box = _extract_box_connections_from_data(MOCK_DATA_LUA_JSON, "shareWireguard")
+    box = extract_box_connections_from_data(MOCK_DATA_LUA_JSON, "shareWireguard")
     assert box is not None
     assert "conn-abc" in box
 
@@ -34,8 +34,6 @@ def test_resolve_update_interval() -> None:
 
 def test_pbkdf2_response_format() -> None:
     """PBKDF2 response uses expected format for valid challenge."""
-    challenge = "2$10000$aa$10000$bb"
-    # salts must be valid hex
     challenge = "2$5$0123456789abcdef0123456789abcdef$5$fedcba9876543210fedcba9876543210"
     response = FritzBoxVPNSession._calculate_pbkdf2_response(challenge, "password")
     assert "$" in response

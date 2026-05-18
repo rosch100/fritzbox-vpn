@@ -2,9 +2,7 @@ rules:
   # Bronze
   action-setup: done
   appropriate-polling: done
-  brands:
-    status: exempt
-    comment: custom HACS integration; brands entry required only for homeassistant/core
+  brands: done
   common-modules: done
   config-flow-test-coverage: done
   config-flow: done

@@ -8,6 +8,7 @@ from collections.abc import Mapping
 from typing import Any
 
 import voluptuous as vol
+from fritzboxvpn import FritzBoxVPNSession
 from homeassistant.const import CONF_HOST, CONF_PASSWORD, CONF_USERNAME
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
@@ -28,7 +29,7 @@ from .const import (
     UPDATE_INTERVAL_MIN,
     password_from_sources,
 )
-from .coordinator import FritzBoxVPNSession, normalize_update_interval
+from .coordinator import normalize_update_interval
 
 _LOGGER = logging.getLogger(__name__)
 

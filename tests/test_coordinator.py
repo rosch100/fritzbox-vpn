@@ -11,9 +11,9 @@ from custom_components.fritzbox_vpn.const import (
 )
 from custom_components.fritzbox_vpn.coordinator import (
     FritzBoxVPNCoordinator,
-    _normalize_box_connections,
     normalize_update_interval,
 )
+from fritzboxvpn.parsing import normalize_box_connections
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import UpdateFailed
@@ -32,12 +32,12 @@ def test_normalize_update_interval_clamps_and_defaults() -> None:
 
 def test_normalize_box_connections_list_and_dict() -> None:
     """boxConnections list/dict payloads normalize to uid-keyed dict."""
-    listed = _normalize_box_connections(
+    listed = normalize_box_connections(
         [{"uid": "a", "active": 1, "name": "A"}]
     )
     assert listed["a"]["active"] is True
 
-    keyed = _normalize_box_connections(
+    keyed = normalize_box_connections(
         {"b": {"uid": "", "active": "true", "name": "B"}}
     )
     assert "b" in keyed

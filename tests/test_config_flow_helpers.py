@@ -1,11 +1,7 @@
 """Unit tests for entity registry helpers (registry repair, orphans)."""
 
 import pytest
-from custom_components.fritzbox_vpn.const import (
-    DATA_KNOWN_UIDS_KEYS,
-    DOMAIN,
-    UNIQUE_ID_PREFIX,
-)
+from custom_components.fritzbox_vpn.const import DOMAIN, UNIQUE_ID_PREFIX
 from custom_components.fritzbox_vpn.entity_registry import (
     connection_uid_from_entity_unique_id,
     entity_id_base,
@@ -17,6 +13,8 @@ from custom_components.fritzbox_vpn.entity_registry import (
     resolve_current_uids,
     uids_from_entity_entries,
 )
+from custom_components.fritzbox_vpn.models import FritzboxVpnRuntimeData
+from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_registry as er
 from pytest_homeassistant_custom_component.common import MockConfigEntry
@@ -52,7 +50,10 @@ async def test_resolve_current_uids_errors(hass: HomeAssistant) -> None:
     assert uids is None
     assert err == "integration_not_loaded"
 
-    hass.data.setdefault(DOMAIN, {})[entry.entry_id] = {}
+    entry.runtime_data = FritzboxVpnRuntimeData(
+        coordinator=type("C", (), {"data": None})(),
+    )
+    entry.mock_state(hass, ConfigEntryState.LOADED)
     uids, err = resolve_current_uids(hass, entry.entry_id)
     assert uids is None
     assert err == "coordinator_not_ready"
@@ -145,9 +146,12 @@ async def test_remove_orphaned_clears_known_uids(hass: HomeAssistant) -> None:
     """remove_orphaned_entities subtracts UIDs from integration store."""
     entry = MockConfigEntry(domain=DOMAIN, data={"host": "1.2.3.4"})
     entry.add_to_hass(hass)
-    hass.data.setdefault(DOMAIN, {})[entry.entry_id] = {
-        DATA_KNOWN_UIDS_KEYS[0]: {"gone", "keep"},
-    }
+    runtime = FritzboxVpnRuntimeData(
+        coordinator=type("C", (), {"data": {}})(),
+    )
+    runtime.known_uids_switch = {"gone", "keep"}
+    entry.runtime_data = runtime
+    entry.mock_state(hass, ConfigEntryState.LOADED)
     entity_registry = er.async_get(hass)
     entity = entity_registry.async_get_or_create(
         "switch",
@@ -158,7 +162,7 @@ async def test_remove_orphaned_clears_known_uids(hass: HomeAssistant) -> None:
     remove_orphaned_entities(
         hass, entry.entry_id, [entity], remove_from_registry=False
     )
-    assert hass.data[DOMAIN][entry.entry_id][DATA_KNOWN_UIDS_KEYS[0]] == {"keep"}
+    assert entry.runtime_data.known_uids_switch == {"keep"}
 
 
 def test_get_entity_id_suffix_repairs_with_stale_base(hass: HomeAssistant) -> None:

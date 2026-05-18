@@ -1,5 +1,6 @@
 # Test dependencies (see .github/workflows/ci.yml)
 # Pin to minimum HA from hacs.json / manifest (2026.1.0)
+-e ./fritzboxvpn
 aiohttp>=3.8.0
 # manifest.json depends on ssdp; HA's ssdp component imports async_upnp_client
 async-upnp-client>=0.33.0

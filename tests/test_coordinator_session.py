@@ -3,7 +3,7 @@
 from unittest.mock import AsyncMock, patch
 
 import pytest
-from custom_components.fritzbox_vpn.coordinator import FritzBoxVPNSession
+from fritzboxvpn import FritzBoxVPNSession
 
 from tests.aiohttp_mock import MockAiohttpResponse, QueuedAiohttpSession, json_response
 from tests.fixtures import (
@@ -157,7 +157,7 @@ async def test_session_toggle_off_success() -> None:
         ]
     )
     fb = FritzBoxVPNSession(http, MOCK_HOST, MOCK_USERNAME, MOCK_PASSWORD)
-    with patch("custom_components.fritzbox_vpn.coordinator.asyncio.sleep", new=AsyncMock()):
+    with patch("fritzboxvpn.session.asyncio.sleep", new=AsyncMock()):
         assert await fb.async_toggle_vpn("conn-abc", False) is True
 
 
@@ -184,7 +184,7 @@ async def test_session_toggle_put_forbidden_retry() -> None:
         ]
     )
     fb = FritzBoxVPNSession(http, MOCK_HOST, MOCK_USERNAME, MOCK_PASSWORD)
-    with patch("custom_components.fritzbox_vpn.coordinator.asyncio.sleep", new=AsyncMock()):
+    with patch("fritzboxvpn.session.asyncio.sleep", new=AsyncMock()):
         assert await fb.async_toggle_vpn("conn-abc", False) is True
 
 

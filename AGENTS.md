@@ -56,6 +56,15 @@ PR-Checks heißen: `Ruff`, `pytest`, `HACS validate`, `hassfest`.
 
 **Geschütztes `main`:** Ruleset „Required CI checks“ – Änderungen nur per **Pull Request**; vor Merge müssen `Ruff`, `pytest`, `HACS validate`, `hassfest` grün sein.
 
-## Verwandtes Core-PR
+## Core-Integration
+
+Vorbereitet unter `home-assistant-core/homeassistant/components/fritzbox_vpn/`:
+
+- API in PyPI-Library **`fritzboxvpn`** (`fritzboxvpn/` im Repo, vor Core-Merge auf PyPI veröffentlichen)
+- `runtime_data` statt `hass.data` für Coordinator/known_uids
+- `quality_scale: gold`, Brand über `homeassistant/brands/fritzbox.json`
+- Core-Tests unter `tests/components/fritzbox_vpn/`
+
+Vor dem Core-PR: `fritzboxvpn==1.0.0` auf PyPI publizieren (Workflow `.github/workflows/publish-pypi.yml`, Setup `docs/pypi-publish.md`), Doku-PR aus `docs/home-assistant-io/fritzbox_vpn.markdown`.
 
 Stabile SSDP-`unique_id` für FRITZ! (inkl. Repeater) liegt in `home-assistant/core` PR #165042. Bei SSDP-Änderungen Konzept mit Core abstimmen; Router/Repeater-Filter nur hier.
