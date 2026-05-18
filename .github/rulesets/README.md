@@ -6,15 +6,14 @@
 
 ## Required CI checks (aktiv)
 
-`required-ci.json` – Pflicht-Checks auf **`main`** vor Merge:
+`required-ci.json` – Schutz für **`main`**:
 
-- `Ruff`, `pytest`, `HACS validate`, `hassfest` (Workflow **CI**)
-- `strict_required_status_checks_policy`: false
-- `do_not_enforce_on_create`: true
+1. **Pull Request erforderlich** (0 Approvals) – kein direkter Push auf `main`
+2. **Pflicht-Checks:** `Ruff`, `pytest`, `HACS validate`, `hassfest` (Workflow **CI**)
 
 Ruleset-ID: **16545012** – [Einstellungen](https://github.com/rosch100/fritzbox-vpn/rules/16545012)
 
-Re-Import nur nötig nach manueller Löschung des Rulesets.
+Änderungen: Feature-Branch → PR → CI grün → Merge.
 
 ## CodeQL
 
