@@ -9,13 +9,8 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 
-from .const import (
-    DATA_COORDINATOR,
-    DATA_KNOWN_UIDS_KEYS,
-    DOMAIN,
-    UNIQUE_ID_PREFIX,
-    UNIQUE_ID_SUFFIXES,
-)
+from .const import DOMAIN, UNIQUE_ID_PREFIX, UNIQUE_ID_SUFFIXES
+from .models import runtime_from_hass
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -37,10 +32,11 @@ def resolve_current_uids(
     hass: HomeAssistant, entry_id: str
 ) -> tuple[set[str] | None, str | None]:
     """Current VPN UIDs from coordinator.data."""
-    if DOMAIN not in hass.data or entry_id not in hass.data[DOMAIN]:
+    runtime = runtime_from_hass(hass, entry_id)
+    if runtime is None:
         return (None, "integration_not_loaded")
-    coordinator = hass.data[DOMAIN][entry_id].get(DATA_COORDINATOR)
-    if not coordinator or not hasattr(coordinator, "data"):
+    coordinator = runtime.coordinator
+    if not coordinator or not hasattr(coordinator, "data") or coordinator.data is None:
         return (None, "coordinator_not_ready")
     current_uids = set(coordinator.data.keys()) if coordinator.data else set()
     return (current_uids, None)
@@ -216,9 +212,7 @@ def remove_orphaned_entities(
                     dev_id,
                 )
 
-    if not uids_removed or entry_id not in hass.data.get(DOMAIN, {}):
+    runtime = runtime_from_hass(hass, entry_id)
+    if not uids_removed or runtime is None:
         return
-    store = hass.data[DOMAIN][entry_id]
-    for key in DATA_KNOWN_UIDS_KEYS:
-        if key in store and isinstance(store[key], set):
-            store[key] -= uids_removed
+    runtime.clear_known_uids(uids_removed)

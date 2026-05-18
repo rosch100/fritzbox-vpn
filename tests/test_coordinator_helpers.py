@@ -3,11 +3,11 @@
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-from custom_components.fritzbox_vpn.coordinator import (
-    FritzBoxVPNCoordinator,
-    _connection_active_from_api,
-    _extract_box_connections_from_data,
-    _normalize_connection_uid,
+from custom_components.fritzbox_vpn.coordinator import FritzBoxVPNCoordinator
+from fritzboxvpn.parsing import (
+    connection_active_from_api,
+    extract_box_connections_from_data,
+    normalize_connection_uid,
 )
 from homeassistant.core import HomeAssistant
 from pytest_homeassistant_custom_component.common import MockConfigEntry
@@ -17,17 +17,17 @@ from tests.fixtures import MOCK_HOST, MOCK_VPN_CONNECTIONS
 
 def test_connection_active_from_api_variants() -> None:
     """Active flag accepts bool, int, and string forms."""
-    assert _connection_active_from_api({"active": True}) is True
-    assert _connection_active_from_api({"activated": 1}) is True
-    assert _connection_active_from_api({"active": "on"}) is True
-    assert _connection_active_from_api({}) is False
+    assert connection_active_from_api({"active": True}) is True
+    assert connection_active_from_api({"activated": 1}) is True
+    assert connection_active_from_api({"active": "on"}) is True
+    assert connection_active_from_api({}) is False
 
 
 def test_normalize_connection_uid() -> None:
     """UID normalization trims and rejects empty values."""
-    assert _normalize_connection_uid("  abc  ") == "abc"
-    assert _normalize_connection_uid("") is None
-    assert _normalize_connection_uid(None) is None
+    assert normalize_connection_uid("  abc  ") == "abc"
+    assert normalize_connection_uid("") is None
+    assert normalize_connection_uid(None) is None
 
 
 def test_extract_box_connections_alternate_paths() -> None:
@@ -43,7 +43,7 @@ def test_extract_box_connections_alternate_paths() -> None:
             }
         }
     }
-    box = _extract_box_connections_from_data(inner_list, "shareWireguard")
+    box = extract_box_connections_from_data(inner_list, "shareWireguard")
     assert box is not None
 
     top_level = {
@@ -51,7 +51,7 @@ def test_extract_box_connections_alternate_paths() -> None:
             "boxConnections": {"y": {"uid": "y", "active": 0}},
         }
     }
-    assert _extract_box_connections_from_data(top_level, "shareWireguard") is not None
+    assert extract_box_connections_from_data(top_level, "shareWireguard") is not None
 
 
 @pytest.mark.asyncio

@@ -8,7 +8,7 @@ from custom_components.fritzbox_vpn import (
     async_setup_entry,
     async_unload_entry,
 )
-from custom_components.fritzbox_vpn.const import DATA_COORDINATOR, DOMAIN
+from custom_components.fritzbox_vpn.models import FritzboxVpnRuntimeData
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed
 from pytest_homeassistant_custom_component.common import MockConfigEntry
@@ -43,8 +43,8 @@ async def test_setup_entry_success(
     ):
         assert await async_setup_entry(hass, mock_config_entry)
 
-    assert mock_config_entry.entry_id in hass.data[DOMAIN]
-    assert DATA_COORDINATOR in hass.data[DOMAIN][mock_config_entry.entry_id]
+    assert isinstance(mock_config_entry.runtime_data, FritzboxVpnRuntimeData)
+    assert mock_config_entry.runtime_data.coordinator is mock_coordinator
     forward_mock.assert_awaited_once_with(mock_config_entry, PLATFORMS)
 
 
@@ -77,9 +77,7 @@ async def test_unload_entry(
     mock_coordinator = AsyncMock()
     mock_coordinator.fritz_session = AsyncMock()
     mock_coordinator.fritz_session.async_close = AsyncMock()
-    hass.data.setdefault(DOMAIN, {})[mock_config_entry.entry_id] = {
-        DATA_COORDINATOR: mock_coordinator,
-    }
+    mock_config_entry.runtime_data = FritzboxVpnRuntimeData(coordinator=mock_coordinator)
 
     with patch.object(
         hass.config_entries,
@@ -88,5 +86,5 @@ async def test_unload_entry(
     ):
         assert await async_unload_entry(hass, mock_config_entry)
 
-    assert mock_config_entry.entry_id not in hass.data.get(DOMAIN, {})
+    assert mock_config_entry.runtime_data is None
     mock_coordinator.fritz_session.async_close.assert_awaited_once()

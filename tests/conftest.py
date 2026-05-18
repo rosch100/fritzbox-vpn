@@ -3,14 +3,9 @@
 from pathlib import Path
 
 import pytest
-from custom_components.fritzbox_vpn.const import (
-    DATA_COORDINATOR,
-    DATA_KNOWN_UIDS_BINARY_SENSOR,
-    DATA_KNOWN_UIDS_SENSOR,
-    DATA_KNOWN_UIDS_SWITCH,
-    DOMAIN,
-)
 from custom_components.fritzbox_vpn.coordinator import FritzBoxVPNCoordinator
+from custom_components.fritzbox_vpn.models import FritzboxVpnRuntimeData
+from homeassistant.config_entries import ConfigEntryState
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from tests.fixtures import MOCK_VPN_CONNECTIONS
@@ -35,7 +30,7 @@ def enable_custom_integrations_fixture(enable_custom_integrations) -> None:
 def mock_config_entry() -> MockConfigEntry:
     """Configured FritzBox VPN entry."""
     return MockConfigEntry(
-        domain=DOMAIN,
+        domain="fritzbox_vpn",
         data={
             "host": "192.168.178.1",
             "username": "user",
@@ -49,7 +44,7 @@ def mock_config_entry() -> MockConfigEntry:
 async def coordinator_with_data(
     hass, mock_config_entry: MockConfigEntry
 ) -> FritzBoxVPNCoordinator:
-    """Coordinator registered in hass.data with VPN sample data."""
+    """Coordinator on entry.runtime_data with VPN sample data."""
     mock_config_entry.add_to_hass(hass)
     coordinator = FritzBoxVPNCoordinator(
         hass,
@@ -58,10 +53,6 @@ async def coordinator_with_data(
         mock_config_entry.entry_id,
     )
     coordinator.async_set_updated_data(MOCK_VPN_CONNECTIONS)
-    hass.data.setdefault(DOMAIN, {})[mock_config_entry.entry_id] = {
-        DATA_COORDINATOR: coordinator,
-        DATA_KNOWN_UIDS_SWITCH: set(),
-        DATA_KNOWN_UIDS_SENSOR: set(),
-        DATA_KNOWN_UIDS_BINARY_SENSOR: set(),
-    }
+    mock_config_entry.runtime_data = FritzboxVpnRuntimeData(coordinator=coordinator)
+    mock_config_entry.mock_state(hass, ConfigEntryState.LOADED)
     return coordinator

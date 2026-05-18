@@ -7,6 +7,7 @@ from custom_components.fritzbox_vpn import (
     SERVICE_REGISTRATION_FLAG,
     _async_remove_unavailable_entities,
     _async_repair_entity_id_suffixes,
+    async_setup,
     async_setup_entry,
 )
 from custom_components.fritzbox_vpn.const import (
@@ -66,6 +67,7 @@ async def test_services_registered_once(
     hass: HomeAssistant, mock_config_entry: MockConfigEntry
 ) -> None:
     """Services are registered on first setup and removed on last unload."""
+    await async_setup(hass, {})
     mock_config_entry.add_to_hass(hass)
     mock_coordinator = AsyncMock()
     mock_coordinator.data = MOCK_VPN_CONNECTIONS

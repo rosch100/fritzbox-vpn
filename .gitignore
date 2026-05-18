@@ -61,6 +61,7 @@ fritzbox-vpn.code-workspace
 # OS
 .DS_Store
 Thumbs.db
+actionlint
 
 # Secrets
 *.key

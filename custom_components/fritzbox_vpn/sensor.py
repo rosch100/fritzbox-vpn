@@ -2,18 +2,13 @@
 
 from typing import Any
 
+from fritzboxvpn import API_KEY_UID
 from homeassistant.components.sensor import SensorDeviceClass, SensorEntity
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import (
-    API_KEY_UID,
-    DATA_COORDINATOR,
-    DATA_KNOWN_UIDS_SENSOR,
-    DATA_LOCK_ADD_ENTITIES_SENSOR,
-    DOMAIN,
     UNIQUE_ID_SUFFIX_STATUS,
     UNIQUE_ID_SUFFIX_UID,
     UNIQUE_ID_SUFFIX_VPN_UID,
@@ -21,19 +16,19 @@ from .const import (
 )
 from .coordinator import FritzBoxVPNCoordinator
 from .entity import FritzBoxVPNEntity, setup_vpn_platform
+from .models import FritzboxVpnConfigEntry
 
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    entry: ConfigEntry,
+    entry: FritzboxVpnConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up FritzBox VPN sensor entities."""
-    coordinator: FritzBoxVPNCoordinator = hass.data[DOMAIN][entry.entry_id][
-        DATA_COORDINATOR
-    ]
 
-    def _create_entities(uids: set[str]) -> list[SensorEntity]:
+    def _create_entities(
+        coordinator: FritzBoxVPNCoordinator, uids: set[str]
+    ) -> list[SensorEntity]:
         if not coordinator.data:
             return []
         entities: list[SensorEntity] = []
@@ -47,12 +42,9 @@ async def async_setup_entry(
         return entities
 
     await setup_vpn_platform(
-        hass,
         entry,
         async_add_entities,
-        platform_label="sensor",
-        known_uids_key=DATA_KNOWN_UIDS_SENSOR,
-        lock_key=DATA_LOCK_ADD_ENTITIES_SENSOR,
+        platform="sensor",
         create_entities=_create_entities,
     )
 
@@ -63,7 +55,7 @@ class FritzBoxVPNStatusSensor(FritzBoxVPNEntity, SensorEntity):
     def __init__(
         self,
         coordinator: FritzBoxVPNCoordinator,
-        entry: ConfigEntry,
+        entry: FritzboxVpnConfigEntry,
         connection_uid: str,
         connection_data: dict[str, Any],
     ) -> None:
@@ -92,7 +84,7 @@ class FritzBoxVPNUIDSensor(FritzBoxVPNEntity, SensorEntity):
     def __init__(
         self,
         coordinator: FritzBoxVPNCoordinator,
-        entry: ConfigEntry,
+        entry: FritzboxVpnConfigEntry,
         connection_uid: str,
         connection_data: dict[str, Any],
     ) -> None:
@@ -120,7 +112,7 @@ class FritzBoxVPNVPNUIDSensor(FritzBoxVPNEntity, SensorEntity):
     def __init__(
         self,
         coordinator: FritzBoxVPNCoordinator,
-        entry: ConfigEntry,
+        entry: FritzboxVpnConfigEntry,
         connection_uid: str,
         connection_data: dict[str, Any],
     ) -> None:

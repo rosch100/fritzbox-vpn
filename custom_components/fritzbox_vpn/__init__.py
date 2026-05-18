@@ -7,12 +7,13 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
+from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers.typing import ConfigType
 
 from .const import (
     CONF_CONFIG_ENTRY_ID,
-    DATA_COORDINATOR,
     DOMAIN,
     ERROR_INDICATOR_AUTH,
     MANUFACTURER_AVM,
@@ -28,6 +29,7 @@ from .entity_registry import (
     remove_orphaned_entities,
     repair_entity_id_suffixes,
 )
+from .models import FritzboxVpnConfigEntry, FritzboxVpnRuntimeData
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -38,9 +40,11 @@ SERVICE_SCHEMA_OPTIONAL_ENTRY_ID = vol.Schema(
     {vol.Optional(CONF_CONFIG_ENTRY_ID): str}
 )
 
+CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
+
 
 def _domain_store(hass: HomeAssistant) -> dict:
-    """Integration domain store in hass.data."""
+    """Integration domain store in hass.data (service registration only)."""
     return hass.data.setdefault(DOMAIN, {})
 
 
@@ -156,7 +160,13 @@ def _repair_suffixes_before_platform_setup(hass: HomeAssistant, entry_id: str) -
     return repaired_count
 
 
-async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
+    """Set up Fritz!Box VPN integration."""
+    _register_services_if_needed(hass)
+    return True
+
+
+async def async_setup_entry(hass: HomeAssistant, entry: FritzboxVpnConfigEntry) -> bool:
     """Set up FritzBox VPN from a config entry."""
     host = _entry_host(entry)
     _LOGGER.info("Setting up FritzBox VPN integration for host: %s", host)
@@ -185,11 +195,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         _LOGGER.warning("Failed to fetch initial VPN data, retrying later: %s", err)
         raise ConfigEntryNotReady(f"Timeout/Error connecting to {NAME_FRITZBOX}: {err}") from err
 
-    _domain_store(hass)[entry.entry_id] = {
-        DATA_COORDINATOR: coordinator,
-    }
-
-    _register_services_if_needed(hass)
+    entry.runtime_data = FritzboxVpnRuntimeData(coordinator=coordinator)
 
     device_registry = dr.async_get(hass)
     parent_device = device_registry.async_get_or_create(
@@ -202,8 +208,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     )
     _LOGGER.info("Created parent device: %s (ID: %s)", parent_device.name, parent_device.id)
 
-    # Do registry repair before forwarding platforms to avoid reloading during setup,
-    # which can trigger "already been setup" errors for the same config entry.
     _repair_suffixes_before_platform_setup(hass, entry.entry_id)
 
     try:
@@ -223,28 +227,27 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     return True
 
 
-async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+async def async_unload_entry(hass: HomeAssistant, entry: FritzboxVpnConfigEntry) -> bool:
     """Unload a config entry."""
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
 
     if unload_ok:
-        coordinator: FritzBoxVPNCoordinator = hass.data[DOMAIN][entry.entry_id][DATA_COORDINATOR]
-        await coordinator.fritz_session.async_close()
-
-        hass.data[DOMAIN].pop(entry.entry_id)
+        if entry.runtime_data is not None:
+            await entry.runtime_data.coordinator.fritz_session.async_close()
+        entry.runtime_data = None
 
         other_loaded = [
             e for e in hass.config_entries.async_loaded_entries(DOMAIN)
             if e.entry_id != entry.entry_id
         ]
-        if not other_loaded and hass.data[DOMAIN].pop(SERVICE_REGISTRATION_FLAG, None):
+        if not other_loaded and _domain_store(hass).pop(SERVICE_REGISTRATION_FLAG, None):
             hass.services.async_remove(DOMAIN, SERVICE_REMOVE_UNAVAILABLE_ENTITIES)
             hass.services.async_remove(DOMAIN, SERVICE_REPAIR_ENTITY_ID_SUFFIXES)
 
     return unload_ok
 
 
-async def async_reload_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
+async def async_reload_entry(hass: HomeAssistant, entry: FritzboxVpnConfigEntry) -> None:
     """Reload config entry."""
     _LOGGER.info("Reloading FritzBox VPN integration for host: %s", _entry_host(entry))
     unload_ok = await async_unload_entry(hass, entry)

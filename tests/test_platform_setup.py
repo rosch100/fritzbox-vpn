@@ -4,11 +4,9 @@ from unittest.mock import MagicMock
 
 import pytest
 from custom_components.fritzbox_vpn import binary_sensor, sensor, switch
-from custom_components.fritzbox_vpn.const import (
-    DATA_COORDINATOR,
-    DATA_KNOWN_UIDS_SWITCH,
-    DOMAIN,
-)
+from custom_components.fritzbox_vpn.coordinator import FritzBoxVPNCoordinator
+from custom_components.fritzbox_vpn.models import FritzboxVpnRuntimeData
+from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import HomeAssistant
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
@@ -68,7 +66,7 @@ async def test_switch_adds_entity_on_coordinator_update(
     hass: HomeAssistant, coordinator_with_data, mock_config_entry: MockConfigEntry
 ) -> None:
     """Listener adds switch when a new VPN UID appears."""
-    coordinator = hass.data[DOMAIN][mock_config_entry.entry_id][DATA_COORDINATOR]
+    coordinator = mock_config_entry.runtime_data.coordinator
     captured_listener = None
     original_add_listener = coordinator.async_add_listener
 
@@ -96,9 +94,7 @@ async def test_switch_adds_entity_on_coordinator_update(
             "connected": False,
         },
     }
-    hass.data[DOMAIN][mock_config_entry.entry_id][DATA_KNOWN_UIDS_SWITCH] = set(
-        MOCK_VPN_CONNECTIONS.keys()
-    )
+    mock_config_entry.runtime_data.known_uids_switch = set(MOCK_VPN_CONNECTIONS.keys())
 
     captured_listener()
     await hass.async_block_till_done()
@@ -111,17 +107,14 @@ async def test_switch_setup_without_vpn_data(
     hass: HomeAssistant, mock_config_entry: MockConfigEntry
 ) -> None:
     """Switch setup succeeds with empty coordinator data."""
-    from custom_components.fritzbox_vpn.coordinator import FritzBoxVPNCoordinator
-
     mock_config_entry.add_to_hass(hass)
     coordinator = FritzBoxVPNCoordinator(
         hass, mock_config_entry.data, None, mock_config_entry.entry_id
     )
     coordinator.async_set_updated_data({})
     coordinator.async_add_listener = MagicMock(return_value=lambda: None)
-    hass.data[DOMAIN] = {
-        mock_config_entry.entry_id: {DATA_COORDINATOR: coordinator}
-    }
+    mock_config_entry.runtime_data = FritzboxVpnRuntimeData(coordinator=coordinator)
+    mock_config_entry.mock_state(hass, ConfigEntryState.LOADED)
 
     added: list = []
     await switch.async_setup_entry(

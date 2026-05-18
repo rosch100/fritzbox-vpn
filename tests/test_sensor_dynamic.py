@@ -2,11 +2,6 @@
 
 import pytest
 from custom_components.fritzbox_vpn import sensor
-from custom_components.fritzbox_vpn.const import (
-    DATA_COORDINATOR,
-    DATA_KNOWN_UIDS_SENSOR,
-    DOMAIN,
-)
 from homeassistant.core import HomeAssistant
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
@@ -18,7 +13,7 @@ async def test_sensor_adds_on_coordinator_update(
     hass: HomeAssistant, coordinator_with_data, mock_config_entry: MockConfigEntry
 ) -> None:
     """Coordinator listener registers new sensor entities."""
-    coordinator = hass.data[DOMAIN][mock_config_entry.entry_id][DATA_COORDINATOR]
+    coordinator = mock_config_entry.runtime_data.coordinator
     captured_listener = None
     original_add_listener = coordinator.async_add_listener
 
@@ -44,9 +39,7 @@ async def test_sensor_adds_on_coordinator_update(
             "connected": False,
         },
     }
-    hass.data[DOMAIN][mock_config_entry.entry_id][DATA_KNOWN_UIDS_SENSOR] = set(
-        MOCK_VPN_CONNECTIONS.keys()
-    )
+    mock_config_entry.runtime_data.known_uids_sensor = set(MOCK_VPN_CONNECTIONS.keys())
     captured_listener()
     await hass.async_block_till_done()
     assert len(added) > initial

@@ -2,27 +2,20 @@
 
 from __future__ import annotations
 
-import asyncio
 import logging
 from collections.abc import Callable
 from typing import Any
 
-from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant
+from fritzboxvpn import API_KEY_ACTIVE, API_KEY_CONNECTED, API_KEY_NAME, API_KEY_UID
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import (
-    API_KEY_ACTIVE,
-    API_KEY_CONNECTED,
-    API_KEY_NAME,
-    API_KEY_UID,
     ATTR_STATUS,
     ATTR_UID,
     ATTR_VPN_UID,
-    DATA_COORDINATOR,
     DEFAULT_NAME_UNKNOWN,
     DOMAIN,
     MANUFACTURER_AVM,
@@ -30,10 +23,11 @@ from .const import (
     UNIQUE_ID_PREFIX,
 )
 from .coordinator import FritzBoxVPNCoordinator
+from .models import FritzboxVpnConfigEntry, RuntimePlatform, runtime_from_entry
 
 _LOGGER = logging.getLogger(__name__)
 
-EntityFactory = Callable[[set[str]], list]
+EntityFactory = Callable[[FritzBoxVPNCoordinator, set[str]], list]
 
 
 def vpn_unique_id(connection_uid: str, suffix: str) -> str:
@@ -42,7 +36,7 @@ def vpn_unique_id(connection_uid: str, suffix: str) -> str:
 
 
 def vpn_device_info(
-    entry: ConfigEntry, connection_uid: str, connection_data: dict[str, Any]
+    entry: FritzboxVpnConfigEntry, connection_uid: str, connection_data: dict[str, Any]
 ) -> DeviceInfo:
     """Device registry entry for one WireGuard VPN connection."""
     return DeviceInfo(
@@ -107,7 +101,7 @@ class FritzBoxVPNEntity(CoordinatorEntity):
     def __init__(
         self,
         coordinator: FritzBoxVPNCoordinator,
-        entry: ConfigEntry,
+        entry: FritzboxVpnConfigEntry,
         connection_uid: str,
         connection_data: dict[str, Any],
         *,
@@ -131,32 +125,30 @@ class FritzBoxVPNEntity(CoordinatorEntity):
 
 
 async def setup_vpn_platform(
-    hass: HomeAssistant,
-    entry: ConfigEntry,
+    entry: FritzboxVpnConfigEntry,
     async_add_entities: AddEntitiesCallback,
     *,
-    platform_label: str,
-    known_uids_key: str,
-    lock_key: str,
+    platform: RuntimePlatform,
     create_entities: EntityFactory,
 ) -> None:
     """Register entities and add new ones when coordinator data gains VPN UIDs."""
-    coordinator: FritzBoxVPNCoordinator = hass.data[DOMAIN][entry.entry_id][
-        DATA_COORDINATOR
-    ]
-    known_uids: set[str] = hass.data[DOMAIN][entry.entry_id].setdefault(
-        known_uids_key, set()
-    )
+    runtime = runtime_from_entry(entry)
+    if runtime is None:
+        _LOGGER.error("Runtime data missing during %s platform setup", platform)
+        return
+
+    coordinator = runtime.coordinator
+    known_uids, lock = runtime.platform_tracking(platform)
 
     if coordinator.data:
         initial_uids = set(coordinator.data.keys())
         known_uids.update(initial_uids)
-        entities = create_entities(initial_uids)
+        entities = create_entities(coordinator, initial_uids)
         _LOGGER.info(
             "Found %d VPN connections, creating %d %s entities",
             len(initial_uids),
             len(entities),
-            platform_label,
+            platform,
         )
     else:
         entities = []
@@ -165,13 +157,12 @@ async def setup_vpn_platform(
     async_add_entities(entities, update_before_add=True)
 
     async def _add_new_entities() -> None:
-        lock = hass.data[DOMAIN][entry.entry_id].setdefault(lock_key, asyncio.Lock())
         async with lock:
             current = set(coordinator.data.keys()) if coordinator.data else set()
             new_uids = current - known_uids
             if not new_uids:
                 return
-            new_entities = create_entities(new_uids)
+            new_entities = create_entities(coordinator, new_uids)
             if not new_entities:
                 return
             known_uids.update(new_uids)
@@ -179,10 +170,10 @@ async def setup_vpn_platform(
             _LOGGER.info(
                 "New VPN connection(s) detected, added %d %s entities",
                 len(new_entities),
-                platform_label,
+                platform,
             )
 
     def _on_coordinator_update() -> None:
-        hass.async_create_task(_add_new_entities())
+        coordinator.hass.async_create_task(_add_new_entities())
 
     entry.async_on_unload(coordinator.async_add_listener(_on_coordinator_update))

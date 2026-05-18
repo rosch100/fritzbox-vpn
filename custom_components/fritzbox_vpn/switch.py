@@ -3,21 +3,12 @@
 import logging
 from typing import Any
 
+from fritzboxvpn import API_KEY_ACTIVE, API_KEY_NAME
 from homeassistant.components.switch import SwitchEntity
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import (
-    API_KEY_ACTIVE,
-    API_KEY_NAME,
-    DATA_COORDINATOR,
-    DATA_KNOWN_UIDS_SWITCH,
-    DATA_LOCK_ADD_ENTITIES_SWITCH,
-    DEFAULT_NAME_UNKNOWN,
-    DOMAIN,
-    UNIQUE_ID_SUFFIX_SWITCH,
-)
+from .const import DEFAULT_NAME_UNKNOWN, UNIQUE_ID_SUFFIX_SWITCH
 from .coordinator import FritzBoxVPNCoordinator
 from .entity import (
     FritzBoxVPNEntity,
@@ -25,6 +16,7 @@ from .entity import (
     setup_vpn_platform,
     vpn_switch_attributes,
 )
+from .models import FritzboxVpnConfigEntry
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -33,15 +25,14 @@ PARALLEL_UPDATES = 1
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    entry: ConfigEntry,
+    entry: FritzboxVpnConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up FritzBox VPN switch entities."""
-    coordinator: FritzBoxVPNCoordinator = hass.data[DOMAIN][entry.entry_id][
-        DATA_COORDINATOR
-    ]
 
-    def _create_entities(uids: set[str]) -> list[FritzBoxVPNSwitch]:
+    def _create_entities(
+        coordinator: FritzBoxVPNCoordinator, uids: set[str]
+    ) -> list[FritzBoxVPNSwitch]:
         if not coordinator.data:
             return []
         return [
@@ -51,12 +42,9 @@ async def async_setup_entry(
         ]
 
     await setup_vpn_platform(
-        hass,
         entry,
         async_add_entities,
-        platform_label="switch",
-        known_uids_key=DATA_KNOWN_UIDS_SWITCH,
-        lock_key=DATA_LOCK_ADD_ENTITIES_SWITCH,
+        platform="switch",
         create_entities=_create_entities,
     )
 
@@ -67,7 +55,7 @@ class FritzBoxVPNSwitch(FritzBoxVPNEntity, SwitchEntity):
     def __init__(
         self,
         coordinator: FritzBoxVPNCoordinator,
-        entry: ConfigEntry,
+        entry: FritzboxVpnConfigEntry,
         connection_uid: str,
         connection_data: dict[str, Any],
     ) -> None:
