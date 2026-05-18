@@ -54,3 +54,5 @@ jobs:
         with:
           packages-dir: fritzboxvpn/dist
           print-hash: true
+          # Trusted publishing (OIDC) when no token is set; otherwise API token upload.
+          password: ${{ secrets.PYPI_API_TOKEN }}
