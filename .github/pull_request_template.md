@@ -10,6 +10,7 @@
 
 ## Checklist
 
+- [ ] Copilot Code Review abgewartet (läuft automatisch bei Push)
 - [ ] Keine Secrets oder Zugangsdaten im Diff
 - [ ] SSDP-Helfer nur in `ssdp_unique_id.py` (keine Duplikate in `config_flow`)
 - [ ] Version in `manifest.json` nur bei Release-relevanten Änderungen angepasst

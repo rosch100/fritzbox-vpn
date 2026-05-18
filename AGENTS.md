@@ -30,6 +30,15 @@ python3 -m venv .venv
 
 `tests/conftest.py` setzt `hass_config_dir` auf das Repo-Root und aktiviert Custom Integrations.
 
+## GitHub Copilot Code Review
+
+- **Automatisch:** Ruleset „Copilot code review“ (alle Branches, Review bei jedem Push).
+- **Konfiguration im Repo:** `.github/rulesets/copilot-code-review.json` (Re-Import: Settings → Rules → Rulesets → Import).
+- **Review-Richtlinien:** `.github/copilot-instructions.md`, pfadspezifisch `.github/instructions/*.instructions.md`
+- **Einstellung prüfen:** Repository → Settings → Copilot → Code review → „Use custom instructions when reviewing pull requests“ (Standard: an).
+
+Voraussetzung: Copilot-Zugang des PR-Autors (Pro/Business/Enterprise); ab Juni 2026 verbrauchen Reviews ggf. Actions-Minuten.
+
 ## CI (GitHub Actions)
 
 - **tests.yml** – pytest + Coverage (`.coveragerc`, `fail_under` für `ssdp_unique_id.py`)
