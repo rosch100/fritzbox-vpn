@@ -50,7 +50,7 @@ jobs:
         run: twine check dist/*
 
       - name: Publish to PyPI
-        uses: pypa/gh-action-pypi-publish@release/v2
+        uses: pypa/gh-action-pypi-publish@release/v1
         with:
           packages-dir: fritzboxvpn/dist
           print-hash: true
