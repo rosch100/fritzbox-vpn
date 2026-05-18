@@ -1,2 +1,4 @@
-# For running scripts/test_live_fritzbox_vpn.py (no Home Assistant required)
+# scripts/test_live_fritzbox_vpn.py
 aiohttp>=3.8.0
+# tests/test_ssdp_unique_id.py (install homeassistant in the test env)
+pytest>=8.0

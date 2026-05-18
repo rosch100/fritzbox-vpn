@@ -21,9 +21,9 @@ list_appletv_apps.py
 monitor_apple_tv.py
 deploy.sh
 
-# Test-Dateien
-test_*.py
-*_test.py
+# Ad-hoc test scripts (pytest suite lives in tests/)
+/test_*.py
+/scripts/test_*.py
 
 # Konfigurationsdateien (lokal, enthalten möglicherweise Secrets)
 config.yaml

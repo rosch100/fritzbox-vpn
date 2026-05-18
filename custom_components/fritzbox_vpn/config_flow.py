@@ -4,8 +4,6 @@ import ipaddress
 import logging
 import re
 from typing import Any, Dict, List, Mapping, Optional, Set, Tuple
-from urllib.parse import urlparse
-
 import voluptuous as vol
 
 from homeassistant import config_entries
@@ -46,6 +44,7 @@ from .const import (
 )
 from .coordinator import FritzBoxVPNSession, normalize_update_interval
 from .fritz_config_source import get_existing_fritz_config
+from .ssdp_unique_id import host_from_ssdp, unique_id_for_discovery
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -446,6 +445,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     def __init__(self):
         self._discovered_host: Optional[str] = None
+        self._discovered_unique_id: Optional[str] = None
         self._existing_config: Optional[Dict[str, Any]] = None
 
     async def async_step_user(
@@ -504,20 +504,21 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         if not self._is_fritzbox_device(discovery_info):
             return self.async_abort(reason="not_fritzbox")
 
-        host = self._extract_host_from_ssdp(discovery_info)
+        host = host_from_ssdp(discovery_info)
         if not host:
             return self.async_abort(reason="no_host")
+        try:
+            if ipaddress.ip_address(host).is_link_local:
+                return self.async_abort(reason="no_host")
+        except ValueError:
+            pass
 
-        unique_id = host
-        if discovery_info.ssdp_usn:
-            usn_parts = discovery_info.ssdp_usn.split("::")
-            if usn_parts and usn_parts[0].startswith("uuid:"):
-                unique_id = usn_parts[0].replace("uuid:", "")
-
+        unique_id = unique_id_for_discovery(discovery_info, host)
         await self.async_set_unique_id(unique_id)
         self._abort_if_unique_id_configured()
 
         self._discovered_host = host
+        self._discovered_unique_id = unique_id
         self.context["title_placeholders"] = {"host": host}
 
         self._existing_config = await get_existing_fritz_config(self.hass)
@@ -556,8 +557,8 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         except Exception as err:
             _set_validation_error(errors, err, log_unknown_details=False)
         else:
-            host = user_input.get(CONF_HOST)
-            await self.async_set_unique_id(host)
+            unique_id = self._discovered_unique_id or user_input.get(CONF_HOST)
+            await self.async_set_unique_id(unique_id)
             self._abort_if_unique_id_configured()
             return self.async_create_entry(title=info["title"], data=user_input)
 
@@ -600,35 +601,6 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             return False
 
         return True
-
-    @staticmethod
-    def _extract_host_from_ssdp(discovery_info: SsdpServiceInfo) -> Optional[str]:
-        """Extract host IP from SSDP discovery info."""
-        if discovery_info.ssdp_location:
-            try:
-                parsed = urlparse(discovery_info.ssdp_location)
-                if parsed.hostname:
-                    return parsed.hostname
-            except Exception:
-                pass
-
-        if hasattr(discovery_info, "ssdp_headers") and discovery_info.ssdp_headers:
-            location = discovery_info.ssdp_headers.get("location")
-            if location:
-                try:
-                    parsed = urlparse(location)
-                    if parsed.hostname:
-                        return parsed.hostname
-                except Exception:
-                    pass
-
-        if discovery_info.ssdp_usn:
-            usn_lower = discovery_info.ssdp_usn.lower()
-            if "fritz.box" in usn_lower:
-                return "fritz.box"
-
-        _LOGGER.warning("Could not extract host from SSDP discovery info")
-        return None
 
     @staticmethod
     @callback
