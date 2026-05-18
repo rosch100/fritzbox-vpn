@@ -150,6 +150,59 @@ Jede VPN-Switch-Entity bietet folgende Attribute:
   - `"disabled"` - VPN ist deaktiviert
   - `"unknown"` - Status konnte nicht ermittelt werden
 
+## Unterstützte Geräte
+
+**AVM Fritz!Box-Router** mit **WireGuard VPN** in Fritz!OS (z. B. FRITZ!Box 7590, 7530, 6690, 4060 – wenn WireGuard in der Oberfläche verfügbar ist). Repeater werden von dieser Integration nicht per SSDP erkannt.
+
+## Anwendungsfälle
+
+- VPN beim Verlassen des Hauses einschalten, beim Zurückkommen ausschalten
+- Benachrichtigung, wenn eine aktivierte VPN-Verbindung nicht mehr verbunden ist
+- VPN-Status im Dashboard anzeigen (Switch, Status-Sensor, Verbunden-Binärsensor)
+
+## Beispiel-Automation
+
+Benachrichtigung, wenn VPN aktiviert, aber nicht verbunden:
+
+```yaml
+alias: Fritz VPN getrennt
+triggers:
+  - trigger: state
+    entity_id: binary_sensor.fritzbox_vpn_<connection_uid>_connected
+    to: "off"
+conditions:
+  - condition: state
+    entity_id: switch.fritzbox_vpn_<connection_uid>_switch
+    state: "on"
+actions:
+  - action: notify.notify
+    data:
+      message: "VPN {{ states('sensor.fritzbox_vpn_<connection_uid>_status') }} ist nicht verbunden"
+```
+
+`<connection_uid>` durch die UID vom Sensor **Verbindungs-UID** oder aus den Switch-Attributen ersetzen.
+
+## Diagnose
+
+Unter **Einstellungen → Geräte & Dienste → Fritz!Box VPN → ⋮ → Diagnose herunterladen** erhältst du eine JSON-Datei ohne Passwörter: Host, Intervall, Anzahl VPNs, Namen/Status je Verbindung.
+
+## Fehlerbehebung
+
+| Symptom | Prüfen |
+|--------|--------|
+| **Authentifizierung fehlgeschlagen** | Zugangsdaten; TR-064 aktiv; **Erneut anmelden**, wenn angeboten |
+| **Verbindung fehlgeschlagen** | IP/Hostname; Erreichbarkeit von HA; ggf. HTTP statt HTTPS |
+| **Keine VPN-Entitäten** | WireGuard auf der Fritz!Box eingerichtet; Integration neu laden |
+| **Entitäten unavailable** | VPN auf der Box gelöscht – **Unavailable-Entitäten entfernen** in den Optionen |
+| **Entitäts-IDs mit `_2`** | **Entitäts-ID-Suffixe reparieren** in den Optionen |
+
+## Deinstallation
+
+1. **Einstellungen → Geräte & Dienste → Fritz!Box VPN**
+2. Integration öffnen → **Löschen**
+3. Optional verbleibende Entitäten unter **Entitäten** filtern (`fritzbox_vpn`) und entfernen
+4. Bei Bedarf Home Assistant neu starten
+
 ## Voraussetzungen
 
 - AVM FritzBox mit WireGuard VPN-Unterstützung

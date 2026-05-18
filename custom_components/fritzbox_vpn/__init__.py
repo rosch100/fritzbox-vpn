@@ -3,19 +3,13 @@
 import logging
 
 import voluptuous as vol
-from homeassistant.components import persistent_notification
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant, ServiceCall
-from homeassistant.exceptions import ConfigEntryNotReady
+from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 
-from .config_flow import (
-    _get_orphaned_entity_entries,
-    _remove_orphaned_entities_and_clear_known_uids,
-    repair_entity_id_suffixes,
-)
 from .const import (
     CONF_CONFIG_ENTRY_ID,
     DATA_COORDINATOR,
@@ -26,10 +20,14 @@ from .const import (
     NAME_FRITZBOX,
     SERVICE_REMOVE_UNAVAILABLE_ENTITIES,
     SERVICE_REPAIR_ENTITY_ID_SUFFIXES,
-    auth_error_notification_id,
     host_from_config,
 )
 from .coordinator import FritzBoxVPNCoordinator
+from .entity_registry import (
+    get_orphaned_entity_entries,
+    remove_orphaned_entities,
+    repair_entity_id_suffixes,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -61,13 +59,13 @@ def _entry_ids_for_cleanup_service(hass: HomeAssistant, call: ServiceCall) -> li
 async def _async_remove_unavailable_entities(hass: HomeAssistant, call: ServiceCall) -> None:
     """Remove entity and device registry entries for VPN connections no longer on the Fritz!Box."""
     for entry_id in _entry_ids_for_cleanup_service(hass, call):
-        to_remove, err = _get_orphaned_entity_entries(hass, entry_id)
+        to_remove, err = get_orphaned_entity_entries(hass, entry_id)
         if err:
             _LOGGER.warning("remove_unavailable_entities: skip entry %s (%s)", entry_id, err)
             continue
         if not to_remove:
             continue
-        _remove_orphaned_entities_and_clear_known_uids(hass, entry_id, to_remove)
+        remove_orphaned_entities(hass, entry_id, to_remove)
         await hass.config_entries.async_reload(entry_id)
         _LOGGER.info("remove_unavailable_entities: removed %d entities and reloaded entry %s", len(to_remove), entry_id)
 
@@ -83,10 +81,10 @@ async def _async_repair_entity_id_suffixes(hass: HomeAssistant, call: ServiceCal
 
 def _apply_auto_cleanup(hass: HomeAssistant, entry_id: str, current_uids: set[str]) -> None:
     """Clear known_uids for UIDs no longer present; do not remove from registry so entity_id stays stable."""
-    to_remove, err = _get_orphaned_entity_entries(hass, entry_id, current_uids=current_uids)
+    to_remove, err = get_orphaned_entity_entries(hass, entry_id, current_uids=current_uids)
     if err or not to_remove:
         return
-    _remove_orphaned_entities_and_clear_known_uids(
+    remove_orphaned_entities(
         hass, entry_id, to_remove, remove_from_registry=False
     )
     _LOGGER.info(
@@ -171,16 +169,18 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         on_orphaned_removed=lambda eid, cu: _apply_auto_cleanup(hass, eid, cu),
     )
 
-    persistent_notification.dismiss(hass, auth_error_notification_id(host))
-
     try:
         await coordinator.async_config_entry_first_refresh()
         _LOGGER.info("Initial data refresh successful. Found %d VPN connections", len(coordinator.data) if coordinator.data else 0)
     except Exception as err:
         err_lower = str(err).lower()
         if any(ind in err_lower for ind in ERROR_INDICATOR_AUTH):
-            _LOGGER.error("Failed to fetch initial VPN data due to authentication error: %s", err)
-            return False
+            _LOGGER.error(
+                "Failed to fetch initial VPN data due to authentication error: %s", err
+            )
+            raise ConfigEntryAuthFailed(
+                f"Authentication failed for {NAME_FRITZBOX}: {err}"
+            ) from err
 
         _LOGGER.warning("Failed to fetch initial VPN data, retrying later: %s", err)
         raise ConfigEntryNotReady(f"Timeout/Error connecting to {NAME_FRITZBOX}: {err}") from err
@@ -230,8 +230,6 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     if unload_ok:
         coordinator: FritzBoxVPNCoordinator = hass.data[DOMAIN][entry.entry_id][DATA_COORDINATOR]
         await coordinator.fritz_session.async_close()
-
-        persistent_notification.dismiss(hass, auth_error_notification_id(_entry_host(entry)))
 
         hass.data[DOMAIN].pop(entry.entry_id)
 

@@ -1,34 +1,26 @@
 """Sensor platform for FritzBox VPN integration."""
 
-import asyncio
-import logging
 from typing import Any
 
-from homeassistant.components.sensor import SensorEntity
+from homeassistant.components.sensor import SensorDeviceClass, SensorEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.entity import DeviceInfo
+from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import (
-    API_KEY_NAME,
     API_KEY_UID,
     DATA_COORDINATOR,
     DATA_KNOWN_UIDS_SENSOR,
     DATA_LOCK_ADD_ENTITIES_SENSOR,
-    DEFAULT_NAME_UNKNOWN,
     DOMAIN,
-    MANUFACTURER_AVM,
-    MODEL_WIREGUARD_VPN,
-    UNIQUE_ID_PREFIX,
     UNIQUE_ID_SUFFIX_STATUS,
     UNIQUE_ID_SUFFIX_UID,
     UNIQUE_ID_SUFFIX_VPN_UID,
+    VPN_STATUS_OPTIONS,
 )
 from .coordinator import FritzBoxVPNCoordinator
-
-_LOGGER = logging.getLogger(__name__)
+from .entity import FritzBoxVPNEntity, setup_vpn_platform
 
 
 async def async_setup_entry(
@@ -36,17 +28,15 @@ async def async_setup_entry(
     entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    """Set up FritzBox VPN sensor entities. Adds new entities when new VPN connections appear."""
-    coordinator: FritzBoxVPNCoordinator = hass.data[DOMAIN][entry.entry_id][DATA_COORDINATOR]
-    known_uids: set = hass.data[DOMAIN][entry.entry_id].setdefault(
-        DATA_KNOWN_UIDS_SENSOR, set()
-    )
+    """Set up FritzBox VPN sensor entities."""
+    coordinator: FritzBoxVPNCoordinator = hass.data[DOMAIN][entry.entry_id][
+        DATA_COORDINATOR
+    ]
 
-    def _create_sensor_entities(uids: set[str]):
-        """Create status/uid/vpn_uid sensors for UIDs present in coordinator.data."""
+    def _create_entities(uids: set[str]) -> list[SensorEntity]:
         if not coordinator.data:
             return []
-        entities = []
+        entities: list[SensorEntity] = []
         for uid in uids:
             if uid not in coordinator.data:
                 continue
@@ -56,43 +46,18 @@ async def async_setup_entry(
             entities.append(FritzBoxVPNVPNUIDSensor(coordinator, entry, uid, conn))
         return entities
 
-    if coordinator.data:
-        initial_uids = set(coordinator.data.keys())
-        known_uids.update(initial_uids)
-        entities = _create_sensor_entities(initial_uids)
-        _LOGGER.info("Found %d VPN connections, creating %d sensor entities", len(initial_uids), len(entities))
-    else:
-        entities = []
-        _LOGGER.warning("No VPN connections found in coordinator data")
-
-    async_add_entities(entities, update_before_add=True)
-
-    async def _add_new_sensor_entities() -> None:
-        lock = hass.data[DOMAIN][entry.entry_id].setdefault(
-            DATA_LOCK_ADD_ENTITIES_SENSOR, asyncio.Lock()
-        )
-        async with lock:
-            current = set(coordinator.data.keys()) if coordinator.data else set()
-            new_uids = current - known_uids
-            if not new_uids:
-                return
-            new_entities = _create_sensor_entities(new_uids)
-            if not new_entities:
-                return
-            known_uids.update(new_uids)
-            async_add_entities(new_entities)
-            _LOGGER.info(
-                "New VPN connection(s) detected, added %d sensor entities",
-                len(new_entities),
-            )
-
-    def _on_coordinator_update() -> None:
-        hass.async_create_task(_add_new_sensor_entities())
-
-    entry.async_on_unload(coordinator.async_add_listener(_on_coordinator_update))
+    await setup_vpn_platform(
+        hass,
+        entry,
+        async_add_entities,
+        platform_label="sensor",
+        known_uids_key=DATA_KNOWN_UIDS_SENSOR,
+        lock_key=DATA_LOCK_ADD_ENTITIES_SENSOR,
+        create_entities=_create_entities,
+    )
 
 
-class FritzBoxVPNStatusSensor(CoordinatorEntity, SensorEntity):
+class FritzBoxVPNStatusSensor(FritzBoxVPNEntity, SensorEntity):
     """Sensor entity for VPN connection status (textual)."""
 
     def __init__(
@@ -102,42 +67,24 @@ class FritzBoxVPNStatusSensor(CoordinatorEntity, SensorEntity):
         connection_uid: str,
         connection_data: dict[str, Any],
     ) -> None:
-        super().__init__(coordinator)
-        self._entry = entry
-        self._connection_uid = connection_uid
-        self._connection_data = connection_data
-        vpn_name = connection_data.get(API_KEY_NAME, DEFAULT_NAME_UNKNOWN)
-        self._attr_unique_id = f"{UNIQUE_ID_PREFIX}{connection_uid}_{UNIQUE_ID_SUFFIX_STATUS}"
-        self._attr_name = "Status"
-        self._attr_icon = "mdi:information"
-        self._attr_has_entity_name = True
-        self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, entry.entry_id, connection_uid)},
-            name=vpn_name,
-            manufacturer=MANUFACTURER_AVM,
-            model=MODEL_WIREGUARD_VPN,
-            via_device=(DOMAIN, entry.entry_id),
+        super().__init__(
+            coordinator,
+            entry,
+            connection_uid,
+            connection_data,
+            unique_id_suffix=UNIQUE_ID_SUFFIX_STATUS,
         )
-
-    @property
-    def available(self) -> bool:
-        """True if coordinator has valid data and this connection is present."""
-        if not self.coordinator.last_update_success or not self.coordinator.data:
-            return False
-        return self._connection_uid in self.coordinator.data
+        self._attr_translation_key = "status"
+        self._attr_device_class = SensorDeviceClass.ENUM
+        self._attr_options = list(VPN_STATUS_OPTIONS)
 
     @property
     def native_value(self) -> str:
         """Status as text."""
         return self.coordinator.get_vpn_status(self._connection_uid)
 
-    @property
-    def native_unit_of_measurement(self) -> str | None:
-        """Unit of measurement (none for status text)."""
-        return None
 
-
-class FritzBoxVPNUIDSensor(CoordinatorEntity, SensorEntity):
+class FritzBoxVPNUIDSensor(FritzBoxVPNEntity, SensorEntity):
     """Sensor entity for VPN connection UID."""
 
     _attr_entity_registry_enabled_default = False
@@ -149,42 +96,23 @@ class FritzBoxVPNUIDSensor(CoordinatorEntity, SensorEntity):
         connection_uid: str,
         connection_data: dict[str, Any],
     ) -> None:
-        super().__init__(coordinator)
-        self._entry = entry
-        self._connection_uid = connection_uid
-        self._connection_data = connection_data
-        vpn_name = connection_data.get(API_KEY_NAME, DEFAULT_NAME_UNKNOWN)
-        self._attr_unique_id = f"{UNIQUE_ID_PREFIX}{connection_uid}_{UNIQUE_ID_SUFFIX_UID}"
-        self._attr_name = "UID"
-        self._attr_icon = "mdi:identifier"
-        self._attr_has_entity_name = True
-        self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, entry.entry_id, connection_uid)},
-            name=vpn_name,
-            manufacturer=MANUFACTURER_AVM,
-            model=MODEL_WIREGUARD_VPN,
-            via_device=(DOMAIN, entry.entry_id),
+        super().__init__(
+            coordinator,
+            entry,
+            connection_uid,
+            connection_data,
+            unique_id_suffix=UNIQUE_ID_SUFFIX_UID,
         )
-
-    @property
-    def available(self) -> bool:
-        """True if coordinator has valid data and this connection is present."""
-        if not self.coordinator.last_update_success or not self.coordinator.data:
-            return False
-        return self._connection_uid in self.coordinator.data
+        self._attr_translation_key = "connection_uid"
+        self._attr_entity_category = EntityCategory.DIAGNOSTIC
 
     @property
     def native_value(self) -> str:
         """Connection UID."""
         return self._connection_uid
 
-    @property
-    def native_unit_of_measurement(self) -> str | None:
-        """Unit of measurement (none for identifier)."""
-        return None
 
-
-class FritzBoxVPNVPNUIDSensor(CoordinatorEntity, SensorEntity):
+class FritzBoxVPNVPNUIDSensor(FritzBoxVPNEntity, SensorEntity):
     """Sensor entity for VPN internal UID."""
 
     _attr_entity_registry_enabled_default = False
@@ -196,38 +124,20 @@ class FritzBoxVPNVPNUIDSensor(CoordinatorEntity, SensorEntity):
         connection_uid: str,
         connection_data: dict[str, Any],
     ) -> None:
-        super().__init__(coordinator)
-        self._entry = entry
-        self._connection_uid = connection_uid
-        self._connection_data = connection_data
-        vpn_name = connection_data.get(API_KEY_NAME, DEFAULT_NAME_UNKNOWN)
-        self._attr_unique_id = f"{UNIQUE_ID_PREFIX}{connection_uid}_{UNIQUE_ID_SUFFIX_VPN_UID}"
-        self._attr_name = "VPN UID"
-        self._attr_icon = "mdi:identifier"
-        self._attr_has_entity_name = True
-        self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, entry.entry_id, connection_uid)},
-            name=vpn_name,
-            manufacturer=MANUFACTURER_AVM,
-            model=MODEL_WIREGUARD_VPN,
-            via_device=(DOMAIN, entry.entry_id),
+        super().__init__(
+            coordinator,
+            entry,
+            connection_uid,
+            connection_data,
+            unique_id_suffix=UNIQUE_ID_SUFFIX_VPN_UID,
         )
-
-    @property
-    def available(self) -> bool:
-        """True if coordinator has valid data and this connection is present."""
-        if not self.coordinator.last_update_success or not self.coordinator.data:
-            return False
-        return self._connection_uid in self.coordinator.data
+        self._attr_translation_key = "vpn_uid"
+        self._attr_entity_category = EntityCategory.DIAGNOSTIC
 
     @property
     def native_value(self) -> str:
         """VPN UID."""
-        if self.coordinator.data and self._connection_uid in self.coordinator.data:
-            return self.coordinator.data[self._connection_uid].get(API_KEY_UID, '')
-        return ''
-
-    @property
-    def native_unit_of_measurement(self) -> str | None:
-        """Unit of measurement (none for VPN UID)."""
-        return None
+        conn = self._vpn_connection()
+        if conn is None:
+            return ""
+        return str(conn.get(API_KEY_UID, ""))

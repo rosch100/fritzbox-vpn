@@ -1,6 +1,6 @@
 [project]
 name = "fritzbox-vpn"
-version = "1.0.2"
+version = "1.2.0"
 description = "Home Assistant custom integration for Fritz!Box VPN"
 readme = "README.md"
 requires-python = ">=3.11"

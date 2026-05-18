@@ -13,6 +13,10 @@
       "confirm": {
         "title": "Fritz!Box VPN gefunden",
         "description": "Eine FritzBox wurde automatisch gefunden: {host}. Bitte bestätigen Sie die Konfiguration."
+      },
+      "reauth_confirm": {
+        "title": "Fritz!Box VPN erneut anmelden",
+        "description": "Die Anmeldung für {host} ist fehlgeschlagen. Bitte gültige Zugangsdaten eingeben."
       }
     },
     "error": {
@@ -39,7 +43,7 @@
       },
       "configure": {
         "title": "Fritz!Box VPN konfigurieren",
-        "description": "Aktualisieren Sie die FritzBox-Verbindungsdaten. Das Passwort-Feld wird aus Sicherheitsgründen nicht angezeigt. Lassen Sie es leer, um das aktuelle Passwort beizubehalten, oder geben Sie ein neues Passwort ein, um es zu ändern.",
+        "description": "Aktualisieren Sie die FritzBox-Verbindungsdaten. Das Passwort-Feld wird aus Sicherheitsgründen nicht angezeigt. Lassen Sie es leer, um das aktuelles Passwort beizubehalten, oder geben Sie ein neues Passwort ein, um es zu ändern.",
         "data": {
           "host": "FritzBox IP-Adresse",
           "username": "Benutzername",
@@ -72,6 +76,40 @@
       "coordinator_not_ready": "Daten werden noch geladen. Bitte kurz warten und erneut versuchen."
     }
   },
+  "entity": {
+    "switch": {
+      "vpn": {
+        "name": "VPN"
+      }
+    },
+    "binary_sensor": {
+      "connected": {
+        "name": "Verbunden"
+      }
+    },
+    "sensor": {
+      "status": {
+        "name": "Status",
+        "state": {
+          "connected": "Verbunden",
+          "enabled": "Aktiviert",
+          "disabled": "Deaktiviert",
+          "unknown": "Unbekannt"
+        }
+      },
+      "connection_uid": {
+        "name": "Verbindungs-UID"
+      },
+      "vpn_uid": {
+        "name": "VPN-UID"
+      }
+    }
+  },
+  "exceptions": {
+    "toggle_failed": {
+      "message": "VPN-Verbindung {name} konnte nicht geändert werden.{error}"
+    }
+  },
   "services": {
     "remove_unavailable_entities": {
       "name": "Nicht verfügbare Entitäten entfernen",
@@ -93,11 +131,5 @@
         }
       }
     }
-  },
-  "common": {
-    "auth_error_notification_title": "Fritz!Box VPN: Authentifizierungsfehler",
-    "auth_error_notification_message": "Die Fritz!Box VPN Integration kann nicht auf die Fritz!Box zugreifen.\n\n**Host:** {host}\n\n**Fehler:** {error}\n\n**Mögliche Ursachen:**\n- Das Fritz!Box Passwort wurde geändert\n- Der Benutzername ist falsch\n- Die Fritz!Box ist nicht erreichbar\n\nBitte überprüfen Sie die Konfiguration der Integration und aktualisieren Sie die Zugangsdaten falls nötig.{config_link}",
-    "auth_error_notification_config_link": "**→ [Zur Konfiguration öffnen]({url})**\n\n*{hint}*",
-    "auth_error_notification_config_hint": "Gehen Sie zu Einstellungen > Geräte & Dienste und suchen Sie nach \"{title}\""
   }
 }

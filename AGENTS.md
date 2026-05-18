@@ -19,13 +19,17 @@ Home-Assistant-Custom-Integration für WireGuard-VPN auf AVM Fritz!Box.
 - **Keine stillen Fallbacks:** Fehlende Discovery-Daten explizit behandeln (Abort/Fehler), keine Dummy-`unique_id`.
 - **Home Assistant:** Mindestversion in `hacs.json` und `manifest.json` (2026.1.0); Tests: `scripts/requirements-test.txt`.
 
+## Quality Scale
+
+Ziel: **Gold** (siehe `custom_components/fritzbox_vpn/quality_scale.yaml`): Reauth, Diagnostics, Übersetzungen, **≥85 % Test-Coverage** (`pytest --cov`). Offizielles Badge erst nach Aufnahme in Home Assistant Core.
+
 ## Tests lokal
 
 ```bash
 python3 -m venv .venv
 .venv/bin/pip install -r scripts/requirements-test.txt
 .venv/bin/ruff check custom_components tests
-.venv/bin/pytest tests/ --cov -q
+.venv/bin/pytest tests/ --cov=custom_components/fritzbox_vpn -q
 ```
 
 `tests/conftest.py` setzt `hass_config_dir` auf das Repo-Root und aktiviert Custom Integrations.

@@ -191,6 +191,44 @@ def test_is_fritzbox_router_discovery_rejects_non_igd_non_fritzbox_name() -> Non
     assert is_fritzbox_router_discovery(discovery) is False
 
 
+def test_host_from_ssdp_skips_invalid_ssdp_location() -> None:
+    """Malformed ssdp_location is ignored."""
+    discovery = SsdpServiceInfo(
+        ssdp_st="urn:schemas-upnp-org:device:InternetGatewayDevice:1",
+        ssdp_usn=MOCK_USN,
+        ssdp_location="://not-valid",
+        ssdp_server="AVM FRITZ!Box 7530",
+        upnp={ATTR_UPNP_FRIENDLY_NAME: "FRITZ!Box", ATTR_UPNP_UDN: MOCK_UDN},
+    )
+    assert host_from_ssdp(discovery) is None
+
+
+def test_host_from_ssdp_skips_invalid_location_header() -> None:
+    """Malformed location header is ignored without raising."""
+    discovery = SsdpServiceInfo(
+        ssdp_st="urn:schemas-upnp-org:device:InternetGatewayDevice:1",
+        ssdp_usn=MOCK_USN,
+        ssdp_location=None,
+        ssdp_server="AVM FRITZ!Box 7530",
+        ssdp_headers={"location": "://not-a-valid-url"},
+        upnp={ATTR_UPNP_FRIENDLY_NAME: "FRITZ!Box", ATTR_UPNP_UDN: MOCK_UDN},
+    )
+    assert host_from_ssdp(discovery) is None
+
+
+def test_host_from_ssdp_uses_valid_location_header() -> None:
+    """Host can be parsed from SSDP headers when location is absent."""
+    discovery = SsdpServiceInfo(
+        ssdp_st="urn:schemas-upnp-org:device:InternetGatewayDevice:1",
+        ssdp_usn=MOCK_USN,
+        ssdp_location=None,
+        ssdp_server="AVM FRITZ!Box 7530",
+        ssdp_headers={"location": f"https://{MOCK_HOST}:49000/"},
+        upnp={ATTR_UPNP_FRIENDLY_NAME: "FRITZ!Box", ATTR_UPNP_UDN: MOCK_UDN},
+    )
+    assert host_from_ssdp(discovery) == MOCK_HOST
+
+
 def test_is_fritzbox_router_discovery_includes_headers() -> None:
     discovery = SsdpServiceInfo(
         ssdp_st="urn:schemas-upnp-org:device:InternetGatewayDevice:1",

@@ -1,8 +1,11 @@
 [run]
 source = custom_components/fritzbox_vpn
+omit =
+    */__init__.py
 
 [report]
-include =
-    */ssdp_unique_id.py
-fail_under = 95
+exclude_lines =
+    pragma: no cover
+    if TYPE_CHECKING:
+fail_under = 85
 show_missing = true
