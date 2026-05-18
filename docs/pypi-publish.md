@@ -11,18 +11,38 @@ Before a release, set the library version in `fritzboxvpn/pyproject.toml` and th
 
 Integration version (`manifest.json` `"version"`) and library version (`pyproject.toml`) are independent; only the **library** version is uploaded to PyPI.
 
-## 2. Trusted publishing (recommended)
+## 2. Authentication (choose one)
 
-1. Register the project on [PyPI](https://pypi.org/) as `fritzboxvpn` (if not already).
-2. PyPI → **Publishing** → **Add a new pending publisher**:
-   - PyPI project name: `fritzboxvpn`
-   - Owner: `rosch100`
-   - Repository: `fritzbox-vpn`
-   - Workflow name: `publish-pypi.yml`
-   - Environment name: `pypi`
-3. GitHub → repository **Settings** → **Environments** → create **`pypi`** (optional: required reviewers for manual runs only).
+### Option A — Trusted publishing (recommended)
 
-On tag push (e.g. `v1.2.0`) or **Actions → Publish fritzboxvpn to PyPI → Run workflow** (confirm with `publish`), the workflow builds and uploads `fritzboxvpn/dist/*`.
+1. Log in at [pypi.org](https://pypi.org/).
+2. Open **[Account → Publishing](https://pypi.org/manage/account/publishing/)**.
+3. **Add a new pending publisher** (works before the project exists):
+
+   | Field | Value |
+   |--------|--------|
+   | PyPI project name | `fritzboxvpn` |
+   | Owner | `rosch100` |
+   | Repository name | `fritzbox-vpn` |
+   | Workflow name | `publish-pypi.yml` |
+   | Environment name | `pypi` |
+
+   Names must match **exactly** (case-sensitive). The GitHub environment `pypi` already exists in this repo.
+
+4. Run **Actions → Publish fritzboxvpn to PyPI → Run workflow** with `confirm=publish`, or push a tag `v*`.
+
+On first successful upload, PyPI creates the project and activates the publisher.
+
+### Option B — API token (quick alternative)
+
+1. PyPI → **Account settings → API tokens** → create a token scoped to `fritzboxvpn` (or entire account for first upload).
+2. GitHub → **Settings → Environments → pypi → Environment secrets** → add:
+
+   | Name | Value |
+   |------|--------|
+   | `PYPI_API_TOKEN` | `pypi-…` (the token; username is always `__token__`) |
+
+3. Re-run the publish workflow. When `PYPI_API_TOKEN` is set, the workflow uses the token instead of OIDC.
 
 ## 3. Manual publish (local)
 
@@ -31,7 +51,7 @@ cd fritzboxvpn
 python -m pip install --upgrade build twine
 python -m build
 twine check dist/*
-twine upload dist/*   # needs PyPI token or trusted environment
+TWINE_USERNAME=__token__ TWINE_PASSWORD=pypi-… twine upload dist/*
 ```
 
 ## 4. Verify
@@ -43,8 +63,23 @@ python -m pip install "fritzboxvpn==1.0.0"
 
 ## Troubleshooting
 
-| Issue | Action |
-|--------|--------|
-| **403 / invalid token** | Check trusted publisher owner/repo/workflow/environment names match exactly |
-| **File already exists** | Bump `version` in `fritzboxvpn/pyproject.toml`; PyPI versions are immutable |
-| **Core CI cannot install** | Ensure published version matches `manifest.json` `requirements` pin |
+| Error | Cause | Fix |
+|--------|--------|-----|
+| `invalid-publisher`: no corresponding publisher | Trusted publisher not configured on PyPI | Complete [Option A](#option-a--trusted-publishing-recommended) |
+| `invalid-publisher` but publisher looks correct | Typo in repo/workflow/environment name | Compare with workflow log claims (`repository`, `workflow_ref`, `environment`) |
+| **403 / invalid token** | Wrong or missing API token | [Option B](#option-b--api-token-quick-alternative) |
+| **File already exists** | Version already on PyPI | Bump `version` in `fritzboxvpn/pyproject.toml` |
+| **Core CI cannot install** | Pin mismatch | Published version must match `manifest.json` `requirements` |
+
+### Claims from a failed run (for debugging)
+
+If trusted publishing fails, the workflow log lists OIDC claims, e.g.:
+
+```
+sub: repo:rosch100/fritzbox-vpn:environment:pypi
+repository: rosch100/fritzbox-vpn
+workflow_ref: rosch100/fritzbox-vpn/.github/workflows/publish-pypi.yml@refs/heads/main
+environment: pypi
+```
+
+Use these values when configuring the pending publisher on PyPI.
