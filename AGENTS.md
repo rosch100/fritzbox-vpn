@@ -50,7 +50,7 @@ python3 -m venv .venv
 
 PR-Checks heißen: `Ruff`, `pytest`, `HACS validate`, `hassfest`.
 
-**Pflicht-Checks auf `main`:** Ruleset „Required CI checks“ (aktiv) – `Ruff`, `pytest`, `HACS validate`, `hassfest` müssen grün sein.
+**Geschütztes `main`:** Ruleset „Required CI checks“ – Änderungen nur per **Pull Request**; vor Merge müssen `Ruff`, `pytest`, `HACS validate`, `hassfest` grün sein.
 
 ## Verwandtes Core-PR
 
