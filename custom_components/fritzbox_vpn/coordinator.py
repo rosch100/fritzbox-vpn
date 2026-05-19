@@ -40,12 +40,16 @@ _LOGGER = logging.getLogger(__name__)
 
 def normalize_update_interval(value: Any) -> int:
     """Update interval as int in valid range. SSOT for parsing."""
+
     def clamp(n: int) -> int:
         if UPDATE_INTERVAL_MIN <= n <= UPDATE_INTERVAL_MAX:
             return n
         _LOGGER.warning(
-            "update_interval %d out of range (%d–%d), using default %s",
-            n, UPDATE_INTERVAL_MIN, UPDATE_INTERVAL_MAX, DEFAULT_UPDATE_INTERVAL,
+            "Update interval %d out of range (%d–%d), using default %s",
+            n,
+            UPDATE_INTERVAL_MIN,
+            UPDATE_INTERVAL_MAX,
+            DEFAULT_UPDATE_INTERVAL,
         )
         return DEFAULT_UPDATE_INTERVAL
 
@@ -175,7 +179,9 @@ class FritzBoxVPNCoordinator(DataUpdateCoordinator):
         except Exception as err:
             if self._is_auth_error(err):
                 self._schedule_reauth()
-                raise UpdateFailed(f"Unexpected error fetching VPN data: {err}") from err
+                raise UpdateFailed(
+                    f"Unexpected error fetching VPN data: {err}"
+                ) from err
             _LOGGER.exception("Unexpected error fetching VPN data")
             raise UpdateFailed(
                 f"Unexpected error fetching VPN data: {err}",

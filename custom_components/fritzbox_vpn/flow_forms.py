@@ -59,7 +59,12 @@ def validate_host(host: str) -> str:
     if not all(c.isalnum() or c in (".", "-") for c in host):
         raise vol.Invalid("Invalid hostname format")
 
-    if host.startswith(".") or host.endswith(".") or host.startswith("-") or host.endswith("-"):
+    if (
+        host.startswith(".")
+        or host.endswith(".")
+        or host.startswith("-")
+        or host.endswith("-")
+    ):
         raise vol.Invalid("Hostname cannot start or end with dot or hyphen")
 
     return host
@@ -120,7 +125,7 @@ def configure_schema(
         host_default = validate_host(host_default)
     except vol.Invalid:
         _LOGGER.warning(
-            "Invalid host in config entry for options form. Falling back to default host.",
+            "Invalid host in config entry for options form. Falling back to default host",
         )
         host_default = DEFAULT_HOST
     default_update_interval = normalize_update_interval(
@@ -131,7 +136,9 @@ def configure_schema(
             vol.Required(CONF_HOST, default=host_default): str,
             vol.Required(CONF_USERNAME, default=username_default): str,
             vol.Optional(CONF_PASSWORD, default=""): str,
-            vol.Required(CONF_UPDATE_INTERVAL, default=default_update_interval): vol.All(
+            vol.Required(
+                CONF_UPDATE_INTERVAL, default=default_update_interval
+            ): vol.All(
                 vol.Coerce(int),
                 vol.Range(min=UPDATE_INTERVAL_MIN, max=UPDATE_INTERVAL_MAX),
             ),
