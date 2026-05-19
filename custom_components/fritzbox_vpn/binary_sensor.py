@@ -15,6 +15,8 @@ from .coordinator import FritzBoxVPNCoordinator
 from .entity import FritzBoxVPNEntity, setup_vpn_platform
 from .models import FritzboxVpnConfigEntry
 
+PARALLEL_UPDATES = 1
+
 
 async def async_setup_entry(
     hass: HomeAssistant,
@@ -29,7 +31,9 @@ async def async_setup_entry(
         if not coordinator.data:
             return []
         return [
-            FritzBoxVPNConnectedBinarySensor(coordinator, entry, uid, coordinator.data[uid])
+            FritzBoxVPNConnectedBinarySensor(
+                coordinator, entry, uid, coordinator.data[uid]
+            )
             for uid in uids
             if uid in coordinator.data
         ]

@@ -84,8 +84,9 @@ async def _try_create_entry_from_credentials(
     except Exception as err:
         set_validation_error(errors, err, log_unknown_details=log_unknown_details)
         return None
-    await flow.async_set_unique_id(unique_id or user_input.get(CONF_HOST))
-    flow._abort_if_unique_id_configured()
+    if unique_id is not None:
+        await flow.async_set_unique_id(unique_id)
+        flow._abort_if_unique_id_configured()
     return flow.async_create_entry(title=info["title"], data=user_input)
 
 
@@ -113,9 +114,6 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 if has_host and has_username and has_password:
                     try:
                         info = await validate_input(self.hass, self._existing_config)
-                        host = self._existing_config.get(CONF_HOST)
-                        await self.async_set_unique_id(host)
-                        self._abort_if_unique_id_configured()
                         return self.async_create_entry(
                             title=info["title"], data=self._existing_config
                         )
@@ -137,7 +135,9 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         )
                         errors["base"] = ERROR_KEY_UNKNOWN
             schema = credentials_schema(*credentials_defaults(self._existing_config))
-            return self.async_show_form(step_id="user", data_schema=schema, errors=errors)
+            return self.async_show_form(
+                step_id="user", data_schema=schema, errors=errors
+            )
 
         result = await _try_create_entry_from_credentials(
             self,
@@ -145,7 +145,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             user_input,
             errors,
             password_sources=(self._existing_config,),
-            unique_id=user_input.get(CONF_HOST),
+            unique_id=None,
             log_unknown_details=True,
         )
         if result is not None:
@@ -189,8 +189,12 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         if user_input is None:
             return self.async_show_form(
                 step_id="confirm",
-                data_schema=confirm_schema(self._existing_config, self._discovered_host),
-                description_placeholders={"host": self._discovered_host or DEFAULT_HOST},
+                data_schema=confirm_schema(
+                    self._existing_config, self._discovered_host
+                ),
+                description_placeholders={
+                    "host": self._discovered_host or DEFAULT_HOST
+                },
             )
 
         result = await _try_create_entry_from_credentials(
@@ -214,9 +218,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             errors=errors,
         )
 
-    async def async_step_reauth(
-        self, entry_data: Mapping[str, Any]
-    ) -> FlowResult:
+    async def async_step_reauth(self, entry_data: Mapping[str, Any]) -> FlowResult:
         """Handle reauthentication after invalid credentials."""
         return await self.async_step_reauth_confirm()
 
@@ -259,9 +261,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         return self.async_show_form(
             step_id="reauth_confirm",
-            data_schema=reauth_schema(
-                user_input.get(CONF_USERNAME, username_default)
-            ),
+            data_schema=reauth_schema(user_input.get(CONF_USERNAME, username_default)),
             description_placeholders={"host": host},
             errors=errors,
         )
