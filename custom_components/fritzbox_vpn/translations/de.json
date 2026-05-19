@@ -8,6 +8,11 @@
           "host": "FritzBox IP-Adresse",
           "username": "Benutzername",
           "password": "Passwort"
+        },
+        "data_description": {
+          "host": "FritzBox IP-Adresse oder Hostname",
+          "password": "Passwort zur Authentifizierung gegen die FritzBox",
+          "username": "Benutzername zur Authentifizierung gegen die FritzBox"
         }
       },
       "confirm": {
@@ -16,7 +21,31 @@
       },
       "reauth_confirm": {
         "title": "Fritz!Box VPN erneut anmelden",
-        "description": "Die Anmeldung für {host} ist fehlgeschlagen. Bitte gültige Zugangsdaten eingeben."
+        "description": "Die Anmeldung für {host} ist fehlgeschlagen. Bitte gültige Zugangsdaten eingeben.",
+        "data": {
+          "username": "Benutzername",
+          "password": "Passwort"
+        },
+        "data_description": {
+          "username": "Benutzername zur Authentifizierung gegen die FritzBox",
+          "password": "Passwort zur Authentifizierung gegen die FritzBox"
+        }
+      },
+      "reconfigure": {
+        "title": "Fritz!Box VPN neu konfigurieren",
+        "description": "Aktualisieren Sie die FritzBox-Verbindungsdaten. Das Passwort-Feld wird aus Sicherheitsgründen nicht angezeigt. Lassen Sie es leer, um das aktuelle Passwort beizubehalten, oder geben Sie ein neues Passwort ein, um es zu ändern.",
+        "data": {
+          "host": "FritzBox IP-Adresse",
+          "username": "Benutzername",
+          "password": "Passwort (leer lassen, um das aktuelle Passwort beizubehalten)",
+          "update_interval": "Update-Intervall (Sekunden, 5–3600, max. 1 h)"
+        },
+        "data_description": {
+          "host": "FritzBox IP-Adresse oder Hostname",
+          "password": "Passwort zur Authentifizierung gegen die FritzBox",
+          "update_interval": "Update-Intervall in Sekunden",
+          "username": "Benutzername zur Authentifizierung gegen die FritzBox"
+        }
       }
     },
     "error": {
@@ -29,7 +58,9 @@
     "abort": {
       "already_configured": "Diese FritzBox ist bereits konfiguriert.",
       "not_fritzbox": "Das gefundene Gerät ist keine FritzBox.",
-      "no_host": "Die IP-Adresse konnte nicht ermittelt werden."
+      "no_host": "Die IP-Adresse konnte nicht ermittelt werden.",
+      "reauth_successful": "[%key:common::config_flow::abort::reauth_successful%]",
+      "reconfigure_successful": "[%key:common::config_flow::abort::reconfigure_successful%]"
     }
   },
   "options": {
@@ -39,6 +70,9 @@
         "description": "Wählen Sie eine Aktion.",
         "data": {
           "action": "Aktion"
+        },
+        "data_description": {
+          "action": "Auszuführende Aktion"
         }
       },
       "configure": {
@@ -49,6 +83,12 @@
           "username": "Benutzername",
           "password": "Passwort (leer lassen, um aktuelles Passwort beizubehalten)",
           "update_interval": "Update-Intervall (Sekunden, 5–3600, max. 1 h)"
+        },
+        "data_description": {
+          "host": "FritzBox IP-Adresse oder Hostname",
+          "password": "Passwort zur Authentifizierung gegen die FritzBox",
+          "update_interval": "Update-Intervall in Sekunden",
+          "username": "Benutzername zur Authentifizierung gegen die FritzBox"
         }
       },
       "cleanup_confirm": {
@@ -56,6 +96,9 @@
         "description": "Entitäten, die zu VPN-Verbindungen gehören, die auf der Fritz!Box nicht mehr existieren, werden aus der Entity-Registry entfernt. Setzen Sie das Häkchen und senden Sie ab, um sie zu löschen und die Integration neu zu laden.",
         "data": {
           "confirm": "Entitäten entfernen und Integration neu laden"
+        },
+        "data_description": {
+          "confirm": "Haken setzen, um die Entfernung zu bestätigen und neu zu laden"
         }
       },
       "repair_entity_ids_confirm": {
@@ -63,6 +106,9 @@
         "description": "Entitäts-IDs mit Suffix _2, _3, _4 (z. B. nach fehlerhafter Deaktivierung) werden wieder auf die Basis-ID umgestellt. Der verwaiste Basis-Eintrag wird entfernt. Nach der Reparatur wird die Integration neu geladen.",
         "data": {
           "confirm": "Entitäts-IDs reparieren und Integration neu laden"
+        },
+        "data_description": {
+          "confirm": "Haken setzen, um das Reparieren der Entitäts-IDs und neu zu laden zu bestätigen"
         }
       }
     },
@@ -107,27 +153,35 @@
   },
   "exceptions": {
     "toggle_failed": {
-      "message": "VPN-Verbindung {name} konnte nicht geändert werden.{error}"
+      "message": "VPN-Verbindung {name} konnte nicht geändert werden{error}"
     }
   },
   "services": {
     "remove_unavailable_entities": {
       "name": "Nicht verfügbare Entitäten entfernen",
-      "description": "Entitäten löschen, deren VPN-Verbindung auf der Fritz!Box nicht mehr existiert; Integration anschließend neu laden. Optional: config_entry_id auf eine bestimmte Integration begrenzen.",
+      "description": "Entitäten löschen, deren VPN-Verbindung auf der Fritz!Box nicht mehr existiert; Integration anschließend neu laden.",
       "fields": {
+        "target": {
+          "name": "Ziel (target)",
+          "description": "Ziel-Entitäten für diese Integration (`fritzbox_vpn`)."
+        },
         "config_entry_id": {
           "name": "Config-Entry-ID",
-          "description": "Optional. Nur diese Integration bereinigen (ID z. B. aus der URL bei Optionen). Ohne Angabe: alle Fritz!Box-VPN-Integrationen."
+          "description": "Optional. Bereinigung nur für diesen Konfigurationseintrag. Ohne Angabe: alle Fritz!Box-VPN-Integrationen."
         }
       }
     },
     "repair_entity_id_suffixes": {
       "name": "Entitäts-ID-Suffixe reparieren",
-      "description": "Entitäts-IDs mit Suffix _2, _3, _4 (z. B. nach fehlerhafter Deaktivierung) auf die Basis-ID zurücksetzen. Verwaisten Basis-Eintrag entfernen. Optional: config_entry_id auf eine Integration begrenzen.",
+      "description": "Entitäts-IDs mit Suffix _2, _3, _4 (z. B. nach fehlerhafter Deaktivierung) auf die Basis-ID zurücksetzen. Verwaisten Basis-Eintrag entfernen.",
       "fields": {
+        "target": {
+          "name": "Ziel (target)",
+          "description": "Ziel-Entitäten für diese Integration (`fritzbox_vpn`)."
+        },
         "config_entry_id": {
           "name": "Config-Entry-ID",
-          "description": "Optional. Reparatur auf diese Integration beschränken. Ohne Angabe: alle Fritz!Box-VPN-Integrationen."
+          "description": "Optional. Reparatur nur für diesen Konfigurationseintrag. Ohne Angabe: alle Fritz!Box-VPN-Integrationen."
         }
       }
     }

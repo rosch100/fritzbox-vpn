@@ -1,5 +1,6 @@
 """DataUpdateCoordinator for FritzBox VPN integration."""
 
+import inspect
 import logging
 from collections.abc import Callable
 from datetime import timedelta
@@ -40,12 +41,16 @@ _LOGGER = logging.getLogger(__name__)
 
 def normalize_update_interval(value: Any) -> int:
     """Update interval as int in valid range. SSOT for parsing."""
+
     def clamp(n: int) -> int:
         if UPDATE_INTERVAL_MIN <= n <= UPDATE_INTERVAL_MAX:
             return n
         _LOGGER.warning(
-            "update_interval %d out of range (%d–%d), using default %s",
-            n, UPDATE_INTERVAL_MIN, UPDATE_INTERVAL_MAX, DEFAULT_UPDATE_INTERVAL,
+            "Update interval %d out of range (%d–%d), using default %s",
+            n,
+            UPDATE_INTERVAL_MIN,
+            UPDATE_INTERVAL_MAX,
+            DEFAULT_UPDATE_INTERVAL,
         )
         return DEFAULT_UPDATE_INTERVAL
 
@@ -134,7 +139,13 @@ class FritzBoxVPNCoordinator(DataUpdateCoordinator):
         _LOGGER.warning(
             "Authentication failed; starting reauth flow for entry %s", self.entry_id
         )
-        self.hass.async_create_task(entry.async_start_reauth(self.hass))
+        self.hass.async_create_task(self._async_start_reauth(entry))
+
+    async def _async_start_reauth(self, entry: Any) -> None:
+        """Start re-authentication flow for an entry."""
+        result = entry.async_start_reauth(self.hass)
+        if inspect.isawaitable(result):
+            await result
 
     async def _async_update_data(self) -> dict[str, Any]:
         """Fetch latest VPN data from Fritz!Box."""
@@ -175,7 +186,9 @@ class FritzBoxVPNCoordinator(DataUpdateCoordinator):
         except Exception as err:
             if self._is_auth_error(err):
                 self._schedule_reauth()
-                raise UpdateFailed(f"Unexpected error fetching VPN data: {err}") from err
+                raise UpdateFailed(
+                    f"Unexpected error fetching VPN data: {err}"
+                ) from err
             _LOGGER.exception("Unexpected error fetching VPN data")
             raise UpdateFailed(
                 f"Unexpected error fetching VPN data: {err}",

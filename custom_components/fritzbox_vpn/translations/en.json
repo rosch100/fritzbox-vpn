@@ -8,6 +8,11 @@
           "host": "FritzBox IP Address",
           "username": "Username",
           "password": "Password"
+        },
+        "data_description": {
+          "host": "FritzBox IP address or hostname",
+          "password": "Password used to authenticate against the FritzBox",
+          "username": "Username used to authenticate against the FritzBox"
         }
       },
       "confirm": {
@@ -16,7 +21,15 @@
       },
       "reauth_confirm": {
         "title": "Reauthenticate Fritz!Box VPN",
-        "description": "Authentication failed for {host}. Enter valid credentials."
+        "description": "Authentication failed for {host}. Enter valid credentials.",
+        "data": {
+          "username": "Username",
+          "password": "Password"
+        },
+        "data_description": {
+          "username": "Username used to authenticate against the FritzBox",
+          "password": "Password used to authenticate against the FritzBox"
+        }
       }
     },
     "error": {
@@ -29,7 +42,8 @@
     "abort": {
       "already_configured": "This FritzBox is already configured.",
       "not_fritzbox": "The discovered device is not a FritzBox.",
-      "no_host": "Could not determine the IP address."
+      "no_host": "Could not determine the IP address.",
+      "reauth_successful": "[%key:common::config_flow::abort::reauth_successful%]"
     }
   },
   "options": {
@@ -39,6 +53,9 @@
         "description": "Choose an action.",
         "data": {
           "action": "Action"
+        },
+        "data_description": {
+          "action": "Action to perform"
         }
       },
       "configure": {
@@ -49,6 +66,12 @@
           "username": "Username",
           "password": "Password (leave empty to keep current password)",
           "update_interval": "Update interval (seconds, 5–3600, max. 1 h)"
+        },
+        "data_description": {
+          "host": "FritzBox IP address or hostname",
+          "password": "Password used to authenticate against the FritzBox",
+          "update_interval": "Update interval in seconds",
+          "username": "Username used to authenticate against the FritzBox"
         }
       },
       "cleanup_confirm": {
@@ -56,6 +79,9 @@
         "description": "Entities that refer to VPN connections no longer present on the Fritz!Box will be removed from the entity registry. Check the box below and submit to remove them and reload the integration.",
         "data": {
           "confirm": "Remove entities and reload integration"
+        },
+        "data_description": {
+          "confirm": "Check to confirm removal and reload"
         }
       },
       "repair_entity_ids_confirm": {
@@ -63,6 +89,9 @@
         "description": "Entity IDs that got a _2, _3, _4 suffix (e.g. after faulty deactivation) will be renamed back to the base ID. The stale base entry will be removed. Reload will run after repair.",
         "data": {
           "confirm": "Repair entity IDs and reload integration"
+        },
+        "data_description": {
+          "confirm": "Check to confirm repairing entity IDs and reload"
         }
       }
     },

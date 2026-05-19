@@ -138,7 +138,7 @@ Available {% term actions %}:
 - `fritzbox_vpn.remove_unavailable_entities`
 - `fritzbox_vpn.repair_entity_id_suffixes`
 
-Both accept an optional `config_entry_id` to limit the operation to one config entry.
+Both services require a `target` entity selector for entities belonging to this integration (`fritzbox_vpn`). You can optionally set `config_entry_id` to limit the operation to one config entry.
 
 ### Action: Remove unavailable entities
 
@@ -146,6 +146,7 @@ Removes entity (and device) registry entries for VPN connections that no longer 
 
 | Data attribute | Required | Description |
 | --- | --- | --- |
+| `target` | yes | Target entities for this integration (`fritzbox_vpn`). |
 | `config_entry_id` | no | Limit cleanup to this config entry; omit to process all Fritz!Box VPN entries |
 
 ### Action: Repair entity ID suffixes
@@ -154,6 +155,7 @@ Repairs entity IDs that received a numeric suffix after faulty deactivation (for
 
 | Data attribute | Required | Description |
 | --- | --- | --- |
+| `target` | yes | Target entities for this integration (`fritzbox_vpn`). |
 | `config_entry_id` | no | Limit repair to this config entry; omit to process all entries |
 
 ## Troubleshooting
