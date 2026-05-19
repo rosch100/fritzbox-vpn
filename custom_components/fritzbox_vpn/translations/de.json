@@ -8,6 +8,11 @@
           "host": "FritzBox IP-Adresse",
           "username": "Benutzername",
           "password": "Passwort"
+        },
+        "data_description": {
+          "host": "FritzBox IP-Adresse oder Hostname",
+          "password": "Passwort zur Authentifizierung gegen die FritzBox",
+          "username": "Benutzername zur Authentifizierung gegen die FritzBox"
         }
       },
       "confirm": {
@@ -16,7 +21,15 @@
       },
       "reauth_confirm": {
         "title": "Fritz!Box VPN erneut anmelden",
-        "description": "Die Anmeldung für {host} ist fehlgeschlagen. Bitte gültige Zugangsdaten eingeben."
+        "description": "Die Anmeldung für {host} ist fehlgeschlagen. Bitte gültige Zugangsdaten eingeben.",
+        "data": {
+          "username": "Benutzername",
+          "password": "Passwort"
+        },
+        "data_description": {
+          "username": "Benutzername zur Authentifizierung gegen die FritzBox",
+          "password": "Passwort zur Authentifizierung gegen die FritzBox"
+        }
       },
       "reconfigure": {
         "title": "Fritz!Box VPN neu konfigurieren",
@@ -26,6 +39,12 @@
           "username": "Benutzername",
           "password": "Passwort (leer lassen, um das aktuelle Passwort beizubehalten)",
           "update_interval": "Update-Intervall (Sekunden, 5–3600, max. 1 h)"
+        },
+        "data_description": {
+          "host": "FritzBox IP-Adresse oder Hostname",
+          "password": "Passwort zur Authentifizierung gegen die FritzBox",
+          "update_interval": "Update-Intervall in Sekunden",
+          "username": "Benutzername zur Authentifizierung gegen die FritzBox"
         }
       }
     },
@@ -40,6 +59,7 @@
       "already_configured": "Diese FritzBox ist bereits konfiguriert.",
       "not_fritzbox": "Das gefundene Gerät ist keine FritzBox.",
       "no_host": "Die IP-Adresse konnte nicht ermittelt werden.",
+      "reauth_successful": "[%key:common::config_flow::abort::reauth_successful%]",
       "reconfigure_successful": "[%key:common::config_flow::abort::reconfigure_successful%]"
     }
   },
@@ -50,6 +70,9 @@
         "description": "Wählen Sie eine Aktion.",
         "data": {
           "action": "Aktion"
+        },
+        "data_description": {
+          "action": "Auszuführende Aktion"
         }
       },
       "configure": {
@@ -60,6 +83,12 @@
           "username": "Benutzername",
           "password": "Passwort (leer lassen, um aktuelles Passwort beizubehalten)",
           "update_interval": "Update-Intervall (Sekunden, 5–3600, max. 1 h)"
+        },
+        "data_description": {
+          "host": "FritzBox IP-Adresse oder Hostname",
+          "password": "Passwort zur Authentifizierung gegen die FritzBox",
+          "update_interval": "Update-Intervall in Sekunden",
+          "username": "Benutzername zur Authentifizierung gegen die FritzBox"
         }
       },
       "cleanup_confirm": {
@@ -67,6 +96,9 @@
         "description": "Entitäten, die zu VPN-Verbindungen gehören, die auf der Fritz!Box nicht mehr existieren, werden aus der Entity-Registry entfernt. Setzen Sie das Häkchen und senden Sie ab, um sie zu löschen und die Integration neu zu laden.",
         "data": {
           "confirm": "Entitäten entfernen und Integration neu laden"
+        },
+        "data_description": {
+          "confirm": "Haken setzen, um die Entfernung zu bestätigen und neu zu laden"
         }
       },
       "repair_entity_ids_confirm": {
@@ -74,6 +106,9 @@
         "description": "Entitäts-IDs mit Suffix _2, _3, _4 (z. B. nach fehlerhafter Deaktivierung) werden wieder auf die Basis-ID umgestellt. Der verwaiste Basis-Eintrag wird entfernt. Nach der Reparatur wird die Integration neu geladen.",
         "data": {
           "confirm": "Entitäts-IDs reparieren und Integration neu laden"
+        },
+        "data_description": {
+          "confirm": "Haken setzen, um das Reparieren der Entitäts-IDs und neu zu laden zu bestätigen"
         }
       }
     },
