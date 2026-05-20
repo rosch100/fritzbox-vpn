@@ -44,12 +44,14 @@ def hostname_from_url(url: str) -> str | None:
 
 def uuid_from_discovery(discovery_info: SsdpServiceInfo) -> str | None:
     """Device UUID from UPnP UDN or SSDP USN."""
-    if raw_udn := discovery_info.upnp.get(ATTR_UPNP_UDN):
-        if device_uuid := uuid_from_upnp_udn(raw_udn):
-            return device_uuid
-    if discovery_info.ssdp_usn:
-        if device_uuid := uuid_from_ssdp_usn(discovery_info.ssdp_usn):
-            return device_uuid
+    if (raw_udn := discovery_info.upnp.get(ATTR_UPNP_UDN)) and (
+        device_uuid := uuid_from_upnp_udn(raw_udn)
+    ):
+        return device_uuid
+    if discovery_info.ssdp_usn and (
+        device_uuid := uuid_from_ssdp_usn(discovery_info.ssdp_usn)
+    ):
+        return device_uuid
     return None
 
 
@@ -80,23 +82,26 @@ def host_from_ssdp_usn(usn: str) -> str | None:
                 break
             fragment_end += 1
         fragment = usn[fragment_start:fragment_end]
-        if hostname := hostname_from_url(f"http:{fragment}"):
-            if hostname.lower() == FRITZ_BOX_HOST:
-                return FRITZ_BOX_HOST
+        if (hostname := hostname_from_url(f"http:{fragment}")) and (
+            hostname.lower() == FRITZ_BOX_HOST
+        ):
+            return FRITZ_BOX_HOST
         search_start = scheme_pos + 3
     return None
 
 
 def host_from_ssdp(discovery_info: SsdpServiceInfo) -> str | None:
     """Host from SSDP location, headers, or USN."""
-    if discovery_info.ssdp_location:
-        if hostname := hostname_from_url(discovery_info.ssdp_location):
-            return hostname
+    if discovery_info.ssdp_location and (
+        hostname := hostname_from_url(discovery_info.ssdp_location)
+    ):
+        return hostname
     if discovery_info.ssdp_headers:
         location_header = discovery_info.ssdp_headers.get("location")
-        if isinstance(location_header, str):
-            if hostname := hostname_from_url(location_header):
-                return hostname
+        if isinstance(location_header, str) and (
+            hostname := hostname_from_url(location_header)
+        ):
+            return hostname
     if discovery_info.ssdp_usn:
         return host_from_ssdp_usn(discovery_info.ssdp_usn)
     return None
