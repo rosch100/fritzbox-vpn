@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import ipaddress
 import logging
 from collections.abc import Mapping
 from typing import Any
@@ -55,6 +54,7 @@ from .fritz_config_source import get_existing_fritz_config
 from .ssdp_unique_id import (
     host_from_ssdp,
     is_fritzbox_router_discovery,
+    is_link_local_host,
     unique_id_for_discovery,
 )
 
@@ -163,13 +163,8 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             return self.async_abort(reason="not_fritzbox")
 
         host = host_from_ssdp(discovery_info)
-        if not host:
+        if not host or is_link_local_host(host):
             return self.async_abort(reason="no_host")
-        try:
-            if ipaddress.ip_address(host).is_link_local:
-                return self.async_abort(reason="no_host")
-        except ValueError:
-            pass
 
         unique_id = unique_id_for_discovery(discovery_info, host)
         await self.async_set_unique_id(unique_id)
