@@ -1,4 +1,4 @@
-"""Adapter: FritzConnection-based session for FritzBox VPN Web UI REST API."""
+"""Adapter: FritzConnection-based session for FritzBox VPN HTTP API endpoints."""
 
 from __future__ import annotations
 
