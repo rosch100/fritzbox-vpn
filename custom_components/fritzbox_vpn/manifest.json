@@ -11,7 +11,6 @@
   "loggers": ["fritzboxvpn"],
   "quality_scale": "gold",
   "requirements": ["fritzboxvpn==1.0.0", "fritzconnection"],
-  "license": "Apache-2.0",
   "ssdp": [
     {
       "st": "urn:schemas-upnp-org:device:fritzbox:1"
