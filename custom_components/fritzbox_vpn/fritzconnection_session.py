@@ -120,7 +120,7 @@ class FritzConnectionVPNSession:
         return self._fwg.toggle_vpn(connection_uid, enable)
 
     async def async_close(self) -> None:
-        self._ensure_client()
+        await self._hass.async_add_executor_job(self._ensure_client)
         if self._mode == "fritzboxvpn":
             assert self._fallback_session is not None
             await self._fallback_session.async_close()
@@ -129,7 +129,7 @@ class FritzConnectionVPNSession:
 
     async def async_get_vpn_connections(self) -> dict[str, Any]:
         """Fetch latest VPN connections with HTTPS->HTTP fallback."""
-        self._ensure_client()
+        await self._hass.async_add_executor_job(self._ensure_client)
         if self._mode == "fritzboxvpn":
             assert self._fallback_session is not None
             return await self._fallback_session.async_get_vpn_connections()
@@ -160,7 +160,7 @@ class FritzConnectionVPNSession:
 
     async def async_toggle_vpn(self, connection_uid: str, enable: bool) -> bool:
         """Toggle VPN on/off with HTTPS->HTTP fallback and auth propagation."""
-        self._ensure_client()
+        await self._hass.async_add_executor_job(self._ensure_client)
         if self._mode == "fritzboxvpn":
             assert self._fallback_session is not None
             return await self._fallback_session.async_toggle_vpn(
