@@ -33,23 +33,50 @@ jobs:
       id-token: write
     steps:
       - uses: actions/checkout@v6
+        with:
+          # Needed to diff against the parent commit for the version-change guard.
+          fetch-depth: 2
 
       - uses: actions/setup-python@v6
         with:
           python-version: "3.13"
 
+      - name: Check whether library version changed
+        id: versioncheck
+        shell: bash
+        run: |
+          # Default: publish only if fritzboxvpn's library version-bump is part of the tag commit.
+          publish=false
+
+          # Manual publish always forces publishing.
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" && "${{ github.event.inputs.confirm }}" == "publish" ]]; then
+            publish=true
+          else
+            # Tags point at commits; compare the tagged commit with its parent.
+            if git rev-parse HEAD^ >/dev/null 2>&1; then
+              if git diff --name-only HEAD^ HEAD | rg -q '^fritzboxvpn/pyproject\.toml$'; then
+                publish=true
+              fi
+            fi
+          fi
+
+          echo "publish=${publish}" >> "$GITHUB_OUTPUT"
+
       - name: Install build tools
         run: python -m pip install --upgrade pip build twine
 
       - name: Build wheel and sdist
+        if: steps.versioncheck.outputs.publish == 'true'
         working-directory: fritzboxvpn
         run: python -m build
 
       - name: Verify package metadata
+        if: steps.versioncheck.outputs.publish == 'true'
         working-directory: fritzboxvpn
         run: twine check dist/*
 
       - name: Publish to PyPI
+        if: steps.versioncheck.outputs.publish == 'true'
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           packages-dir: fritzboxvpn/dist
