@@ -10,7 +10,7 @@
   "issue_tracker": "https://github.com/rosch100/fritzbox-vpn/issues",
   "loggers": ["fritzboxvpn"],
   "quality_scale": "gold",
-  "requirements": ["fritzboxvpn==1.0.0"],
+  "requirements": ["fritzboxvpn==1.0.0", "fritzconnection"],
   "ssdp": [
     {
       "st": "urn:schemas-upnp-org:device:fritzbox:1"

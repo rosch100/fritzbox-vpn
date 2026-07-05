@@ -78,11 +78,21 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      # GitHub's license detection can lag behind for PRs; for PRs we ignore
+      # only the license check to avoid blocking CI until the default branch
+      # metadata is updated.
       - uses: hacs/action@22.5.0
+        if: github.event_name == 'pull_request'
         with:
           category: integration
-          repository: rosch100/fritzbox-vpn
-          comment: ${{ github.event_name == 'pull_request' }}
+          comment: true
+          ignore: license
+
+      - uses: hacs/action@22.5.0
+        if: github.event_name != 'pull_request'
+        with:
+          category: integration
+          comment: false
 
   hassfest:
     name: hassfest
