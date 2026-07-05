@@ -24,7 +24,11 @@ permissions:
 jobs:
   publish:
     name: PyPI
-    if: github.event_name != 'workflow_dispatch' || github.event.inputs.confirm == 'publish'
+    # Best practice: Only publish when the underlying PyPI package version changes.
+    # Beta/pre-release tags (e.g. v1.2.2b1) may not bump the library version, so
+    # uploading would fail with "File already exists".
+    if: (github.event_name != 'workflow_dispatch' || github.event.inputs.confirm == 'publish')
+      && (github.event_name != 'push' || (!contains(github.ref_name, 'beta') && !contains(github.ref_name, 'b')))
     runs-on: ubuntu-latest
     timeout-minutes: 15
     environment: pypi
