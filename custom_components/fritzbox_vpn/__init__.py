@@ -27,6 +27,7 @@ from .coordinator import FritzBoxVPNCoordinator
 from .entity_registry import (
     get_orphaned_entity_entries,
     remove_orphaned_entities,
+    remove_unexpected_entity_entries,
     repair_entity_id_suffixes,
 )
 from .models import FritzboxVpnConfigEntry, FritzboxVpnRuntimeData
@@ -221,6 +222,18 @@ async def async_setup_entry(hass: HomeAssistant, entry: FritzboxVpnConfigEntry) 
         ) from err
 
     entry.runtime_data = FritzboxVpnRuntimeData(coordinator=coordinator)
+
+    if coordinator.data:
+        removed_shadow_entities = remove_unexpected_entity_entries(
+            hass,
+            entry.entry_id,
+            current_uids=set(coordinator.data.keys()),
+        )
+        if removed_shadow_entities:
+            _LOGGER.info(
+                "Removed %d shadow entity registry entries during setup",
+                removed_shadow_entities,
+            )
 
     device_registry = dr.async_get(hass)
     parent_device = device_registry.async_get_or_create(

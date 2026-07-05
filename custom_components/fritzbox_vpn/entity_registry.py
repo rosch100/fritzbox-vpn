@@ -61,6 +61,39 @@ def get_orphaned_entity_entries(
     return (to_remove, None)
 
 
+def remove_unexpected_entity_entries(
+    hass: HomeAssistant,
+    entry_id: str,
+    *,
+    current_uids: set[str],
+) -> int:
+    """Remove entity registry entries that are not provided anymore.
+
+    This primarily fixes "shadow" entities caused by wrong/broken unique_id
+    generation across upgrades: if an entry's unique_id does not match any of
+    our expected unique_id values for the currently known VPN connections,
+    remove it from the entity registry.
+    """
+    expected_unique_ids = {
+        f"{UNIQUE_ID_PREFIX}{uid}_{suffix}"
+        for uid in current_uids
+        for suffix in UNIQUE_ID_SUFFIXES
+    }
+
+    entity_registry = er.async_get(hass)
+    to_remove: list[er.RegistryEntry] = []
+    for entry in er.async_entries_for_config_entry(entity_registry, entry_id):
+        unique_id = entry.unique_id or ""
+        if not unique_id.startswith(UNIQUE_ID_PREFIX):
+            continue
+        if unique_id in expected_unique_ids:
+            continue
+        to_remove.append(entry)
+
+    remove_orphaned_entities(hass, entry_id, to_remove)
+    return len(to_remove)
+
+
 def uids_from_entity_entries(entries: list[er.RegistryEntry]) -> set[str]:
     """Connection UIDs from entity registry entries."""
     uids: set[str] = set()
