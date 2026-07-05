@@ -210,8 +210,8 @@ def set_validation_error(
 
 async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> dict[str, Any]:
     """Validate Fritz!Box connectivity; VPN connections are discovered at setup."""
-    # Validate via Fritz!Box WebUI REST WireGuard endpoints using FritzConnection.
-    # Note: this adapter is sync under the hood and uses executor jobs.
+    # Validate via Fritz!Box Web UI REST WireGuard endpoints using FritzConnection.
+    # This adapter is synchronous underneath and runs blocking calls in the executor.
     session = FritzConnectionVPNSession(
         hass,
         data[CONF_HOST],
