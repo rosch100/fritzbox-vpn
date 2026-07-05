@@ -99,6 +99,7 @@ class FritzBoxVPNEntity(CoordinatorEntity):
 
     _attr_name = None
     _attr_has_entity_name = True
+    _attr_translation_domain = DOMAIN
 
     def __init__(
         self,
