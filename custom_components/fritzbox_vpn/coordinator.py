@@ -10,12 +10,10 @@ from fritzboxvpn import (
     API_KEY_ACTIVE,
     API_KEY_CONNECTED,
     API_KEY_NAME,
-    FritzBoxVPNSession,
 )
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .const import (
@@ -35,6 +33,7 @@ from .const import (
     UPDATE_INTERVAL_MIN,
     host_from_config,
 )
+from .fritzconnection_session import FritzConnectionVPNSession
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -102,11 +101,12 @@ class FritzBoxVPNCoordinator(DataUpdateCoordinator):
             name=DOMAIN,
             update_interval=timedelta(seconds=update_interval_seconds),
         )
-        self.fritz_session = FritzBoxVPNSession(
-            async_get_clientsession(hass),
+        self.fritz_session = FritzConnectionVPNSession(
+            hass,
             host_from_config(config),
             config[CONF_USERNAME],
             config[CONF_PASSWORD],
+            use_tls=True,
         )
         self.config = config
         self.entry_id = entry_id

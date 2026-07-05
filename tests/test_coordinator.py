@@ -1,5 +1,6 @@
 """Tests for FritzBox VPN coordinator and session helpers."""
 
+import inspect
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -108,6 +109,14 @@ async def test_schedule_reauth_only_once(hass: HomeAssistant) -> None:
         coordinator._schedule_reauth()
 
     hass.async_create_task.assert_called_once()
+
+    # When `async_create_task` is mocked, the coroutine argument would
+    # otherwise be left un-awaited and raise a "never awaited" warning.
+    called_args, _called_kwargs = hass.async_create_task.call_args
+    if called_args:
+        coro = called_args[0]
+        if inspect.iscoroutine(coro):
+            coro.close()
 
 
 @pytest.mark.asyncio
