@@ -39,17 +39,43 @@ class FritzConnectionVPNSession:
         self._password = password
         self._use_tls = use_tls
 
+        self._mode: str | None = None
+
         self._fc: FritzConnection | None = None  # type: ignore[name-defined]
         self._fwg: FritzWireguard | None = None  # type: ignore[name-defined]
+        self._fallback_session: Any | None = None
 
     def _ensure_client(self) -> None:
-        if self._fc is not None and self._fwg is not None:
+        if self._mode == "fritzconnection" and self._fc is not None and self._fwg is not None:
+            return
+        if self._mode == "fritzboxvpn" and self._fallback_session is not None:
             return
 
         # Import lazily so unit tests can run even when `fritzconnection`
         # is not installed in the fritzbox-vpn test venv.
-        from fritzconnection import FritzConnection  # type: ignore
-        from fritzconnection.lib.fritzwireguard import FritzWireguard  # type: ignore
+        try:
+            from fritzconnection import FritzConnection  # type: ignore
+            from fritzconnection.lib.fritzwireguard import (
+                FritzWireguard,  # type: ignore
+            )
+        except ModuleNotFoundError:
+            # Some fritzconnection builds ship without the WireGuard module.
+            # In that case fall back to the integration's fritzboxvpn library.
+            from fritzboxvpn import FritzBoxVPNSession
+            from homeassistant.helpers.aiohttp_client import (
+                async_get_clientsession,
+            )
+
+            protocol = "https" if self._use_tls else "http"
+            self._fallback_session = FritzBoxVPNSession(
+                async_get_clientsession(self._hass),
+                self._host,
+                self._username,
+                self._password,
+                protocol=protocol,
+            )
+            self._mode = "fritzboxvpn"
+            return
 
         self._fc = FritzConnection(
             address=self._host,
@@ -58,6 +84,7 @@ class FritzConnectionVPNSession:
             use_tls=self._use_tls,
         )
         self._fwg = FritzWireguard(fc=self._fc)
+        self._mode = "fritzconnection"
 
     @staticmethod
     def _is_fritz_authorization_error(err: Exception) -> bool:
@@ -80,19 +107,32 @@ class FritzConnectionVPNSession:
 
     def _get_vpn_connections_sync(self) -> dict[str, Any]:
         self._ensure_client()
+        if self._mode != "fritzconnection":
+            raise RuntimeError("Unexpected mode for sync VPN fetch")
         assert self._fwg is not None
         return self._fwg.get_vpn_connections()
 
     def _toggle_vpn_sync(self, connection_uid: str, enable: bool) -> bool:
         self._ensure_client()
+        if self._mode != "fritzconnection":
+            raise RuntimeError("Unexpected mode for sync VPN toggle")
         assert self._fwg is not None
         return self._fwg.toggle_vpn(connection_uid, enable)
 
     async def async_close(self) -> None:
+        self._ensure_client()
+        if self._mode == "fritzboxvpn":
+            assert self._fallback_session is not None
+            await self._fallback_session.async_close()
+            return
         await self._hass.async_add_executor_job(self._close_sync)
 
     async def async_get_vpn_connections(self) -> dict[str, Any]:
         """Fetch latest VPN connections with HTTPS->HTTP fallback."""
+        self._ensure_client()
+        if self._mode == "fritzboxvpn":
+            assert self._fallback_session is not None
+            return await self._fallback_session.async_get_vpn_connections()
         try:
             return await self._hass.async_add_executor_job(
                 self._get_vpn_connections_sync
@@ -120,6 +160,12 @@ class FritzConnectionVPNSession:
 
     async def async_toggle_vpn(self, connection_uid: str, enable: bool) -> bool:
         """Toggle VPN on/off with HTTPS->HTTP fallback and auth propagation."""
+        self._ensure_client()
+        if self._mode == "fritzboxvpn":
+            assert self._fallback_session is not None
+            return await self._fallback_session.async_toggle_vpn(
+                connection_uid, enable
+            )
         try:
             return await self._hass.async_add_executor_job(
                 self._toggle_vpn_sync, connection_uid, enable
