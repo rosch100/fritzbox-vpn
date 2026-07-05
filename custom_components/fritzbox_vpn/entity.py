@@ -97,7 +97,6 @@ def raise_toggle_failed(vpn_name: str, error: str = "") -> None:
 class FritzBoxVPNEntity(CoordinatorEntity):
     """Base entity bound to one VPN connection on the coordinator."""
 
-    _attr_name = None
     _attr_has_entity_name = True
     _attr_translation_domain = DOMAIN
 
