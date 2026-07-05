@@ -112,11 +112,11 @@ def test_set_validation_error_branches() -> None:
 async def test_validate_input_success(hass: HomeAssistant) -> None:
     """validate_input returns title when session login succeeds."""
     session_mock = AsyncMock()
-    session_mock.async_get_session = AsyncMock(return_value="sid")
+    session_mock.async_get_vpn_connections = AsyncMock(return_value={"x": {}})
     session_mock.async_close = AsyncMock()
 
     with patch(
-        "custom_components.fritzbox_vpn.flow_forms.FritzBoxVPNSession",
+        "custom_components.fritzbox_vpn.flow_forms.FritzConnectionVPNSession",
         return_value=session_mock,
     ):
         info = await validate_input(
