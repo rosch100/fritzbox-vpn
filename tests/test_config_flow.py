@@ -149,13 +149,13 @@ async def test_reauth_updates_credentials(hass: HomeAssistant, mock_config_entry
 async def test_validate_input_maps_auth_error(hass: HomeAssistant) -> None:
     """validate_input raises InvalidAuth on login failure."""
     session_mock = AsyncMock()
-    session_mock.async_get_session = AsyncMock(
+    session_mock.async_get_vpn_connections = AsyncMock(
         side_effect=ValueError("Login failed: Invalid SID")
     )
     session_mock.async_close = AsyncMock()
 
     with patch(
-        "custom_components.fritzbox_vpn.flow_forms.FritzBoxVPNSession",
+        "custom_components.fritzbox_vpn.flow_forms.FritzConnectionVPNSession",
         return_value=session_mock,
     ):
         with pytest.raises(InvalidAuth):
@@ -275,13 +275,13 @@ async def test_reauth_shows_error_on_validation_failure(
 async def test_validate_input_maps_connect_error(hass: HomeAssistant) -> None:
     """validate_input raises CannotConnect on connection errors."""
     session_mock = AsyncMock()
-    session_mock.async_get_session = AsyncMock(
+    session_mock.async_get_vpn_connections = AsyncMock(
         side_effect=ConnectionError("Failed to get login page")
     )
     session_mock.async_close = AsyncMock()
 
     with patch(
-        "custom_components.fritzbox_vpn.flow_forms.FritzBoxVPNSession",
+        "custom_components.fritzbox_vpn.flow_forms.FritzConnectionVPNSession",
         return_value=session_mock,
     ):
         with pytest.raises(CannotConnect):
