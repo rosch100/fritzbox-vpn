@@ -6,16 +6,22 @@ from custom_components.fritzbox_vpn.entity_registry import (
     connection_uid_from_entity_unique_id,
     entity_id_base,
     entity_id_suffix_number,
+    expected_object_id_for_device_suffix,
     get_entity_id_suffix_repairs,
+    get_legacy_entity_object_id_repairs,
     get_orphaned_entity_entries,
     remove_orphaned_entities,
     repair_entity_id_suffixes,
+    repair_entity_ids,
+    repair_legacy_entity_object_ids,
     resolve_current_uids,
     uids_from_entity_entries,
+    unique_id_suffix_from_entity_unique_id,
 )
 from custom_components.fritzbox_vpn.models import FritzboxVpnRuntimeData
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
@@ -57,6 +63,122 @@ async def test_resolve_current_uids_errors(hass: HomeAssistant) -> None:
     uids, err = resolve_current_uids(hass, entry.entry_id)
     assert uids is None
     assert err == "coordinator_not_ready"
+
+
+def test_unique_id_suffix_from_entity_unique_id() -> None:
+    """Parse platform suffix token from entity unique_id."""
+    uid = "abc"
+    assert (
+        unique_id_suffix_from_entity_unique_id(f"{UNIQUE_ID_PREFIX}{uid}_connected")
+        == "connected"
+    )
+    assert (
+        unique_id_suffix_from_entity_unique_id(f"{UNIQUE_ID_PREFIX}{uid}_vpn_uid")
+        == "vpn_uid"
+    )
+    assert unique_id_suffix_from_entity_unique_id("other") is None
+
+
+def test_expected_object_id_for_device_suffix() -> None:
+    """Expected object_id slugs follow Home Assistant slugify rules."""
+    assert expected_object_id_for_device_suffix("Altanis Berlin", "switch") == (
+        "altanis_berlin"
+    )
+    assert expected_object_id_for_device_suffix("Altanis Berlin", "connected") == (
+        "altanis_berlin_connected"
+    )
+    assert expected_object_id_for_device_suffix("Altanis Berlin", "vpn_uid") == (
+        "altanis_berlin_vpn_uid"
+    )
+
+
+@pytest.mark.asyncio
+async def test_repair_legacy_entity_object_ids(hass: HomeAssistant) -> None:
+    """Legacy entity IDs missing suffix tokens are renamed automatically."""
+    entry = MockConfigEntry(domain=DOMAIN, data={"host": "1.2.3.4"})
+    entry.add_to_hass(hass)
+    entity_registry = er.async_get(hass)
+    device_registry = dr.async_get(hass)
+    device = device_registry.async_get_or_create(
+        config_entry_id=entry.entry_id,
+        identifiers={(DOMAIN, entry.entry_id, "conn1")},
+        name="Altanis Berlin",
+    )
+    connected = entity_registry.async_get_or_create(
+        "binary_sensor",
+        DOMAIN,
+        f"{UNIQUE_ID_PREFIX}conn1_connected",
+        config_entry=entry,
+        device_id=device.id,
+        suggested_object_id="altanis_berlin",
+    )
+    vpn_uid = entity_registry.async_get_or_create(
+        "sensor",
+        DOMAIN,
+        f"{UNIQUE_ID_PREFIX}conn1_vpn_uid",
+        config_entry=entry,
+        device_id=device.id,
+        suggested_object_id="altanis_berlin",
+    )
+    old_switch = entity_registry.async_get_or_create(
+        "switch",
+        DOMAIN,
+        f"{UNIQUE_ID_PREFIX}conn1_switch",
+        config_entry=entry,
+        device_id=device.id,
+        suggested_object_id="altanis_berlin_vpn",
+    )
+
+    repairs = get_legacy_entity_object_id_repairs(hass, entry.entry_id)
+    assert len(repairs) == 3
+
+    count, messages = repair_legacy_entity_object_ids(hass, entry.entry_id)
+    assert count == 3
+    assert messages
+
+    assert entity_registry.async_get(connected.entity_id) is None
+    assert entity_registry.async_get("binary_sensor.altanis_berlin_connected")
+    assert entity_registry.async_get(vpn_uid.entity_id) is None
+    assert entity_registry.async_get("sensor.altanis_berlin_vpn_uid")
+    assert entity_registry.async_get(old_switch.entity_id) is None
+    assert entity_registry.async_get("switch.altanis_berlin")
+
+
+@pytest.mark.asyncio
+async def test_repair_entity_ids_runs_legacy_before_suffix(hass: HomeAssistant) -> None:
+    """Combined repair handles legacy names and numeric suffixes."""
+    entry = MockConfigEntry(domain=DOMAIN, data={"host": "1.2.3.4"})
+    entry.add_to_hass(hass)
+    entity_registry = er.async_get(hass)
+    device_registry = dr.async_get(hass)
+    device = device_registry.async_get_or_create(
+        config_entry_id=entry.entry_id,
+        identifiers={(DOMAIN, entry.entry_id, "conn1")},
+        name="Altanis Berlin",
+    )
+    entity_registry.async_get_or_create(
+        "binary_sensor",
+        DOMAIN,
+        f"{UNIQUE_ID_PREFIX}conn1_connected",
+        config_entry=entry,
+        device_id=device.id,
+        suggested_object_id="altanis_berlin",
+    )
+    entity_registry.async_get_or_create(
+        "switch",
+        DOMAIN,
+        f"{UNIQUE_ID_PREFIX}conn1_switch",
+        suggested_object_id="fritzbox_vpn_conn1_switch_2",
+        config_entry=entry,
+    )
+
+    count, _ = repair_entity_ids(hass, entry.entry_id)
+    assert count >= 2
+    assert entity_registry.async_get("binary_sensor.altanis_berlin_connected")
+    switch_entry = entity_registry.async_get("switch.fritzbox_vpn_conn1_switch")
+    assert switch_entry is not None or entity_registry.async_get(
+        "switch.fritzbox_vpn_conn1_switch_2"
+    ) is None
 
 
 @pytest.mark.asyncio

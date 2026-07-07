@@ -28,7 +28,7 @@ from .entity_registry import (
     get_orphaned_entity_entries,
     remove_orphaned_entities,
     remove_unexpected_entity_entries,
-    repair_entity_id_suffixes,
+    repair_entity_ids,
 )
 from .models import FritzboxVpnConfigEntry, FritzboxVpnRuntimeData
 
@@ -88,13 +88,13 @@ async def _async_remove_unavailable_entities(
 async def _async_repair_entity_id_suffixes(
     hass: HomeAssistant, call: ServiceCall
 ) -> None:
-    """Repair entity IDs with _2, _3, … suffix: remove stale base entry and rename to base ID."""
+    """Repair legacy and suffixed entity IDs, then reload when anything changed."""
     for entry_id in _entry_ids_for_cleanup_service(hass, call):
-        count, _ = repair_entity_id_suffixes(hass, entry_id)
+        count, _ = repair_entity_ids(hass, entry_id)
         if count:
             await hass.config_entries.async_reload(entry_id)
             _LOGGER.info(
-                "Repair entity ID suffixes: repaired %d entities for entry %s",
+                "Repair entity IDs: repaired %d entities for entry %s",
                 count,
                 entry_id,
             )
@@ -170,12 +170,12 @@ def _cleanup_empty_connection_devices(hass: HomeAssistant, entry_id: str) -> int
     return removed
 
 
-def _repair_suffixes_before_platform_setup(hass: HomeAssistant, entry_id: str) -> int:
-    """Repair entity-id suffixes before platform setup."""
-    repaired_count, _ = repair_entity_id_suffixes(hass, entry_id)
+def _repair_entity_ids_before_platform_setup(hass: HomeAssistant, entry_id: str) -> int:
+    """Repair entity IDs before platform setup."""
+    repaired_count, _ = repair_entity_ids(hass, entry_id)
     if repaired_count:
         _LOGGER.info(
-            "Repaired %d entity ID suffix(es) before platform setup",
+            "Repaired %d entity ID(s) before platform setup",
             repaired_count,
         )
     return repaired_count
@@ -256,7 +256,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: FritzboxVpnConfigEntry) 
         "Created parent device: %s (ID: %s)", parent_device.name, parent_device.id
     )
 
-    _repair_suffixes_before_platform_setup(hass, entry.entry_id)
+    _repair_entity_ids_before_platform_setup(hass, entry.entry_id)
 
     try:
         await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)

@@ -31,9 +31,10 @@ from .const import (
 )
 from .entity_registry import (
     get_entity_id_suffix_repairs,
+    get_legacy_entity_object_id_repairs,
     get_orphaned_entity_entries,
     remove_orphaned_entities,
-    repair_entity_id_suffixes,
+    repair_entity_ids,
 )
 from .flow_forms import CannotConnect, InvalidAuth
 from .fritz_config_source import get_existing_fritz_config
@@ -322,12 +323,19 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                 self.hass, self._config_entry.entry_id
             )
             registry = er.async_get(self.hass)
-            repairs = get_entity_id_suffix_repairs(
+            legacy_repairs = get_legacy_entity_object_id_repairs(
+                self.hass, self._config_entry.entry_id
+            )
+            suffix_repairs = get_entity_id_suffix_repairs(
                 registry, self._config_entry.entry_id
             )
             has_cleanup_action = error_key is None and bool(to_remove)
-            has_repair_action = bool(repairs)
-            return (has_cleanup_action, has_repair_action, len(repairs))
+            has_repair_action = bool(legacy_repairs) or bool(suffix_repairs)
+            return (
+                has_cleanup_action,
+                has_repair_action,
+                len(legacy_repairs) + len(suffix_repairs),
+            )
         except Exception as err:
             _LOGGER.exception(
                 "Failed to evaluate available options actions for entry %s: %s",
@@ -426,16 +434,18 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
     async def async_step_repair_entity_ids_confirm(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
-        """Confirm repair of entity IDs (_2, _3, … → base ID)."""
+        """Confirm repair of entity IDs (legacy suffixes and _2, _3, …)."""
         config_entry = self._get_current_entry()
         if not config_entry:
             return self.async_abort(reason=ERROR_KEY_CONFIG_ENTRY_NOT_FOUND)
         entry_id = config_entry.entry_id
         registry = er.async_get(self.hass)
-        repairs = get_entity_id_suffix_repairs(registry, entry_id)
+        legacy_repairs = get_legacy_entity_object_id_repairs(self.hass, entry_id)
+        suffix_repairs = get_entity_id_suffix_repairs(registry, entry_id)
+        pending = [*legacy_repairs, *suffix_repairs]
 
         async def on_repair(confirmed_entry_id: str) -> None:
-            count, _ = repair_entity_id_suffixes(self.hass, confirmed_entry_id)
+            count, _ = repair_entity_ids(self.hass, confirmed_entry_id)
             if count:
                 await self.hass.config_entries.async_reload(confirmed_entry_id)
 
@@ -443,7 +453,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
             step_id="repair_entity_ids_confirm",
             entry_id=entry_id,
             user_input=user_input,
-            pending=repairs,
+            pending=pending,
             on_confirm=on_repair,
         )
 

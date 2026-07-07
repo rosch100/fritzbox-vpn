@@ -8,8 +8,14 @@ import re
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
+from homeassistant.util import slugify
 
-from .const import DOMAIN, UNIQUE_ID_PREFIX, UNIQUE_ID_SUFFIXES
+from .const import (
+    DOMAIN,
+    UNIQUE_ID_PREFIX,
+    UNIQUE_ID_SUFFIX_SWITCH,
+    UNIQUE_ID_SUFFIXES,
+)
 from .models import runtime_from_hass
 
 _LOGGER = logging.getLogger(__name__)
@@ -17,15 +23,49 @@ _LOGGER = logging.getLogger(__name__)
 _ENTITY_ID_OBJECT_ID_SUFFIX_RE = re.compile(r"^(.+)_(\d+)$")
 
 
-def connection_uid_from_entity_unique_id(unique_id: str) -> str | None:
-    """Connection UID from entity unique_id; None if not our format."""
+def unique_id_suffix_from_entity_unique_id(unique_id: str) -> str | None:
+    """Platform suffix token from entity unique_id; None if not our format."""
     if not unique_id or not unique_id.startswith(UNIQUE_ID_PREFIX):
         return None
     rest = unique_id[len(UNIQUE_ID_PREFIX) :]
     for suffix in UNIQUE_ID_SUFFIXES:
         if rest.endswith("_" + suffix):
-            return rest[: -len(suffix) - 1]
+            return suffix
     return None
+
+
+def connection_uid_from_entity_unique_id(unique_id: str) -> str | None:
+    """Connection UID from entity unique_id; None if not our format."""
+    suffix = unique_id_suffix_from_entity_unique_id(unique_id)
+    if suffix is None:
+        return None
+    rest = unique_id[len(UNIQUE_ID_PREFIX) :]
+    return rest[: -len(suffix) - 1]
+
+
+def expected_object_id_for_device_suffix(device_name: str, unique_id_suffix: str) -> str:
+    """Stable object_id slug for a VPN device name and platform suffix."""
+    if unique_id_suffix == UNIQUE_ID_SUFFIX_SWITCH:
+        return slugify(device_name)
+    return slugify(f"{device_name} {unique_id_suffix}")
+
+
+def expected_entity_id_for_registry_entry(
+    device_registry: dr.DeviceRegistry,
+    entry: er.RegistryEntry,
+) -> str | None:
+    """Expected entity_id for a registry entry based on device name and unique_id."""
+    unique_id_suffix = unique_id_suffix_from_entity_unique_id(entry.unique_id or "")
+    if unique_id_suffix is None or not entry.device_id:
+        return None
+    device = device_registry.async_get(entry.device_id)
+    if device is None:
+        return None
+    device_name = device.name_by_user or device.name
+    if not device_name:
+        return None
+    object_id = expected_object_id_for_device_suffix(device_name, unique_id_suffix)
+    return f"{entry.domain}.{object_id}"
 
 
 def resolve_current_uids(
@@ -129,6 +169,53 @@ def entity_id_suffix_number(entity_id: str) -> int | None:
         return None
 
 
+def get_legacy_entity_object_id_repairs(
+    hass: HomeAssistant, entry_id: str
+) -> list[tuple[er.RegistryEntry, str]]:
+    """Rename operations for legacy entity IDs missing suffix tokens."""
+    registry = er.async_get(hass)
+    device_registry = dr.async_get(hass)
+    repairs: list[tuple[er.RegistryEntry, str]] = []
+
+    for entry in er.async_entries_for_config_entry(registry, entry_id):
+        target_entity_id = expected_entity_id_for_registry_entry(device_registry, entry)
+        if target_entity_id is None or entry.entity_id == target_entity_id:
+            continue
+        if registry.async_get(target_entity_id) is not None:
+            continue
+        repairs.append((entry, target_entity_id))
+
+    return repairs
+
+
+def repair_legacy_entity_object_ids(
+    hass: HomeAssistant, entry_id: str
+) -> tuple[int, list[str]]:
+    """Rename legacy entity IDs to current suffix-based object_id scheme."""
+    registry = er.async_get(hass)
+    repairs = get_legacy_entity_object_id_repairs(hass, entry_id)
+    messages: list[str] = []
+    for entry, target_entity_id in repairs:
+        try:
+            registry.async_update_entity(
+                entry.entity_id, new_entity_id=target_entity_id
+            )
+            messages.append(f"{entry.entity_id} → {target_entity_id}")
+            _LOGGER.info(
+                "Repaired legacy entity ID: %s → %s",
+                entry.entity_id,
+                target_entity_id,
+            )
+        except Exception as err:
+            _LOGGER.warning(
+                "Failed to repair legacy entity ID %s → %s: %s",
+                entry.entity_id,
+                target_entity_id,
+                err,
+            )
+    return (len(messages), messages)
+
+
 def get_entity_id_suffix_repairs(
     registry: er.EntityRegistry, entry_id: str
 ) -> list[tuple[er.RegistryEntry, str, bool]]:
@@ -191,6 +278,13 @@ def repair_entity_id_suffixes(
                 err,
             )
     return (len(messages), messages)
+
+
+def repair_entity_ids(hass: HomeAssistant, entry_id: str) -> tuple[int, list[str]]:
+    """Repair legacy object_id suffixes and numeric entity_id suffixes (_2, _3, ...)."""
+    legacy_count, legacy_messages = repair_legacy_entity_object_ids(hass, entry_id)
+    suffix_count, suffix_messages = repair_entity_id_suffixes(hass, entry_id)
+    return (legacy_count + suffix_count, legacy_messages + suffix_messages)
 
 
 def remove_orphaned_entities(
