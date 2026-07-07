@@ -10,6 +10,7 @@ on:
       - "fritzboxvpn/**"
       - "tests/**"
       - "scripts/**"
+      - "docs/releases/**"
       - "hacs.json"
       - "pytest.ini"
       - ".coveragerc"
