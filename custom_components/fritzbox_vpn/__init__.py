@@ -28,7 +28,9 @@ from .entity_registry import (
     get_orphaned_entity_entries,
     remove_orphaned_entities,
     remove_unexpected_entity_entries,
+    repair_entity_id_suffixes,
     repair_entity_ids,
+    repair_legacy_entity_object_ids,
 )
 from .models import FritzboxVpnConfigEntry, FritzboxVpnRuntimeData
 
@@ -171,14 +173,28 @@ def _cleanup_empty_connection_devices(hass: HomeAssistant, entry_id: str) -> int
 
 
 def _repair_entity_ids_before_platform_setup(hass: HomeAssistant, entry_id: str) -> int:
-    """Repair entity IDs before platform setup."""
-    repaired_count, _ = repair_entity_ids(hass, entry_id)
+    """Repair numeric entity_id suffixes (_2, _3, …) before platform setup."""
+    repaired_count, _ = repair_entity_id_suffixes(hass, entry_id)
     if repaired_count:
         _LOGGER.info(
-            "Repaired %d entity ID(s) before platform setup",
+            "Repaired %d numeric entity ID suffix(es) before platform setup",
             repaired_count,
         )
     return repaired_count
+
+
+async def async_migrate_entry(hass: HomeAssistant, entry: FritzboxVpnConfigEntry) -> bool:
+    """Run one-time migrations for config entries."""
+    if entry.version < 2:
+        count, _ = repair_legacy_entity_object_ids(hass, entry.entry_id)
+        if count:
+            _LOGGER.info(
+                "Migrated %d legacy entity ID(s) for config entry %s",
+                count,
+                entry.entry_id,
+            )
+        hass.config_entries.async_update_entry(entry, version=2)
+    return True
 
 
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:

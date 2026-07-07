@@ -172,7 +172,12 @@ def entity_id_suffix_number(entity_id: str) -> int | None:
 def get_legacy_entity_object_id_repairs(
     hass: HomeAssistant, entry_id: str
 ) -> list[tuple[er.RegistryEntry, str]]:
-    """Rename operations for legacy entity IDs missing suffix tokens."""
+    """Rename operations for legacy entity IDs missing suffix tokens.
+
+    Uses the current device name to compute target entity IDs. Intended for the
+    one-time v1→v2 config-entry migration and explicit user-initiated repair,
+    not for automatic repair on every setup/reload.
+    """
     registry = er.async_get(hass)
     device_registry = dr.async_get(hass)
     repairs: list[tuple[er.RegistryEntry, str]] = []
