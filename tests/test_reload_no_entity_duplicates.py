@@ -94,6 +94,11 @@ async def test_reload_does_not_duplicate_entity_registry_entries(
                 vpn_unique_id(connection_uid, UNIQUE_ID_SUFFIX_VPN_UID)
             ].endswith("_vpn_uid")
 
+            switch_entity_id = unique_id_to_entity_id[
+                vpn_unique_id(connection_uid, UNIQUE_ID_SUFFIX_SWITCH)
+            ]
+            assert not switch_entity_id.endswith("_vpn_vpn")
+
     def _factory(*_args, **_kwargs):
         return _make_fake_coordinator(hass)
 

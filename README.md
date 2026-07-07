@@ -36,6 +36,10 @@ To install a beta release (e.g. for testing fixes before the next stable release
 
 Beta releases are published as GitHub Pre-releases (tags like `v0.10.0b1`).
 
+### Version 1.2.2b5 (Beta)
+
+**Breaking change:** The VPN switch is now the device's main feature (`has_entity_name` / `_attr_name = None`). The display name is the VPN connection name only (e.g. "Office VPN" instead of "Office VPN VPN"). The **entity ID** changes from `switch.<vpn_name>_vpn` to `switch.<vpn_name>` (e.g. `switch.office_vpn_vpn` → `switch.office_vpn`). Update automations and dashboards that reference the old entity ID; `unique_id` is unchanged.
+
 ## Configuration
 
 **Important:** TR-064 is always required for API access (see Requirements section). For automatic discovery to work, UPnP should be enabled in your FritzBox (recommended, but not required). If UPnP is disabled, you can still configure the integration manually.

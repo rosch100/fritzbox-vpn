@@ -12,6 +12,7 @@ from homeassistant.const import CONF_HOST, CONF_PASSWORD, CONF_USERNAME
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.data_entry_flow import FlowResult
 from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers import selector
 from homeassistant.helpers.service_info.ssdp import SsdpServiceInfo
 
 from .const import (
@@ -60,9 +61,15 @@ from .ssdp_unique_id import (
 
 _LOGGER = logging.getLogger(__name__)
 
-OPTIONS_LABEL_CONFIGURE = "Configure (host, user, update interval)"
-OPTIONS_LABEL_CLEANUP = "Remove unavailable entities"
-OPTIONS_LABEL_REPAIR_ENTITY_IDS = "Repair entity IDs"
+def _options_action_selector(available_actions: list[str]) -> selector.SelectSelector:
+    """Options-flow action selector with translated labels."""
+    return selector.SelectSelector(
+        selector.SelectSelectorConfig(
+            options=available_actions,
+            translation_key="options_action",
+            mode=selector.SelectSelectorMode.LIST,
+        )
+    )
 
 
 async def _try_create_entry_from_credentials(
@@ -261,6 +268,63 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             errors=errors,
         )
 
+    async def async_step_reconfigure(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Reconfigure host, credentials, and update interval without re-adding."""
+        reconfigure_entry = self._get_reconfigure_entry()
+        errors: dict[str, str] = {}
+
+        if user_input is None:
+            return self.async_show_form(
+                step_id="reconfigure",
+                data_schema=configure_schema(
+                    reconfigure_entry.data or {},
+                    reconfigure_entry.options or {},
+                ),
+                errors=errors,
+            )
+
+        user_input = dict(user_input)
+        fill_password_if_missing(user_input, reconfigure_entry.data or {})
+        if not validate_host_on_submit(user_input, errors):
+            return self.async_show_form(
+                step_id="reconfigure",
+                data_schema=configure_schema(
+                    user_input, reconfigure_entry.options or {}
+                ),
+                errors=errors,
+            )
+        try:
+            await validate_input(self.hass, user_input)
+        except Exception as err:
+            set_validation_error(errors, err, log_unknown_details=True)
+        else:
+            config_data = {
+                CONF_HOST: user_input[CONF_HOST],
+                CONF_USERNAME: user_input[CONF_USERNAME],
+                CONF_PASSWORD: user_input[CONF_PASSWORD],
+            }
+            options_data = {
+                CONF_UPDATE_INTERVAL: normalize_update_interval(
+                    user_input.get(CONF_UPDATE_INTERVAL, DEFAULT_UPDATE_INTERVAL)
+                )
+            }
+            return self.async_update_reload_and_abort(
+                reconfigure_entry,
+                data=config_data,
+                options=options_data,
+                reason="reconfigure_successful",
+            )
+
+        return self.async_show_form(
+            step_id="reconfigure",
+            data_schema=configure_schema(
+                user_input, reconfigure_entry.options or {}
+            ),
+            errors=errors,
+        )
+
     @staticmethod
     @callback
     def async_get_options_flow(
@@ -317,18 +381,18 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                 return await self.async_step_repair_entity_ids_confirm()
             return await self.async_step_configure()
 
-        choices = {OPTIONS_ACTION_CONFIGURE: OPTIONS_LABEL_CONFIGURE}
+        available_actions = [OPTIONS_ACTION_CONFIGURE]
         if has_cleanup_action:
-            choices[OPTIONS_ACTION_CLEANUP] = OPTIONS_LABEL_CLEANUP
+            available_actions.append(OPTIONS_ACTION_CLEANUP)
         if has_repair_action:
-            choices[OPTIONS_ACTION_REPAIR_ENTITY_IDS] = OPTIONS_LABEL_REPAIR_ENTITY_IDS
+            available_actions.append(OPTIONS_ACTION_REPAIR_ENTITY_IDS)
         return self.async_show_form(
             step_id="init",
             data_schema=vol.Schema(
                 {
-                    vol.Required("action", default=OPTIONS_ACTION_CONFIGURE): vol.In(
-                        choices
-                    ),
+                    vol.Required(
+                        "action", default=OPTIONS_ACTION_CONFIGURE
+                    ): _options_action_selector(available_actions),
                 }
             ),
         )

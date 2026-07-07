@@ -1,5 +1,9 @@
 {
   "config": {
+    "flow_title": "Fritz!Box VPN ({host})",
+    "initiate_flow": {
+      "reconfigure": "Reconfigure"
+    },
     "step": {
       "user": {
         "title": "Fritz!Box VPN Configuration",
@@ -17,7 +21,17 @@
       },
       "confirm": {
         "title": "Fritz!Box VPN Found",
-        "description": "A FritzBox was automatically discovered: {host}. Please confirm the configuration."
+        "description": "A FritzBox was automatically discovered: {host}. Please confirm the configuration.",
+        "data": {
+          "host": "FritzBox IP Address",
+          "username": "Username",
+          "password": "Password"
+        },
+        "data_description": {
+          "host": "FritzBox IP address or hostname",
+          "password": "Password used to authenticate against the FritzBox",
+          "username": "Username used to authenticate against the FritzBox"
+        }
       },
       "reauth_confirm": {
         "title": "Reauthenticate Fritz!Box VPN",
@@ -29,6 +43,22 @@
         "data_description": {
           "username": "Username used to authenticate against the FritzBox",
           "password": "Password used to authenticate against the FritzBox"
+        }
+      },
+      "reconfigure": {
+        "title": "Reconfigure Fritz!Box VPN",
+        "description": "Update your FritzBox connection details. The password field is not displayed for security reasons. Leave it empty to keep the current password, or enter a new password to change it.",
+        "data": {
+          "host": "FritzBox IP Address",
+          "username": "Username",
+          "password": "Password (leave empty to keep current password)",
+          "update_interval": "Update interval (seconds, 5–3600, max. 1 h)"
+        },
+        "data_description": {
+          "host": "FritzBox IP address or hostname",
+          "password": "Password used to authenticate against the FritzBox",
+          "update_interval": "Update interval in seconds",
+          "username": "Username used to authenticate against the FritzBox"
         }
       }
     },
@@ -43,7 +73,8 @@
       "already_configured": "This FritzBox is already configured.",
       "not_fritzbox": "The discovered device is not a FritzBox.",
       "no_host": "Could not determine the IP address.",
-      "reauth_successful": "[%key:common::config_flow::abort::reauth_successful%]"
+      "reauth_successful": "Reauthentication was successful.",
+      "reconfigure_successful": "Reconfiguration was successful."
     }
   },
   "options": {
@@ -105,12 +136,16 @@
       "coordinator_not_ready": "Data is still loading. Please wait a moment and try again."
     }
   },
-  "entity": {
-    "switch": {
-      "vpn": {
-        "name": "VPN"
+  "selector": {
+    "options_action": {
+      "options": {
+        "configure": "Configure (host, user, update interval)",
+        "cleanup": "Remove unavailable entities",
+        "repair_entity_ids": "Repair entity IDs"
       }
-    },
+    }
+  },
+  "entity": {
     "binary_sensor": {
       "connected": {
         "name": "Connected"

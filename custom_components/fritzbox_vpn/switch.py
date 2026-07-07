@@ -50,7 +50,11 @@ async def async_setup_entry(
 
 
 class FritzBoxVPNSwitch(FritzBoxVPNEntity, SwitchEntity):
-    """Switch entity for a FritzBox VPN connection."""
+    """Switch entity for a FritzBox VPN connection (main device feature)."""
+
+    # HA best practice: main feature uses device name only (see has_entity_name docs).
+    # Breaking change in 1.2.2b5: entity_id changes from switch.<vpn>_vpn to switch.<vpn>.
+    _attr_name = None
 
     def __init__(
         self,
@@ -66,7 +70,6 @@ class FritzBoxVPNSwitch(FritzBoxVPNEntity, SwitchEntity):
             connection_data,
             unique_id_suffix=UNIQUE_ID_SUFFIX_SWITCH,
         )
-        self._attr_translation_key = "vpn"
 
     @property
     def is_on(self) -> bool:
