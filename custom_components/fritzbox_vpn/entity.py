@@ -131,14 +131,14 @@ class FritzBoxVPNEntity(CoordinatorEntity):
 
     @property
     def suggested_object_id(self) -> str | None:
-        """Return a stable object_id for entity_id generation.
+        """Return a stable object_id suffix for entity_id generation.
 
-        HA derives the entity_id from this value; using fixed suffix tokens
-        avoids language-dependent translation differences.
+        With ``has_entity_name=True``, Home Assistant prepends the device name
+        via ``async_calculate_suggested_object_id``; return only the fixed
+        suffix token here to avoid duplicated name parts and language drift.
         """
         if self._attr_object_id_suffix:
-            vpn_name = self._connection_data.get(API_KEY_NAME, DEFAULT_NAME_UNKNOWN)
-            return f"{vpn_name}_{self._attr_object_id_suffix}"
+            return self._attr_object_id_suffix
         return super().suggested_object_id
 
 
