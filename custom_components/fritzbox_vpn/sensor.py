@@ -69,6 +69,7 @@ class FritzBoxVPNStatusSensor(FritzBoxVPNEntity, SensorEntity):
             unique_id_suffix=UNIQUE_ID_SUFFIX_STATUS,
         )
         self._attr_translation_key = "status"
+        self._attr_object_id_suffix = UNIQUE_ID_SUFFIX_STATUS
         self._attr_device_class = SensorDeviceClass.ENUM
         self._attr_options = list(VPN_STATUS_OPTIONS)
 
@@ -98,6 +99,7 @@ class FritzBoxVPNUIDSensor(FritzBoxVPNEntity, SensorEntity):
             unique_id_suffix=UNIQUE_ID_SUFFIX_UID,
         )
         self._attr_translation_key = "connection_uid"
+        self._attr_object_id_suffix = UNIQUE_ID_SUFFIX_UID
         self._attr_entity_category = EntityCategory.DIAGNOSTIC
 
     @property
@@ -126,6 +128,7 @@ class FritzBoxVPNVPNUIDSensor(FritzBoxVPNEntity, SensorEntity):
             unique_id_suffix=UNIQUE_ID_SUFFIX_VPN_UID,
         )
         self._attr_translation_key = "vpn_uid"
+        self._attr_object_id_suffix = UNIQUE_ID_SUFFIX_VPN_UID
         self._attr_entity_category = EntityCategory.DIAGNOSTIC
 
     @property

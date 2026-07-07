@@ -99,6 +99,8 @@ class FritzBoxVPNEntity(CoordinatorEntity):
 
     _attr_has_entity_name = True
     _attr_translation_domain = DOMAIN
+    # Keep entity_id (object_id) stable across languages by using fixed tokens.
+    _attr_object_id_suffix: str | None = None
 
     def __init__(
         self,
@@ -126,6 +128,18 @@ class FritzBoxVPNEntity(CoordinatorEntity):
     def _vpn_connection(self) -> dict[str, Any] | None:
         """Current connection dict from coordinator, if available."""
         return connection_data(self.coordinator, self._connection_uid)
+
+    @property
+    def suggested_object_id(self) -> str | None:
+        """Return a stable object_id for entity_id generation.
+
+        HA derives the entity_id from this value; using fixed suffix tokens
+        avoids language-dependent translation differences.
+        """
+        if self._attr_object_id_suffix:
+            vpn_name = self._connection_data.get(API_KEY_NAME, DEFAULT_NAME_UNKNOWN)
+            return f"{vpn_name}_{self._attr_object_id_suffix}"
+        return super().suggested_object_id
 
 
 async def setup_vpn_platform(

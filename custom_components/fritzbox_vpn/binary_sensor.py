@@ -64,6 +64,7 @@ class FritzBoxVPNConnectedBinarySensor(FritzBoxVPNEntity, BinarySensorEntity):
             unique_id_suffix=UNIQUE_ID_SUFFIX_CONNECTED,
         )
         self._attr_translation_key = "connected"
+        self._attr_object_id_suffix = UNIQUE_ID_SUFFIX_CONNECTED
         self._attr_device_class = BinarySensorDeviceClass.CONNECTIVITY
 
     @property
