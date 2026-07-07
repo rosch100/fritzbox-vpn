@@ -5,6 +5,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 import voluptuous as vol
 from custom_components.fritzbox_vpn.const import (
+    CONF_UPDATE_INTERVAL,
     ERROR_KEY_CANNOT_CONNECT,
     ERROR_KEY_INVALID_AUTH,
     ERROR_KEY_INVALID_HOST,
@@ -14,6 +15,7 @@ from custom_components.fritzbox_vpn.flow_forms import (
     CannotConnect,
     InvalidAuth,
     configure_schema,
+    configure_schema_for_resubmit,
     confirm_checkbox_schema,
     confirm_schema,
     credentials_defaults,
@@ -64,6 +66,31 @@ def test_configure_schema_invalid_host_fallback() -> None:
     """Invalid stored host falls back to default in configure schema."""
     schema = configure_schema({CONF_HOST: ".bad", CONF_USERNAME: "u"}, {})
     assert schema is not None
+
+
+def _schema_field_default(schema: vol.Schema, field: str) -> object:
+    """Return the voluptuous default for a schema field."""
+    for marker in schema.schema:
+        if marker.schema == field:
+            default = marker.default
+            return default() if callable(default) else default
+    raise AssertionError(f"Field {field!r} not found in schema")
+
+
+def test_configure_schema_for_resubmit_preserves_update_interval() -> None:
+    """Re-shown configure forms keep a submitted update interval."""
+    submitted = {
+        CONF_HOST: "192.168.1.10",
+        CONF_USERNAME: "user",
+        CONF_UPDATE_INTERVAL: 60,
+    }
+    stale_options = {CONF_UPDATE_INTERVAL: 30}
+
+    resubmit_schema = configure_schema_for_resubmit(submitted)
+    stale_schema = configure_schema(submitted, stale_options)
+
+    assert _schema_field_default(resubmit_schema, CONF_UPDATE_INTERVAL) == 60
+    assert _schema_field_default(stale_schema, CONF_UPDATE_INTERVAL) == 30
 
 
 def test_confirm_schema_with_current_input() -> None:

@@ -146,6 +146,17 @@ def configure_schema(
     )
 
 
+def configure_schema_for_resubmit(user_input: dict[str, Any]) -> vol.Schema:
+    """Configure schema defaults from the latest submitted form values.
+
+    On validation failure the form is re-shown; host/username come from
+    ``current_data`` and the update interval from ``current_options``. Pass the
+    submitted ``user_input`` for both so a typed interval is not reset to stored
+    options.
+    """
+    return configure_schema(user_input, user_input)
+
+
 def confirm_schema(
     existing_config: Mapping[str, Any] | None,
     discovered_host: str | None,

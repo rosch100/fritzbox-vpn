@@ -355,6 +355,48 @@ async def test_reconfigure_shows_error_on_validation_failure(
 
 
 @pytest.mark.asyncio
+async def test_reconfigure_reuses_stored_password_when_empty(
+    hass: HomeAssistant, mock_config_entry: MockConfigEntry
+) -> None:
+    """Reconfigure with empty password reuses the existing entry credential."""
+    mock_config_entry.add_to_hass(hass)
+    original_password = mock_config_entry.data[CONF_PASSWORD]
+
+    with patch(
+        "custom_components.fritzbox_vpn.flow_forms.validate_input",
+        new=AsyncMock(return_value={"title": mock_config_entry.title}),
+    ) as validate_mock, patch.object(
+        hass.config_entries, "async_reload", new=AsyncMock()
+    ):
+        result = await hass.config_entries.flow.async_init(
+            DOMAIN,
+            context={
+                "source": SOURCE_RECONFIGURE,
+                "entry_id": mock_config_entry.entry_id,
+            },
+        )
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"],
+            {
+                CONF_HOST: "192.168.1.10",
+                CONF_USERNAME: "new-user",
+                CONF_PASSWORD: "",
+                CONF_UPDATE_INTERVAL: 90,
+            },
+        )
+
+    assert result["type"] == FlowResultType.ABORT
+    assert result["reason"] == "reconfigure_successful"
+    validate_mock.assert_awaited_once()
+    assert validate_mock.await_args.args[1][CONF_PASSWORD] == original_password
+
+    updated = hass.config_entries.async_get_entry(mock_config_entry.entry_id)
+    assert updated is not None
+    assert updated.data[CONF_PASSWORD] == original_password
+    assert updated.options[CONF_UPDATE_INTERVAL] == 90
+
+
+@pytest.mark.asyncio
 async def test_validate_input_maps_connect_error(hass: HomeAssistant) -> None:
     """validate_input raises CannotConnect on connection errors."""
     session_mock = AsyncMock()

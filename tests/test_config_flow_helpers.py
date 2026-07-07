@@ -175,10 +175,8 @@ async def test_repair_entity_ids_runs_legacy_before_suffix(hass: HomeAssistant) 
     count, _ = repair_entity_ids(hass, entry.entry_id)
     assert count >= 2
     assert entity_registry.async_get("binary_sensor.altanis_berlin_connected")
-    switch_entry = entity_registry.async_get("switch.fritzbox_vpn_conn1_switch")
-    assert switch_entry is not None or entity_registry.async_get(
-        "switch.fritzbox_vpn_conn1_switch_2"
-    ) is None
+    assert entity_registry.async_get("switch.fritzbox_vpn_conn1_switch") is not None
+    assert entity_registry.async_get("switch.fritzbox_vpn_conn1_switch_2") is None
 
 
 @pytest.mark.asyncio

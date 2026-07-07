@@ -294,7 +294,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         return self.async_show_form(
             step_id="reconfigure",
-            data_schema=flow_forms.configure_schema(user_input, entry_options),
+            data_schema=flow_forms.configure_schema_for_resubmit(user_input),
             errors=errors,
         )
 
@@ -499,6 +499,6 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
 
         return self.async_show_form(
             step_id="configure",
-            data_schema=flow_forms.configure_schema(user_input, entry_options),
+            data_schema=flow_forms.configure_schema_for_resubmit(user_input),
             errors=errors,
         )
