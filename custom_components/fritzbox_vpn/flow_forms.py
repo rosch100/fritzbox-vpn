@@ -146,6 +146,17 @@ def configure_schema(
     )
 
 
+def configure_schema_for_resubmit(user_input: dict[str, Any]) -> vol.Schema:
+    """Configure schema defaults from the latest submitted form values.
+
+    On validation failure the form is re-shown; host/username come from
+    ``current_data`` and the update interval from ``current_options``. Pass the
+    submitted ``user_input`` for both so a typed interval is not reset to stored
+    options.
+    """
+    return configure_schema(user_input, user_input)
+
+
 def confirm_schema(
     existing_config: Mapping[str, Any] | None,
     discovered_host: str | None,
@@ -173,6 +184,41 @@ def reauth_schema(username_default: str) -> vol.Schema:
 def confirm_checkbox_schema() -> vol.Schema:
     """Single confirm checkbox for destructive options steps."""
     return vol.Schema({vol.Required("confirm", default=False): bool})
+
+
+def config_and_options_from_configure_input(
+    user_input: dict[str, Any],
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Split configure/reconfigure form input into entry data and options."""
+    config_data = {
+        CONF_HOST: user_input[CONF_HOST],
+        CONF_USERNAME: user_input[CONF_USERNAME],
+        CONF_PASSWORD: user_input[CONF_PASSWORD],
+    }
+    options_data = {
+        CONF_UPDATE_INTERVAL: normalize_update_interval(
+            user_input.get(CONF_UPDATE_INTERVAL, DEFAULT_UPDATE_INTERVAL)
+        )
+    }
+    return config_data, options_data
+
+
+async def async_validate_configure_input(
+    hass: HomeAssistant,
+    user_input: dict[str, Any],
+    errors: dict[str, str],
+    *password_sources: Mapping[str, Any] | None,
+) -> bool:
+    """Validate host and Fritz!Box connectivity for configure/reconfigure steps."""
+    fill_password_if_missing(user_input, *password_sources)
+    if not validate_host_on_submit(user_input, errors):
+        return False
+    try:
+        await validate_input(hass, user_input)
+    except Exception as err:
+        set_validation_error(errors, err, log_unknown_details=True)
+        return False
+    return True
 
 
 def validation_error_key(error_msg: str) -> str:

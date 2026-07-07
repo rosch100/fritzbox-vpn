@@ -27,7 +27,10 @@ from .coordinator import FritzBoxVPNCoordinator
 from .entity_registry import (
     get_orphaned_entity_entries,
     remove_orphaned_entities,
+    remove_unexpected_entity_entries,
     repair_entity_id_suffixes,
+    repair_entity_ids,
+    repair_legacy_entity_object_ids,
 )
 from .models import FritzboxVpnConfigEntry, FritzboxVpnRuntimeData
 
@@ -87,13 +90,13 @@ async def _async_remove_unavailable_entities(
 async def _async_repair_entity_id_suffixes(
     hass: HomeAssistant, call: ServiceCall
 ) -> None:
-    """Repair entity IDs with _2, _3, … suffix: remove stale base entry and rename to base ID."""
+    """Repair legacy and suffixed entity IDs, then reload when anything changed."""
     for entry_id in _entry_ids_for_cleanup_service(hass, call):
-        count, _ = repair_entity_id_suffixes(hass, entry_id)
+        count, _ = repair_entity_ids(hass, entry_id)
         if count:
             await hass.config_entries.async_reload(entry_id)
             _LOGGER.info(
-                "Repair entity ID suffixes: repaired %d entities for entry %s",
+                "Repair entity IDs: repaired %d entities for entry %s",
                 count,
                 entry_id,
             )
@@ -169,15 +172,29 @@ def _cleanup_empty_connection_devices(hass: HomeAssistant, entry_id: str) -> int
     return removed
 
 
-def _repair_suffixes_before_platform_setup(hass: HomeAssistant, entry_id: str) -> int:
-    """Repair entity-id suffixes before platform setup."""
+def _repair_entity_ids_before_platform_setup(hass: HomeAssistant, entry_id: str) -> int:
+    """Repair numeric entity_id suffixes (_2, _3, …) before platform setup."""
     repaired_count, _ = repair_entity_id_suffixes(hass, entry_id)
     if repaired_count:
         _LOGGER.info(
-            "Repaired %d entity ID suffix(es) before platform setup",
+            "Repaired %d numeric entity ID suffix(es) before platform setup",
             repaired_count,
         )
     return repaired_count
+
+
+async def async_migrate_entry(hass: HomeAssistant, entry: FritzboxVpnConfigEntry) -> bool:
+    """Run one-time migrations for config entries."""
+    if entry.version < 2:
+        count, _ = repair_legacy_entity_object_ids(hass, entry.entry_id)
+        if count:
+            _LOGGER.info(
+                "Migrated %d legacy entity ID(s) for config entry %s",
+                count,
+                entry.entry_id,
+            )
+        hass.config_entries.async_update_entry(entry, version=2)
+    return True
 
 
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
@@ -222,6 +239,26 @@ async def async_setup_entry(hass: HomeAssistant, entry: FritzboxVpnConfigEntry) 
 
     entry.runtime_data = FritzboxVpnRuntimeData(coordinator=coordinator)
 
+    if coordinator.data:
+        try:
+            removed_shadow_entities = remove_unexpected_entity_entries(
+                hass,
+                entry.entry_id,
+                current_uids=set(coordinator.data.keys()),
+            )
+            if removed_shadow_entities:
+                _LOGGER.info(
+                    "Removed %d shadow entity registry entries during setup",
+                    removed_shadow_entities,
+                )
+        except Exception as err:
+            # Best-effort cleanup: do not let registry cleanup bugs fail setup.
+            _LOGGER.warning(
+                "Shadow entity cleanup failed during setup for entry %s: %s",
+                entry.entry_id,
+                err,
+            )
+
     device_registry = dr.async_get(hass)
     parent_device = device_registry.async_get_or_create(
         config_entry_id=entry.entry_id,
@@ -235,7 +272,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: FritzboxVpnConfigEntry) 
         "Created parent device: %s (ID: %s)", parent_device.name, parent_device.id
     )
 
-    _repair_suffixes_before_platform_setup(hass, entry.entry_id)
+    _repair_entity_ids_before_platform_setup(hass, entry.entry_id)
 
     try:
         await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)

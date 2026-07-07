@@ -14,6 +14,7 @@ from .entity import (
     FritzBoxVPNEntity,
     raise_toggle_failed,
     setup_vpn_platform,
+    vpn_entities_for_uids,
     vpn_switch_attributes,
 )
 from .models import FritzboxVpnConfigEntry
@@ -33,13 +34,7 @@ async def async_setup_entry(
     def _create_entities(
         coordinator: FritzBoxVPNCoordinator, uids: set[str]
     ) -> list[FritzBoxVPNSwitch]:
-        if not coordinator.data:
-            return []
-        return [
-            FritzBoxVPNSwitch(coordinator, entry, uid, coordinator.data[uid])
-            for uid in uids
-            if uid in coordinator.data
-        ]
+        return vpn_entities_for_uids(coordinator, entry, uids, FritzBoxVPNSwitch)
 
     await setup_vpn_platform(
         entry,
@@ -50,7 +45,11 @@ async def async_setup_entry(
 
 
 class FritzBoxVPNSwitch(FritzBoxVPNEntity, SwitchEntity):
-    """Switch entity for a FritzBox VPN connection."""
+    """Switch entity for a FritzBox VPN connection (main device feature)."""
+
+    # HA best practice: main feature uses device name only (see has_entity_name docs).
+    # Breaking change in 1.2.2b5: entity_id changes from switch.<vpn>_vpn to switch.<vpn>.
+    _attr_name = None
 
     def __init__(
         self,
@@ -66,7 +65,6 @@ class FritzBoxVPNSwitch(FritzBoxVPNEntity, SwitchEntity):
             connection_data,
             unique_id_suffix=UNIQUE_ID_SUFFIX_SWITCH,
         )
-        self._attr_translation_key = "vpn"
 
     @property
     def is_on(self) -> bool:

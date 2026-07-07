@@ -58,7 +58,8 @@ def test_switch_available_and_state(mock_config_entry: MockConfigEntry) -> None:
     )
     assert entity.available
     assert entity.is_on
-    assert entity.translation_key == "vpn"
+    assert entity.name is None
+    assert entity.translation_key is None
 
 
 def test_binary_sensor_connected(mock_config_entry: MockConfigEntry) -> None:

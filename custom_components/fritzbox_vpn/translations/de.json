@@ -1,5 +1,9 @@
 {
   "config": {
+    "flow_title": "Fritz!Box VPN ({host})",
+    "initiate_flow": {
+      "user": "Fritz!Box VPN"
+    },
     "step": {
       "user": {
         "title": "Fritz!Box VPN Konfiguration",
@@ -17,7 +21,17 @@
       },
       "confirm": {
         "title": "Fritz!Box VPN gefunden",
-        "description": "Eine FritzBox wurde automatisch gefunden: {host}. Bitte bestätigen Sie die Konfiguration."
+        "description": "Eine FritzBox wurde automatisch gefunden: {host}. Bitte bestätigen Sie die Konfiguration.",
+        "data": {
+          "host": "FritzBox IP-Adresse",
+          "username": "Benutzername",
+          "password": "Passwort"
+        },
+        "data_description": {
+          "host": "FritzBox IP-Adresse oder Hostname",
+          "password": "Passwort zur Authentifizierung gegen die FritzBox",
+          "username": "Benutzername zur Authentifizierung gegen die FritzBox"
+        }
       },
       "reauth_confirm": {
         "title": "Fritz!Box VPN erneut anmelden",
@@ -59,8 +73,8 @@
       "already_configured": "Diese FritzBox ist bereits konfiguriert.",
       "not_fritzbox": "Das gefundene Gerät ist keine FritzBox.",
       "no_host": "Die IP-Adresse konnte nicht ermittelt werden.",
-      "reauth_successful": "[%key:common::config_flow::abort::reauth_successful%]",
-      "reconfigure_successful": "[%key:common::config_flow::abort::reconfigure_successful%]"
+      "reauth_successful": "Erneute Anmeldung war erfolgreich.",
+      "reconfigure_successful": "Neukonfiguration war erfolgreich."
     }
   },
   "options": {
@@ -122,12 +136,16 @@
       "coordinator_not_ready": "Daten werden noch geladen. Bitte kurz warten und erneut versuchen."
     }
   },
-  "entity": {
-    "switch": {
-      "vpn": {
-        "name": "VPN"
+  "selector": {
+    "options_action": {
+      "options": {
+        "configure": "Konfigurieren (Host, Benutzer, Update-Intervall)",
+        "cleanup": "Nicht verfügbare Entitäten entfernen",
+        "repair_entity_ids": "Entitäts-IDs reparieren"
       }
-    },
+    }
+  },
+  "entity": {
     "binary_sensor": {
       "connected": {
         "name": "Verbunden"
@@ -161,10 +179,6 @@
       "name": "Nicht verfügbare Entitäten entfernen",
       "description": "Entitäten löschen, deren VPN-Verbindung auf der Fritz!Box nicht mehr existiert; Integration anschließend neu laden.",
       "fields": {
-        "target": {
-          "name": "Ziel (target)",
-          "description": "Ziel-Entitäten für diese Integration (`fritzbox_vpn`)."
-        },
         "config_entry_id": {
           "name": "Config-Entry-ID",
           "description": "Optional. Bereinigung nur für diesen Konfigurationseintrag. Ohne Angabe: alle Fritz!Box-VPN-Integrationen."
@@ -175,10 +189,6 @@
       "name": "Entitäts-ID-Suffixe reparieren",
       "description": "Entitäts-IDs mit Suffix _2, _3, _4 (z. B. nach fehlerhafter Deaktivierung) auf die Basis-ID zurücksetzen. Verwaisten Basis-Eintrag entfernen.",
       "fields": {
-        "target": {
-          "name": "Ziel (target)",
-          "description": "Ziel-Entitäten für diese Integration (`fritzbox_vpn`)."
-        },
         "config_entry_id": {
           "name": "Config-Entry-ID",
           "description": "Optional. Reparatur nur für diesen Konfigurationseintrag. Ohne Angabe: alle Fritz!Box-VPN-Integrationen."

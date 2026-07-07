@@ -53,7 +53,7 @@ async def test_repair_entity_id_suffixes_service(
     """Service repairs suffixed entity IDs when configured."""
     mock_config_entry.add_to_hass(hass)
     with patch(
-        "custom_components.fritzbox_vpn.entity_registry.repair_entity_id_suffixes",
+        "custom_components.fritzbox_vpn.entity_registry.repair_entity_ids",
         return_value=(0, []),
     ), patch.object(hass.config_entries, "async_reload", new=AsyncMock()):
         await _async_repair_entity_id_suffixes(

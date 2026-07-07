@@ -1,10 +1,5 @@
 {
   "entity": {
-    "switch": {
-      "vpn": {
-        "default": "mdi:vpn"
-      }
-    },
     "binary_sensor": {
       "connected": {
         "default": "mdi:connection"

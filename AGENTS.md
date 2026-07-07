@@ -1,6 +1,6 @@
 # Agent-Anleitung (fritzbox-vpn)
 
-Home-Assistant-Custom-Integration für WireGuard-VPN auf AVM Fritz!Box.
+Kurzreferenz für **Coding-Agents** (Cursor, Copilot): projektspezifische Invarianten und lokale Checks. Nutzer-Doku: `README.md`. Review-Hinweise: `.github/copilot-instructions.md`.
 
 ## Architektur
 
@@ -10,20 +10,19 @@ Home-Assistant-Custom-Integration für WireGuard-VPN auf AVM Fritz!Box.
 | SSDP / `unique_id` (SSOT) | `ssdp_unique_id.py` |
 | Config Flow | `config_flow.py` |
 | Daten / Polling | `coordinator.py`, `sensor.py`, `switch.py` |
-| Tests | `tests/` (pytest + `pytest-homeassistant-custom-component`) |
+| Tests | `tests/` |
 
-## Wichtige Regeln
+## Invarianten
 
-- **SSDP-Logik nur in `ssdp_unique_id.py`:** UUID aus UDN/USN, Host aus Location, `unique_id_for_discovery`, Router vs. Repeater (`is_fritzbox_router_discovery`). Nicht in `config_flow` duplizieren.
-- **Repeater:** Diese Integration discovert nur **Router**, keine FRITZ!Repeater (anders als `homeassistant.components.fritz` im Core).
-- **Keine stillen Fallbacks:** Fehlende Discovery-Daten explizit behandeln (Abort/Fehler), keine Dummy-`unique_id`.
-- **Home Assistant:** Mindestversion in `hacs.json` und `manifest.json` (2026.1.0); Tests: `scripts/requirements-test.txt`.
+- SSDP/`unique_id` nur in `ssdp_unique_id.py` — nicht in `config_flow.py` duplizieren.
+- Nur Fritz!Box-**Router** discovern, keine FRITZ!Repeater.
+- Keine stillen Fallbacks: fehlende Discovery-Daten → Abort/Fehler, keine Dummy-`unique_id`.
+- Breaking Changes: Release Notes in `docs/releases/v{version}.md` (Workflow `release.yml`, HACS/HA-Update-Dialog).
+- Mindestversion HA: `hacs.json` / `manifest.json`.
 
-## Quality Scale
+## Qualität & Tests
 
-Ziel: **Gold** (siehe `custom_components/fritzbox_vpn/quality_scale.yaml`): Reauth, Diagnostics, Übersetzungen, **≥85 % Test-Coverage** (`pytest --cov`). Offizielles Badge erst nach Aufnahme in Home Assistant Core.
-
-## Tests lokal
+Ziel **Gold** (`custom_components/fritzbox_vpn/quality_scale.yaml`), Coverage ≥ 85 %.
 
 ```bash
 python3 -m venv .venv
@@ -32,39 +31,8 @@ python3 -m venv .venv
 .venv/bin/pytest tests/ --cov=custom_components/fritzbox_vpn -q
 ```
 
-`tests/conftest.py` setzt `hass_config_dir` auf das Repo-Root und aktiviert Custom Integrations.
+Vor Merge: CI-Jobs `Ruff`, `pytest`, `HACS validate`, `hassfest`.
 
-## GitHub Copilot Code Review
+## Core-Vorbereitung
 
-- **Automatisch:** Ruleset „Copilot code review“ (alle Branches, Review bei jedem Push).
-- **Konfiguration:** `.github/rulesets/copilot-code-review.json`, Richtlinien in `.github/copilot-instructions.md` und `.github/instructions/*.instructions.md`.
-- **Settings:** Repository → Copilot → Code review → Custom Instructions aktiviert lassen.
-
-## CI / Automation (Übersicht)
-
-| Workflow | Trigger | Zweck |
-|----------|---------|--------|
-| **ci.yml** | PR/Push (Pfade), nightly, manual | Ruff, pytest, HACS, hassfest |
-| **actionlint.yml** | `.github/**` | Workflow-Syntax |
-| **dependency-review.yml** | PR (Deps) | Sicherheit Abhängigkeiten (fail high+) |
-| **release.yml** | Tags `v*` | GitHub Release + Manifest-Versionscheck |
-| **stale.yml** | täglich | Inaktive Issues/PRs |
-| **Dependabot** | wöchentlich | Actions + pip |
-| **CodeQL** | Default Setup (GitHub) | Python + Actions, kein `codeql.yml` (Konflikt) |
-
-PR-Checks heißen: `Ruff`, `pytest`, `HACS validate`, `hassfest`.
-
-**Geschütztes `main`:** Ruleset „Required CI checks“ – Änderungen nur per **Pull Request**; vor Merge müssen `Ruff`, `pytest`, `HACS validate`, `hassfest` grün sein.
-
-## Core-Integration
-
-Vorbereitet unter `home-assistant-core/homeassistant/components/fritzbox_vpn/`:
-
-- API in PyPI-Library **`fritzboxvpn`** (`fritzboxvpn/` im Repo, vor Core-Merge auf PyPI veröffentlichen)
-- `runtime_data` statt `hass.data` für Coordinator/known_uids
-- `quality_scale: gold`, Brand über `homeassistant/brands/fritzbox.json`
-- Core-Tests unter `tests/components/fritzbox_vpn/`
-
-Vor dem Core-PR: `fritzboxvpn==1.0.0` auf PyPI publizieren (Workflow `.github/workflows/publish-pypi.yml`, Setup `docs/pypi-publish.md`), Doku-PR aus `docs/home-assistant-io/fritzbox_vpn.markdown`.
-
-Stabile SSDP-`unique_id` für FRITZ! (inkl. Repeater) liegt in `home-assistant/core` PR #165042. Bei SSDP-Änderungen Konzept mit Core abstimmen; Router/Repeater-Filter nur hier.
+API-Library `fritzboxvpn/` (PyPI vor Core-Merge), Core-Pfad unter `home-assistant-core/homeassistant/components/fritzbox_vpn/`. Details: `docs/pypi-publish.md`, `docs/home-assistant-io/fritzbox_vpn.markdown`.
