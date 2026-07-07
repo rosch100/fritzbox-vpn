@@ -14,6 +14,7 @@ from .entity import (
     FritzBoxVPNEntity,
     raise_toggle_failed,
     setup_vpn_platform,
+    vpn_entities_for_uids,
     vpn_switch_attributes,
 )
 from .models import FritzboxVpnConfigEntry
@@ -33,13 +34,7 @@ async def async_setup_entry(
     def _create_entities(
         coordinator: FritzBoxVPNCoordinator, uids: set[str]
     ) -> list[FritzBoxVPNSwitch]:
-        if not coordinator.data:
-            return []
-        return [
-            FritzBoxVPNSwitch(coordinator, entry, uid, coordinator.data[uid])
-            for uid in uids
-            if uid in coordinator.data
-        ]
+        return vpn_entities_for_uids(coordinator, entry, uids, FritzBoxVPNSwitch)
 
     await setup_vpn_platform(
         entry,

@@ -12,7 +12,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import UNIQUE_ID_SUFFIX_CONNECTED
 from .coordinator import FritzBoxVPNCoordinator
-from .entity import FritzBoxVPNEntity, setup_vpn_platform
+from .entity import FritzBoxVPNEntity, setup_vpn_platform, vpn_entities_for_uids
 from .models import FritzboxVpnConfigEntry
 
 PARALLEL_UPDATES = 1
@@ -28,15 +28,9 @@ async def async_setup_entry(
     def _create_entities(
         coordinator: FritzBoxVPNCoordinator, uids: set[str]
     ) -> list[FritzBoxVPNConnectedBinarySensor]:
-        if not coordinator.data:
-            return []
-        return [
-            FritzBoxVPNConnectedBinarySensor(
-                coordinator, entry, uid, coordinator.data[uid]
-            )
-            for uid in uids
-            if uid in coordinator.data
-        ]
+        return vpn_entities_for_uids(
+            coordinator, entry, uids, FritzBoxVPNConnectedBinarySensor
+        )
 
     await setup_vpn_platform(
         entry,
@@ -62,9 +56,8 @@ class FritzBoxVPNConnectedBinarySensor(FritzBoxVPNEntity, BinarySensorEntity):
             connection_uid,
             connection_data,
             unique_id_suffix=UNIQUE_ID_SUFFIX_CONNECTED,
+            translation_key="connected",
         )
-        self._attr_translation_key = "connected"
-        self._attr_object_id_suffix = UNIQUE_ID_SUFFIX_CONNECTED
         self._attr_device_class = BinarySensorDeviceClass.CONNECTIVITY
 
     @property

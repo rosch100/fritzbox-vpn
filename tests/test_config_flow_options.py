@@ -30,7 +30,7 @@ async def test_options_configure_updates_entry(
     mock_config_entry.add_to_hass(hass)
 
     with patch(
-        "custom_components.fritzbox_vpn.config_flow.validate_input",
+        "custom_components.fritzbox_vpn.flow_forms.validate_input",
         new=AsyncMock(return_value={"title": mock_config_entry.title}),
     ), patch.object(
         hass.config_entries, "async_reload", new=AsyncMock()
@@ -128,7 +128,7 @@ async def test_user_autoconfig_from_fritz(hass: HomeAssistant) -> None:
             }
         ),
     ), patch(
-        "custom_components.fritzbox_vpn.config_flow.validate_input",
+        "custom_components.fritzbox_vpn.flow_forms.validate_input",
         new=AsyncMock(return_value={"title": "Fritz!Box VPN"}),
     ):
         result = await hass.config_entries.flow.async_init(
@@ -216,7 +216,7 @@ async def test_options_configure_validation_error(
     """Configure step shows base error when validation fails."""
     mock_config_entry.add_to_hass(hass)
     with patch(
-        "custom_components.fritzbox_vpn.config_flow.validate_input",
+        "custom_components.fritzbox_vpn.flow_forms.validate_input",
         new=AsyncMock(side_effect=CannotConnect),
     ):
         handler = OptionsFlowHandler(mock_config_entry)

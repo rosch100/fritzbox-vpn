@@ -28,6 +28,49 @@ from .models import FritzboxVpnConfigEntry, RuntimePlatform, runtime_from_entry
 _LOGGER = logging.getLogger(__name__)
 
 EntityFactory = Callable[[FritzBoxVPNCoordinator, set[str]], list]
+VpnEntityFactory = Callable[
+    [FritzBoxVPNCoordinator, FritzboxVpnConfigEntry, str, dict[str, Any]], Any
+]
+VpnConnectionEntitiesFactory = Callable[
+    [FritzBoxVPNCoordinator, FritzboxVpnConfigEntry, str, dict[str, Any]], list[Any]
+]
+
+
+def vpn_entities_for_connections(
+    coordinator: FritzBoxVPNCoordinator,
+    entry: FritzboxVpnConfigEntry,
+    uids: set[str],
+    create_entities: VpnConnectionEntitiesFactory,
+) -> list[Any]:
+    """Create entities for each VPN UID (factory may return multiple per connection)."""
+    if not coordinator.data:
+        return []
+    entities: list[Any] = []
+    for uid in uids:
+        if uid in coordinator.data:
+            entities.extend(
+                create_entities(coordinator, entry, uid, coordinator.data[uid])
+            )
+    return entities
+
+
+def vpn_entities_for_uids(
+    coordinator: FritzBoxVPNCoordinator,
+    entry: FritzboxVpnConfigEntry,
+    uids: set[str],
+    create_entity: VpnEntityFactory,
+) -> list[Any]:
+    """Create one entity per VPN UID that exists in coordinator data."""
+
+    def _create_one(
+        coord: FritzBoxVPNCoordinator,
+        ent: FritzboxVpnConfigEntry,
+        uid: str,
+        conn: dict[str, Any],
+    ) -> list[Any]:
+        return [create_entity(coord, ent, uid, conn)]
+
+    return vpn_entities_for_connections(coordinator, entry, uids, _create_one)
 
 
 def vpn_unique_id(connection_uid: str, suffix: str) -> str:
@@ -110,6 +153,8 @@ class FritzBoxVPNEntity(CoordinatorEntity):
         connection_payload: dict[str, Any],
         *,
         unique_id_suffix: str,
+        translation_key: str | None = None,
+        object_id_suffix: str | None = None,
     ) -> None:
         super().__init__(coordinator)
         self._entry = entry
@@ -119,6 +164,13 @@ class FritzBoxVPNEntity(CoordinatorEntity):
         self._attr_device_info = vpn_device_info(
             entry, connection_uid, connection_payload
         )
+        if translation_key is not None:
+            self._attr_translation_key = translation_key
+            self._attr_object_id_suffix = (
+                object_id_suffix if object_id_suffix is not None else unique_id_suffix
+            )
+        elif object_id_suffix is not None:
+            self._attr_object_id_suffix = object_id_suffix
 
     @property
     def available(self) -> bool:

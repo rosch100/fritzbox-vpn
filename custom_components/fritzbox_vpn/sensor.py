@@ -15,7 +15,7 @@ from .const import (
     VPN_STATUS_OPTIONS,
 )
 from .coordinator import FritzBoxVPNCoordinator
-from .entity import FritzBoxVPNEntity, setup_vpn_platform
+from .entity import FritzBoxVPNEntity, setup_vpn_platform, vpn_entities_for_connections
 from .models import FritzboxVpnConfigEntry
 
 PARALLEL_UPDATES = 1
@@ -28,20 +28,24 @@ async def async_setup_entry(
 ) -> None:
     """Set up FritzBox VPN sensor entities."""
 
+    def _sensors_for_connection(
+        coordinator: FritzBoxVPNCoordinator,
+        entry: FritzboxVpnConfigEntry,
+        uid: str,
+        conn: dict[str, Any],
+    ) -> list[SensorEntity]:
+        return [
+            FritzBoxVPNStatusSensor(coordinator, entry, uid, conn),
+            FritzBoxVPNUIDSensor(coordinator, entry, uid, conn),
+            FritzBoxVPNVPNUIDSensor(coordinator, entry, uid, conn),
+        ]
+
     def _create_entities(
         coordinator: FritzBoxVPNCoordinator, uids: set[str]
     ) -> list[SensorEntity]:
-        if not coordinator.data:
-            return []
-        entities: list[SensorEntity] = []
-        for uid in uids:
-            if uid not in coordinator.data:
-                continue
-            conn = coordinator.data[uid]
-            entities.append(FritzBoxVPNStatusSensor(coordinator, entry, uid, conn))
-            entities.append(FritzBoxVPNUIDSensor(coordinator, entry, uid, conn))
-            entities.append(FritzBoxVPNVPNUIDSensor(coordinator, entry, uid, conn))
-        return entities
+        return vpn_entities_for_connections(
+            coordinator, entry, uids, _sensors_for_connection
+        )
 
     await setup_vpn_platform(
         entry,
@@ -67,9 +71,8 @@ class FritzBoxVPNStatusSensor(FritzBoxVPNEntity, SensorEntity):
             connection_uid,
             connection_data,
             unique_id_suffix=UNIQUE_ID_SUFFIX_STATUS,
+            translation_key="status",
         )
-        self._attr_translation_key = "status"
-        self._attr_object_id_suffix = UNIQUE_ID_SUFFIX_STATUS
         self._attr_device_class = SensorDeviceClass.ENUM
         self._attr_options = list(VPN_STATUS_OPTIONS)
 
@@ -97,9 +100,8 @@ class FritzBoxVPNUIDSensor(FritzBoxVPNEntity, SensorEntity):
             connection_uid,
             connection_data,
             unique_id_suffix=UNIQUE_ID_SUFFIX_UID,
+            translation_key="connection_uid",
         )
-        self._attr_translation_key = "connection_uid"
-        self._attr_object_id_suffix = UNIQUE_ID_SUFFIX_UID
         self._attr_entity_category = EntityCategory.DIAGNOSTIC
 
     @property
@@ -126,9 +128,8 @@ class FritzBoxVPNVPNUIDSensor(FritzBoxVPNEntity, SensorEntity):
             connection_uid,
             connection_data,
             unique_id_suffix=UNIQUE_ID_SUFFIX_VPN_UID,
+            translation_key="vpn_uid",
         )
-        self._attr_translation_key = "vpn_uid"
-        self._attr_object_id_suffix = UNIQUE_ID_SUFFIX_VPN_UID
         self._attr_entity_category = EntityCategory.DIAGNOSTIC
 
     @property

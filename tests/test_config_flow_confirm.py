@@ -29,7 +29,7 @@ async def test_confirm_step_success(hass: HomeAssistant) -> None:
     hass.config_entries.flow._progress[flow.flow_id] = flow
 
     with patch(
-        "custom_components.fritzbox_vpn.config_flow.validate_input",
+        "custom_components.fritzbox_vpn.flow_forms.validate_input",
         new=AsyncMock(return_value={"title": "Fritz!Box VPN"}),
     ):
         result = await flow.async_step_confirm(
@@ -89,7 +89,7 @@ async def test_confirm_step_validation_error(hass: HomeAssistant) -> None:
     flow._discovered_unique_id = MOCK_HOST
 
     with patch(
-        "custom_components.fritzbox_vpn.config_flow.validate_input",
+        "custom_components.fritzbox_vpn.flow_forms.validate_input",
         new=AsyncMock(side_effect=InvalidAuth),
     ):
         result = await flow.async_step_confirm(

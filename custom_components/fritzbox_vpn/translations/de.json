@@ -2,7 +2,7 @@
   "config": {
     "flow_title": "Fritz!Box VPN ({host})",
     "initiate_flow": {
-      "reconfigure": "Neu konfigurieren"
+      "user": "Fritz!Box VPN"
     },
     "step": {
       "user": {

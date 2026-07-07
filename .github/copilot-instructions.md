@@ -33,7 +33,7 @@ Flag as blocking when you see:
 - Repeater discovery enabled or repeater-specific flows added by mistake
 - Dummy defaults for failed API/SSDP instead of explicit errors
 - New code without tests for `config_flow` / SSDP changes
-- Breaking changes to `manifest.json` version without release notes context
+- Breaking changes to `manifest.json` version without release notes in `docs/releases/v{version}.md` (used by `.github/workflows/release.yml` for HACS/HA update dialog)
 
 Prefer suggestions over nits for line length in legacy files (Ruff ignores `E501`).
 

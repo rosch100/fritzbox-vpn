@@ -15,10 +15,9 @@ from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers import selector
 from homeassistant.helpers.service_info.ssdp import SsdpServiceInfo
 
+from . import flow_forms
 from .const import (
-    CONF_UPDATE_INTERVAL,
     DEFAULT_HOST,
-    DEFAULT_UPDATE_INTERVAL,
     DOMAIN,
     ERROR_KEY_CANNOT_CONNECT,
     ERROR_KEY_CONFIG_ENTRY_NOT_FOUND,
@@ -30,27 +29,13 @@ from .const import (
     host_from_config,
     password_from_sources,
 )
-from .coordinator import normalize_update_interval
 from .entity_registry import (
     get_entity_id_suffix_repairs,
     get_orphaned_entity_entries,
     remove_orphaned_entities,
     repair_entity_id_suffixes,
 )
-from .flow_forms import (
-    CannotConnect,
-    InvalidAuth,
-    configure_schema,
-    confirm_checkbox_schema,
-    confirm_schema,
-    credentials_defaults,
-    credentials_schema,
-    fill_password_if_missing,
-    reauth_schema,
-    set_validation_error,
-    validate_host_on_submit,
-    validate_input,
-)
+from .flow_forms import CannotConnect, InvalidAuth
 from .fritz_config_source import get_existing_fritz_config
 from .ssdp_unique_id import (
     host_from_ssdp,
@@ -60,6 +45,7 @@ from .ssdp_unique_id import (
 )
 
 _LOGGER = logging.getLogger(__name__)
+
 
 def _options_action_selector(available_actions: list[str]) -> selector.SelectSelector:
     """Options-flow action selector with translated labels."""
@@ -83,13 +69,13 @@ async def _try_create_entry_from_credentials(
     log_unknown_details: bool,
 ) -> FlowResult | None:
     """Validate credentials and create entry; None if the form should be shown again."""
-    fill_password_if_missing(user_input, *password_sources)
-    if not validate_host_on_submit(user_input, errors):
+    flow_forms.fill_password_if_missing(user_input, *password_sources)
+    if not flow_forms.validate_host_on_submit(user_input, errors):
         return None
     try:
-        info = await validate_input(hass, user_input)
+        info = await flow_forms.validate_input(hass, user_input)
     except Exception as err:
-        set_validation_error(errors, err, log_unknown_details=log_unknown_details)
+        flow_forms.set_validation_error(errors, err, log_unknown_details=log_unknown_details)
         return None
     if unique_id is not None:
         await flow.async_set_unique_id(unique_id)
@@ -120,7 +106,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 has_password = bool(password_from_sources(self._existing_config))
                 if has_host and has_username and has_password:
                     try:
-                        info = await validate_input(self.hass, self._existing_config)
+                        info = await flow_forms.validate_input(self.hass, self._existing_config)
                         return self.async_create_entry(
                             title=info["title"], data=self._existing_config
                         )
@@ -141,7 +127,9 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                             "Autoconfiguration connection test failed: %s", err
                         )
                         errors["base"] = ERROR_KEY_UNKNOWN
-            schema = credentials_schema(*credentials_defaults(self._existing_config))
+            schema = flow_forms.credentials_schema(
+                *flow_forms.credentials_defaults(self._existing_config)
+            )
             return self.async_show_form(
                 step_id="user", data_schema=schema, errors=errors
             )
@@ -157,7 +145,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         )
         if result is not None:
             return result
-        schema = credentials_schema(*credentials_defaults(user_input))
+        schema = flow_forms.credentials_schema(*flow_forms.credentials_defaults(user_input))
         return self.async_show_form(step_id="user", data_schema=schema, errors=errors)
 
     async def async_step_ssdp(self, discovery_info: SsdpServiceInfo) -> FlowResult:
@@ -191,7 +179,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         if user_input is None:
             return self.async_show_form(
                 step_id="confirm",
-                data_schema=confirm_schema(
+                data_schema=flow_forms.confirm_schema(
                     self._existing_config, self._discovered_host
                 ),
                 description_placeholders={
@@ -212,7 +200,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             return result
         return self.async_show_form(
             step_id="confirm",
-            data_schema=confirm_schema(
+            data_schema=flow_forms.confirm_schema(
                 self._existing_config,
                 self._discovered_host,
                 current_input=user_input,
@@ -236,7 +224,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         if user_input is None:
             return self.async_show_form(
                 step_id="reauth_confirm",
-                data_schema=reauth_schema(username_default),
+                data_schema=flow_forms.reauth_schema(username_default),
                 description_placeholders={"host": host},
                 errors=errors,
             )
@@ -247,9 +235,9 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             CONF_PASSWORD: user_input[CONF_PASSWORD],
         }
         try:
-            await validate_input(self.hass, credentials)
+            await flow_forms.validate_input(self.hass, credentials)
         except Exception as err:
-            set_validation_error(errors, err, log_unknown_details=True)
+            flow_forms.set_validation_error(errors, err, log_unknown_details=True)
         else:
             return self.async_update_reload_and_abort(
                 reauth_entry,
@@ -263,7 +251,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         return self.async_show_form(
             step_id="reauth_confirm",
-            data_schema=reauth_schema(user_input.get(CONF_USERNAME, username_default)),
+            data_schema=flow_forms.reauth_schema(user_input.get(CONF_USERNAME, username_default)),
             description_placeholders={"host": host},
             errors=errors,
         )
@@ -274,42 +262,28 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         """Reconfigure host, credentials, and update interval without re-adding."""
         reconfigure_entry = self._get_reconfigure_entry()
         errors: dict[str, str] = {}
+        entry_options = reconfigure_entry.options or {}
 
         if user_input is None:
             return self.async_show_form(
                 step_id="reconfigure",
-                data_schema=configure_schema(
+                data_schema=flow_forms.configure_schema(
                     reconfigure_entry.data or {},
-                    reconfigure_entry.options or {},
+                    entry_options,
                 ),
                 errors=errors,
             )
 
         user_input = dict(user_input)
-        fill_password_if_missing(user_input, reconfigure_entry.data or {})
-        if not validate_host_on_submit(user_input, errors):
-            return self.async_show_form(
-                step_id="reconfigure",
-                data_schema=configure_schema(
-                    user_input, reconfigure_entry.options or {}
-                ),
-                errors=errors,
+        if await flow_forms.async_validate_configure_input(
+            self.hass,
+            user_input,
+            errors,
+            reconfigure_entry.data or {},
+        ):
+            config_data, options_data = flow_forms.config_and_options_from_configure_input(
+                user_input
             )
-        try:
-            await validate_input(self.hass, user_input)
-        except Exception as err:
-            set_validation_error(errors, err, log_unknown_details=True)
-        else:
-            config_data = {
-                CONF_HOST: user_input[CONF_HOST],
-                CONF_USERNAME: user_input[CONF_USERNAME],
-                CONF_PASSWORD: user_input[CONF_PASSWORD],
-            }
-            options_data = {
-                CONF_UPDATE_INTERVAL: normalize_update_interval(
-                    user_input.get(CONF_UPDATE_INTERVAL, DEFAULT_UPDATE_INTERVAL)
-                )
-            }
             return self.async_update_reload_and_abort(
                 reconfigure_entry,
                 data=config_data,
@@ -319,9 +293,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         return self.async_show_form(
             step_id="reconfigure",
-            data_schema=configure_schema(
-                user_input, reconfigure_entry.options or {}
-            ),
+            data_schema=flow_forms.configure_schema(user_input, entry_options),
             errors=errors,
         )
 
@@ -420,7 +392,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
 
         return self.async_show_form(
             step_id=step_id,
-            data_schema=confirm_checkbox_schema(),
+            data_schema=flow_forms.confirm_checkbox_schema(),
         )
 
     async def async_step_cleanup_confirm(
@@ -483,45 +455,40 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
         if not config_entry:
             return self.async_abort(reason=ERROR_KEY_CONFIG_ENTRY_NOT_FOUND)
 
-        if user_input is not None:
-            user_input = dict(user_input)
-            user_input.pop("action", None)
-            fill_password_if_missing(user_input, config_entry.data or {})
-            if not validate_host_on_submit(user_input, errors):
-                return self.async_show_form(
-                    step_id="configure",
-                    data_schema=configure_schema(
-                        user_input, config_entry.options or {}
-                    ),
-                    errors=errors,
-                )
-            try:
-                await validate_input(self.hass, user_input)
-            except Exception as err:
-                set_validation_error(errors, err, log_unknown_details=True)
-            else:
-                config_data = {
-                    CONF_HOST: user_input[CONF_HOST],
-                    CONF_USERNAME: user_input[CONF_USERNAME],
-                    CONF_PASSWORD: user_input[CONF_PASSWORD],
-                }
-                update_interval = normalize_update_interval(
-                    user_input.get(CONF_UPDATE_INTERVAL, DEFAULT_UPDATE_INTERVAL)
-                )
-                options_data = {CONF_UPDATE_INTERVAL: update_interval}
-                self.hass.config_entries.async_update_entry(
-                    config_entry,
-                    data=config_data,
-                    options=options_data,
-                )
-                result = self.async_create_entry(title="", data=options_data)
-                await self.hass.config_entries.async_reload(config_entry.entry_id)
-                return result
+        entry_options = config_entry.options or {}
+
+        if user_input is None:
+            return self.async_show_form(
+                step_id="configure",
+                data_schema=flow_forms.configure_schema(
+                    config_entry.data or {},
+                    entry_options,
+                ),
+                errors=errors,
+            )
+
+        user_input = dict(user_input)
+        user_input.pop("action", None)
+        if await flow_forms.async_validate_configure_input(
+            self.hass,
+            user_input,
+            errors,
+            config_entry.data or {},
+        ):
+            config_data, options_data = flow_forms.config_and_options_from_configure_input(
+                user_input
+            )
+            self.hass.config_entries.async_update_entry(
+                config_entry,
+                data=config_data,
+                options=options_data,
+            )
+            result = self.async_create_entry(title="", data=options_data)
+            await self.hass.config_entries.async_reload(config_entry.entry_id)
+            return result
 
         return self.async_show_form(
             step_id="configure",
-            data_schema=configure_schema(
-                config_entry.data or {}, config_entry.options or {}
-            ),
+            data_schema=flow_forms.configure_schema(user_input, entry_options),
             errors=errors,
         )

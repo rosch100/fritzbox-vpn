@@ -1,6 +1,7 @@
 # Release- und Beta-Release-Workflow für HACS
 # - Tag v*.*.* (z. B. v0.9.0) → normales Release
 # - Tag v*.*.*b* oder v*.*.*-beta.* (z. B. v0.9.0b1) → Pre-Release (Beta)
+# - Release-Text: docs/releases/v{version}.md (sonst GitHub auto-generate)
 
 name: Release
 
@@ -37,10 +38,21 @@ jobs:
             exit 1
           fi
 
-      - uses: softprops/action-gh-release@v2
-        with:
-          generate_release_notes: true
-          prerelease: ${{ contains(github.ref_name, 'b') || contains(github.ref_name, 'beta') }}
-          name: Release ${{ github.ref_name }}
+      - name: Create GitHub Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          NOTES_FILE="docs/releases/${TAG}.md"
+          ARGS=( "$TAG" --title "Release ${TAG}" )
+          if [[ "$TAG" == *b* || "$TAG" == *beta* ]]; then
+            ARGS+=( --prerelease )
+          fi
+          if [ -f "$NOTES_FILE" ]; then
+            echo "Using release notes from $NOTES_FILE"
+            ARGS+=( --notes-file "$NOTES_FILE" )
+          else
+            echo "No release notes at $NOTES_FILE; using auto-generated notes"
+            ARGS+=( --generate-notes )
+          fi
+          gh release create "${ARGS[@]}"
