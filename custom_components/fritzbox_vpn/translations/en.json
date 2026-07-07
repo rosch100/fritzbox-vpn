@@ -171,7 +171,7 @@
   },
   "exceptions": {
     "toggle_failed": {
-      "message": "Failed to change VPN connection {name}.{error}"
+      "message": "Failed to change VPN connection {name}{error}"
     }
   },
   "services": {

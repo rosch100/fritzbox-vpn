@@ -1,17 +1,17 @@
-"""Tests for FritzBox VPN config flow (user, reauth, validation)."""
+"""Tests for FritzBox VPN config flow (user, reauth, reconfigure, validation)."""
 
 from unittest.mock import AsyncMock, patch
 
 import pytest
 import voluptuous as vol
-from custom_components.fritzbox_vpn.const import DOMAIN
+from custom_components.fritzbox_vpn.const import CONF_UPDATE_INTERVAL, DOMAIN
 from custom_components.fritzbox_vpn.flow_forms import (
     CannotConnect,
     InvalidAuth,
     validate_host,
     validate_input,
 )
-from homeassistant.config_entries import SOURCE_REAUTH, SOURCE_USER
+from homeassistant.config_entries import SOURCE_REAUTH, SOURCE_RECONFIGURE, SOURCE_USER
 from homeassistant.const import CONF_HOST, CONF_PASSWORD, CONF_USERNAME
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
@@ -269,6 +269,89 @@ async def test_reauth_shows_error_on_validation_failure(
     assert result["type"] == FlowResultType.FORM
     assert result["step_id"] == "reauth_confirm"
     assert result["errors"]["base"] == "cannot_connect"
+
+
+@pytest.mark.asyncio
+async def test_reconfigure_updates_entry_without_creating_duplicate(
+    hass: HomeAssistant, mock_config_entry: MockConfigEntry
+) -> None:
+    """Reconfigure flow updates data/options on the existing entry only."""
+    mock_config_entry.add_to_hass(hass)
+    entries_before = len(hass.config_entries.async_entries(DOMAIN))
+
+    with patch(
+        "custom_components.fritzbox_vpn.flow_forms.validate_input",
+        new=AsyncMock(return_value={"title": mock_config_entry.title}),
+    ), patch.object(
+        hass.config_entries, "async_reload", new=AsyncMock()
+    ) as reload_mock:
+        result = await hass.config_entries.flow.async_init(
+            DOMAIN,
+            context={
+                "source": SOURCE_RECONFIGURE,
+                "entry_id": mock_config_entry.entry_id,
+            },
+        )
+        assert result["type"] == FlowResultType.FORM
+        assert result["step_id"] == "reconfigure"
+
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"],
+            {
+                CONF_HOST: "192.168.1.10",
+                CONF_USERNAME: "new-user",
+                CONF_PASSWORD: "new-pass",
+                CONF_UPDATE_INTERVAL: 120,
+            },
+        )
+
+    assert result["type"] == FlowResultType.ABORT
+    assert result["reason"] == "reconfigure_successful"
+    assert len(hass.config_entries.async_entries(DOMAIN)) == entries_before
+
+    updated = hass.config_entries.async_get_entry(mock_config_entry.entry_id)
+    assert updated is not None
+    assert updated.data[CONF_HOST] == "192.168.1.10"
+    assert updated.data[CONF_USERNAME] == "new-user"
+    assert updated.data[CONF_PASSWORD] == "new-pass"
+    assert updated.options[CONF_UPDATE_INTERVAL] == 120
+    reload_mock.assert_awaited_once_with(mock_config_entry.entry_id)
+
+
+@pytest.mark.asyncio
+async def test_reconfigure_shows_error_on_validation_failure(
+    hass: HomeAssistant, mock_config_entry: MockConfigEntry
+) -> None:
+    """Reconfigure flow shows form again when validation fails."""
+    mock_config_entry.add_to_hass(hass)
+
+    with patch(
+        "custom_components.fritzbox_vpn.flow_forms.validate_input",
+        new=AsyncMock(side_effect=CannotConnect),
+    ):
+        result = await hass.config_entries.flow.async_init(
+            DOMAIN,
+            context={
+                "source": SOURCE_RECONFIGURE,
+                "entry_id": mock_config_entry.entry_id,
+            },
+        )
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"],
+            {
+                CONF_HOST: "192.168.1.10",
+                CONF_USERNAME: MOCK_USERNAME,
+                CONF_PASSWORD: MOCK_PASSWORD,
+                CONF_UPDATE_INTERVAL: 60,
+            },
+        )
+
+    assert result["type"] == FlowResultType.FORM
+    assert result["step_id"] == "reconfigure"
+    assert result["errors"]["base"] == "cannot_connect"
+    assert hass.config_entries.async_get_entry(mock_config_entry.entry_id).data[
+        CONF_HOST
+    ] == mock_config_entry.data[CONF_HOST]
 
 
 @pytest.mark.asyncio
