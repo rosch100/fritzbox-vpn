@@ -39,7 +39,7 @@ Prefer suggestions over nits for line length in legacy files (Ruff ignores `E501
 
 ## CI expectations
 
-PRs should pass the **CI** workflow jobs: `Ruff`, `pytest`, `HACS validate`, `hassfest`.
+PRs should pass the **CI** workflow jobs: `CI` (aggregate), `Ruff`, `pytest`, `HACS validate`, `hassfest`.
 
 Also: Actionlint (workflow changes), Dependency review (requirements/manifest), CodeQL via GitHub default setup.
 
