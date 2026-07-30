@@ -38,21 +38,27 @@ jobs:
             exit 1
           fi
 
-      - name: Create GitHub Release
+      - name: Create or update GitHub Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ github.ref_name }}
         run: |
           NOTES_FILE="docs/releases/${TAG}.md"
-          ARGS=( "$TAG" --title "Release ${TAG}" )
+          TITLE="Release ${TAG}"
+          EXTRA=()
           if [[ "$TAG" == *b* || "$TAG" == *beta* ]]; then
-            ARGS+=( --prerelease )
+            EXTRA+=( --prerelease )
           fi
           if [ -f "$NOTES_FILE" ]; then
             echo "Using release notes from $NOTES_FILE"
-            ARGS+=( --notes-file "$NOTES_FILE" )
+            NOTES_ARGS=( --notes-file "$NOTES_FILE" )
           else
             echo "No release notes at $NOTES_FILE; using auto-generated notes"
-            ARGS+=( --generate-notes )
+            NOTES_ARGS=( --generate-notes )
           fi
-          gh release create "${ARGS[@]}"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Release $TAG already exists; updating notes/title"
+            gh release edit "$TAG" --title "$TITLE" "${EXTRA[@]}" "${NOTES_ARGS[@]}"
+          else
+            gh release create "$TAG" --title "$TITLE" "${EXTRA[@]}" "${NOTES_ARGS[@]}"
+          fi
