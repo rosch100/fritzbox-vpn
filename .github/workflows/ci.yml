@@ -1,66 +1,92 @@
-# Unified CI: lint, tests, HACS, hassfest (same triggers, consistent PR checks)
+# CI aligned with home-assistant/core and hacs/integration practices:
+# - workflow-level permissions: {} (least privilege; grant per job)
+# - actions pinned by commit SHA with version comments
+# - persist-credentials: false on checkout
+# - concurrency keyed by PR number
+# - ubuntu-24.04, job timeouts, workflow_dispatch inputs
+# - required check names preserved for ruleset: Ruff, pytest, HACS validate, hassfest
 name: CI
+run-name: >-
+  ${{ github.event_name == 'workflow_dispatch'
+      && format('CI: {0}', github.ref_name)
+      || '' }}
 
+# yamllint disable-line rule:truthy
 on:
   push:
     branches:
       - main
-    paths: &ci-paths
-      - "custom_components/**"
-      - "fritzboxvpn/**"
-      - "tests/**"
-      - "scripts/**"
-      - "docs/releases/**"
-      - "hacs.json"
-      - "pytest.ini"
-      - ".coveragerc"
-      - "pyproject.toml"
-      - ".pre-commit-config.yaml"
-      - ".github/workflows/ci.yml"
-      - ".github/workflows/publish-pypi.yml"
-      - ".github/rulesets/**"
-      - ".github/instructions/**"
-      - ".github/copilot-instructions.md"
-      - "AGENTS.md"
   pull_request:
-    paths: *ci-paths
   schedule:
     # Nightly HACS/hassfest even without code changes
     - cron: "0 0 * * *"
   workflow_dispatch:
+    inputs:
+      lint-only:
+        description: Skip pytest (lint + validate only)
+        default: false
+        type: boolean
+      skip-coverage:
+        description: Skip coverage reporting/fail-under
+        default: false
+        type: boolean
+
+env:
+  PYTHON_VERSION: "3.13"
+  RUFF_OUTPUT_FORMAT: github
 
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
-permissions:
-  contents: read
-  pull-requests: write
+# Empty top-level permissions; each job declares the minimum it needs.
+permissions: {}
 
 jobs:
   ruff:
     name: Ruff
     if: github.event_name != 'schedule'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@v6
-
-      - uses: astral-sh/ruff-action@v3
+      - name: Check out code from GitHub
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          persist-credentials: false
+
+      - name: Run Ruff check
+        uses: astral-sh/ruff-action@278981a28ce3188b1e39527901f38254bf3aac89 # v4.1.0
+        with:
+          args: check
+          src: custom_components tests fritzboxvpn/fritzboxvpn
+
+      - name: Run Ruff format check
+        uses: astral-sh/ruff-action@278981a28ce3188b1e39527901f38254bf3aac89 # v4.1.0
+        with:
+          args: format --check
           src: custom_components tests fritzboxvpn/fritzboxvpn
 
   pytest:
     name: pytest
-    if: github.event_name != 'schedule'
-    runs-on: ubuntu-latest
+    if: |
+      github.event_name != 'schedule'
+      && github.event.inputs.lint-only != 'true'
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@v6
-
-      - uses: actions/setup-python@v6
+      - name: Check out code from GitHub
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          python-version: "3.13"
+          persist-credentials: false
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
           cache: pip
           cache-dependency-path: scripts/requirements-test.txt
 
@@ -70,36 +96,92 @@ jobs:
           pip install -r scripts/requirements-test.txt
 
       - name: Run tests with coverage
+        if: github.event.inputs.skip-coverage != 'true'
         run: pytest tests/ --cov --cov-report=term-missing -q
+
+      - name: Run tests without coverage
+        if: github.event.inputs.skip-coverage == 'true'
+        run: pytest tests/ -q
 
   hacs:
     name: HACS validate
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
+    permissions:
+      contents: read
+      # hacs/action may post a PR comment when comment: true
+      pull-requests: write
     steps:
-      - uses: actions/checkout@v6
+      - name: Check out code from GitHub
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       # GitHub's license detection can lag behind for PRs; for PRs we ignore
       # only the license check to avoid blocking CI until the default branch
       # metadata is updated.
-      - uses: hacs/action@22.5.0
+      - name: HACS validation (pull request)
         if: github.event_name == 'pull_request'
+        uses: hacs/action@d556e736723344f83838d08488c983a15381059a # 22.5.0
         with:
           category: integration
           comment: true
           ignore: license
 
-      - uses: hacs/action@22.5.0
+      - name: HACS validation
         if: github.event_name != 'pull_request'
+        uses: hacs/action@d556e736723344f83838d08488c983a15381059a # 22.5.0
         with:
           category: integration
           comment: false
 
   hassfest:
     name: hassfest
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@v6
+      - name: Check out code from GitHub
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
-      - uses: home-assistant/actions/hassfest@master
+      - name: Run hassfest
+        uses: home-assistant/actions/hassfest@ab22029681aa532bfe7de5774a9972d67bfbd2c0 # master
+
+  # Single gate for humans/agents; individual jobs stay required in ruleset.
+  ci:
+    name: CI
+    if: always()
+    needs:
+      - ruff
+      - pytest
+      - hacs
+      - hassfest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions: {}
+    steps:
+      - name: Check job results
+        env:
+          RUFF: ${{ needs.ruff.result }}
+          PYTEST: ${{ needs.pytest.result }}
+          HACS: ${{ needs.hacs.result }}
+          HASSFEST: ${{ needs.hassfest.result }}
+        run: |
+          set -euo pipefail
+          failed=0
+          for name_result in "ruff:${RUFF}" "pytest:${PYTEST}" "hacs:${HACS}" "hassfest:${HASSFEST}"; do
+            name="${name_result%%:*}"
+            result="${name_result##*:}"
+            echo "${name}=${result}"
+            case "${result}" in
+              success|skipped) ;;
+              *)
+                echo "::error::Required job '${name}' finished with '${result}'"
+                failed=1
+                ;;
+            esac
+          done
+          exit "${failed}"

@@ -1,6 +1,5 @@
 """Tests for Fritz config import from other integrations."""
 
-
 import pytest
 from custom_components.fritzbox_vpn.fritz_config_source import (
     _entry_has_credentials,

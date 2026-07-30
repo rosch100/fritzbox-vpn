@@ -9,7 +9,7 @@
 `required-ci.json` – Schutz für **`main`**:
 
 1. **Pull Request erforderlich** (0 Approvals) – kein direkter Push auf `main`
-2. **Pflicht-Checks:** `Ruff`, `pytest`, `HACS validate`, `hassfest` (Workflow **CI**)
+2. **Pflicht-Checks:** `Ruff`, `pytest`, `HACS validate`, `hassfest` (Workflow **CI**; zusätzlich Aggregate-Job `CI`)
 
 Ruleset-ID: **16545012** – [Einstellungen](https://github.com/rosch100/fritzbox-vpn/rules/16545012)
 

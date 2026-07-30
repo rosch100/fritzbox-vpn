@@ -1,4 +1,4 @@
-# Test dependencies (see .github/workflows/ci.yml)
+# Test dependencies (see .github/workflows/ci.yml — Python 3.13)
 # Pin to minimum HA from hacs.json / manifest (2026.1.0)
 -e ./fritzboxvpn
 aiohttp>=3.8.0

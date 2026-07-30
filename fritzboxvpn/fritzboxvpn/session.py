@@ -197,7 +197,9 @@ class FritzBoxVPNSession:
 
         return f"{salt2_hex}${hash2.hex()}"
 
-    async def _fetch_login_page(self, login_url: str, timeout: ClientTimeout) -> str | None:
+    async def _fetch_login_page(
+        self, login_url: str, timeout: ClientTimeout
+    ) -> str | None:
         """GET login page; HTTPS→HTTP fallback. Returns content or None."""
         parsed = urlsplit(login_url)
         api_path = parsed.path
@@ -241,8 +243,7 @@ class FritzBoxVPNSession:
             )
             self.protocol = PROTOCOL_HTTP
             login_url = (
-                f"{self.protocol}://{self.host}{api_path}"
-                f"{'?' + query if query else ''}"
+                f"{self.protocol}://{self.host}{api_path}{'?' + query if query else ''}"
             )
             async with self.session.get(
                 login_url, ssl=False, timeout=timeout
@@ -254,7 +255,7 @@ class FritzBoxVPNSession:
                 return await response.text()
 
     async def _fetch_vpn_connections_once(self) -> dict[str, Any]:
-        """Single VPN connections request; {} on non-auth errors."""
+        """Single VPN connections request; raises on outage/missing payload."""
         session, sid = await self.async_get_session()
         data_url = f"{self.protocol}://{self.host}{API_DATA}"
         params = {

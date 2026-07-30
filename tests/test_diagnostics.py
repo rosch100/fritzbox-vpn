@@ -26,7 +26,9 @@ async def test_diagnostics_redacts_credentials(
             "data": MOCK_VPN_CONNECTIONS,
         },
     )()
-    mock_config_entry.runtime_data = FritzboxVpnRuntimeData(coordinator=mock_coordinator)
+    mock_config_entry.runtime_data = FritzboxVpnRuntimeData(
+        coordinator=mock_coordinator
+    )
 
     result = await async_get_config_entry_diagnostics(hass, mock_config_entry)
 
@@ -47,7 +49,9 @@ async def test_diagnostics_skips_non_dict_connections(
         (),
         {"last_update_success": True, "data": {"bad": "value"}},
     )()
-    mock_config_entry.runtime_data = FritzboxVpnRuntimeData(coordinator=mock_coordinator)
+    mock_config_entry.runtime_data = FritzboxVpnRuntimeData(
+        coordinator=mock_coordinator
+    )
     result = await async_get_config_entry_diagnostics(hass, mock_config_entry)
     assert result["vpn_connection_count"] == 0
     assert result["vpn_connections"] == []

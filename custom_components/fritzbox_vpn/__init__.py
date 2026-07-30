@@ -183,7 +183,9 @@ def _repair_entity_ids_before_platform_setup(hass: HomeAssistant, entry_id: str)
     return repaired_count
 
 
-async def async_migrate_entry(hass: HomeAssistant, entry: FritzboxVpnConfigEntry) -> bool:
+async def async_migrate_entry(
+    hass: HomeAssistant, entry: FritzboxVpnConfigEntry
+) -> bool:
     """Run one-time migrations for config entries."""
     if entry.version < 2:
         count, _ = repair_legacy_entity_object_ids(hass, entry.entry_id)

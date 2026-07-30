@@ -35,10 +35,14 @@ async def test_remove_unavailable_entities_service(
         config_entry=mock_config_entry,
     )
 
-    with patch.object(hass.config_entries, "async_reload", new=AsyncMock()) as reload_mock:
+    with patch.object(
+        hass.config_entries, "async_reload", new=AsyncMock()
+    ) as reload_mock:
         await _async_remove_unavailable_entities(
             hass,
-            type("Call", (), {"data": {"config_entry_id": mock_config_entry.entry_id}})(),
+            type(
+                "Call", (), {"data": {"config_entry_id": mock_config_entry.entry_id}}
+            )(),
         )
 
     reload_mock.assert_awaited_once()
@@ -52,10 +56,13 @@ async def test_repair_entity_id_suffixes_service(
 ) -> None:
     """Service repairs suffixed entity IDs when configured."""
     mock_config_entry.add_to_hass(hass)
-    with patch(
-        "custom_components.fritzbox_vpn.entity_registry.repair_entity_ids",
-        return_value=(0, []),
-    ), patch.object(hass.config_entries, "async_reload", new=AsyncMock()):
+    with (
+        patch(
+            "custom_components.fritzbox_vpn.entity_registry.repair_entity_ids",
+            return_value=(0, []),
+        ),
+        patch.object(hass.config_entries, "async_reload", new=AsyncMock()),
+    ):
         await _async_repair_entity_id_suffixes(
             hass,
             type("Call", (), {"data": {}})(),

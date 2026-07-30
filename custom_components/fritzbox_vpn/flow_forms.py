@@ -8,11 +8,9 @@ from collections.abc import Mapping
 from typing import Any
 
 import voluptuous as vol
-from fritzboxvpn import FritzBoxVPNSession
 from homeassistant.const import CONF_HOST, CONF_PASSWORD, CONF_USERNAME
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
-from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .const import (
     CONF_UPDATE_INTERVAL,
@@ -30,6 +28,7 @@ from .const import (
     password_from_sources,
 )
 from .coordinator import normalize_update_interval
+from .fritzconnection_session import FritzConnectionVPNSession
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -257,15 +256,18 @@ def set_validation_error(
 
 async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> dict[str, Any]:
     """Validate Fritz!Box connectivity; VPN connections are discovered at setup."""
-    session = FritzBoxVPNSession(
-        async_get_clientsession(hass),
+    # Validate via Fritz!Box HTTP API WireGuard endpoints using FritzConnection.
+    # This adapter is synchronous underneath and runs blocking calls in the executor.
+    session = FritzConnectionVPNSession(
+        hass,
         data[CONF_HOST],
         data[CONF_USERNAME],
         password_from_sources(data),
+        use_tls=True,
     )
 
     try:
-        await session.async_get_session()
+        await session.async_get_vpn_connections()
         await session.async_close()
         return {"title": f"{INTEGRATION_TITLE} ({data[CONF_HOST]})"}
     except Exception as err:
