@@ -271,7 +271,13 @@ def repair_entity_id_suffixes(
     *,
     allow_replace_base: bool = False,
 ) -> tuple[int, list[str]]:
-    """Repair suffixed entity IDs (_2, _3, ...) to base IDs when base is free."""
+    """Repair suffixed entity IDs (_2, _3, ...) toward base IDs.
+
+    Default (``allow_replace_base=False``): only rename when the base
+    entity_id is free. Opt-in ``allow_replace_base=True`` is destructive:
+    a same-entry base entity may be removed so a ``_2``/``_3`` entry can
+    take the base ID (manual repair / service only — not used on setup).
+    """
     registry = er.async_get(hass)
     repairs = get_entity_id_suffix_repairs(
         registry, entry_id, allow_replace_base=allow_replace_base

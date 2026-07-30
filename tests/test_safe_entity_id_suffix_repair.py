@@ -72,3 +72,40 @@ async def test_repair_renames_when_base_is_free(hass: HomeAssistant) -> None:
     assert messages
     assert registry.async_get("switch.office_vpn") is not None
     assert registry.async_get(suffixed.entity_id) is None
+
+
+@pytest.mark.asyncio
+async def test_repair_allow_replace_base_removes_base_then_renames(
+    hass: HomeAssistant,
+) -> None:
+    """Opt-in allow_replace_base=True reassigns base ID to the suffixed entry."""
+    entry = MockConfigEntry(domain=DOMAIN, data={"host": "1.2.3.4"})
+    entry.add_to_hass(hass)
+    registry = er.async_get(hass)
+
+    base = registry.async_get_or_create(
+        "switch",
+        DOMAIN,
+        f"{UNIQUE_ID_PREFIX}vpn_old_switch",
+        suggested_object_id="office_vpn",
+        config_entry=entry,
+    )
+    suffixed = registry.async_get_or_create(
+        "switch",
+        DOMAIN,
+        f"{UNIQUE_ID_PREFIX}vpn_new_switch",
+        suggested_object_id="office_vpn_2",
+        config_entry=entry,
+    )
+    assert base.entity_id == "switch.office_vpn"
+    assert suffixed.entity_id == "switch.office_vpn_2"
+    suffixed_unique_id = suffixed.unique_id
+
+    count, _messages = repair_entity_id_suffixes(
+        hass, entry.entry_id, allow_replace_base=True
+    )
+    assert count == 1
+    assert registry.async_get("switch.office_vpn_2") is None
+    replaced = registry.async_get("switch.office_vpn")
+    assert replaced is not None
+    assert replaced.unique_id == suffixed_unique_id
