@@ -31,7 +31,7 @@ python3 -m venv .venv
 .venv/bin/pytest tests/ --cov=custom_components/fritzbox_vpn -q
 ```
 
-Vor Merge: CI-Jobs `Ruff`, `pytest`, `HACS validate`, `hassfest`.
+Vor Merge: CI-Jobs `Ruff`, `pytest`, `HACS validate`, `hassfest` (Aggregate-Check `CI`).
 
 ## Core-Vorbereitung
 

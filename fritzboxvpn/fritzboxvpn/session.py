@@ -197,7 +197,9 @@ class FritzBoxVPNSession:
 
         return f"{salt2_hex}${hash2.hex()}"
 
-    async def _fetch_login_page(self, login_url: str, timeout: ClientTimeout) -> str | None:
+    async def _fetch_login_page(
+        self, login_url: str, timeout: ClientTimeout
+    ) -> str | None:
         """GET login page; HTTPS→HTTP fallback. Returns content or None."""
         parsed = urlsplit(login_url)
         api_path = parsed.path
@@ -241,8 +243,7 @@ class FritzBoxVPNSession:
             )
             self.protocol = PROTOCOL_HTTP
             login_url = (
-                f"{self.protocol}://{self.host}{api_path}"
-                f"{'?' + query if query else ''}"
+                f"{self.protocol}://{self.host}{api_path}{'?' + query if query else ''}"
             )
             async with self.session.get(
                 login_url, ssl=False, timeout=timeout
@@ -271,7 +272,9 @@ class FritzBoxVPNSession:
             if response.status == HTTP_STATUS_FORBIDDEN:
                 raise ValueError(ERROR_MSG_INVALID_SID_403)
             if response.status != HTTP_STATUS_OK:
-                _LOGGER.warning("Failed to get VPN connections: HTTP %d", response.status)
+                _LOGGER.warning(
+                    "Failed to get VPN connections: HTTP %d", response.status
+                )
                 return {}
 
             content_type = (response.headers.get("Content-Type") or "").lower()

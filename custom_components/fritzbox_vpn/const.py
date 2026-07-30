@@ -43,12 +43,8 @@ SERVICE_REMOVE_UNAVAILABLE_ENTITIES = "remove_unavailable_entities"
 SERVICE_REPAIR_ENTITY_ID_SUFFIXES = "repair_entity_id_suffixes"
 CONF_CONFIG_ENTRY_ID = "config_entry_id"
 
-LOG_MSG_VPN_CONNECTIONS_REMOVED = (
-    "VPN connection(s) no longer available on the %s; related entities will show as unavailable: %s"
-)
-LOG_MSG_VPN_CONNECTIONS_REMOVED_HINT = (
-    "You can remove obsolete entities under Settings > Devices & Services > Entities (filter by Fritz!Box VPN)."
-)
+LOG_MSG_VPN_CONNECTIONS_REMOVED = "VPN connection(s) no longer available on the %s; related entities will show as unavailable: %s"
+LOG_MSG_VPN_CONNECTIONS_REMOVED_HINT = "You can remove obsolete entities under Settings > Devices & Services > Entities (filter by Fritz!Box VPN)."
 
 MANUFACTURER_AVM = "AVM"
 MODEL_FRITZBOX = "Fritz!Box"
@@ -84,7 +80,9 @@ def password_from_source(source: Mapping[str, Any] | None) -> str:
     """Return password from one dict (CONF_PASSWORD, 'password', or 'pass'), or empty string."""
     if not source:
         return ""
-    return str(source.get(CONF_PASSWORD) or source.get("password") or source.get("pass") or "")
+    return str(
+        source.get(CONF_PASSWORD) or source.get("password") or source.get("pass") or ""
+    )
 
 
 def password_from_sources(*sources: Mapping[str, Any] | None) -> str:
@@ -116,7 +114,12 @@ FRITZBOX_SSDP_INDICATORS = (
     "fritz",
 )
 
-FRITZ_INTEGRATION_DOMAINS = ("fritz", "fritzbox_tools", "fritzbox", "fritzbox_tools_plus")
+FRITZ_INTEGRATION_DOMAINS = (
+    "fritz",
+    "fritzbox_tools",
+    "fritzbox",
+    "fritzbox_tools_plus",
+)
 SENSITIVE_CONFIG_KEYS = ("password", "pass", "username", "user")
 
 REPEATER_INDICATORS = (
