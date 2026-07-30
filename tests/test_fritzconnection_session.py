@@ -51,12 +51,21 @@ def test_ensure_client_passes_timeout_to_fritzconnection() -> None:
 
     fake_fc_cls = MagicMock(return_value=MagicMock())
     fake_fwg_cls = MagicMock(return_value=MagicMock())
-    fake_mod = types.ModuleType("fritzconnection.lib.fritzwireguard")
-    fake_mod.FritzWireguard = fake_fwg_cls
 
-    with (
-        patch.dict(sys.modules, {"fritzconnection.lib.fritzwireguard": fake_mod}),
-        patch("fritzconnection.FritzConnection", fake_fc_cls),
+    # CI test deps do not install fritzconnection; inject stub modules.
+    fc_mod = types.ModuleType("fritzconnection")
+    fc_mod.FritzConnection = fake_fc_cls
+    lib_mod = types.ModuleType("fritzconnection.lib")
+    fwg_mod = types.ModuleType("fritzconnection.lib.fritzwireguard")
+    fwg_mod.FritzWireguard = fake_fwg_cls
+
+    with patch.dict(
+        sys.modules,
+        {
+            "fritzconnection": fc_mod,
+            "fritzconnection.lib": lib_mod,
+            "fritzconnection.lib.fritzwireguard": fwg_mod,
+        },
     ):
         session._ensure_client()
 
