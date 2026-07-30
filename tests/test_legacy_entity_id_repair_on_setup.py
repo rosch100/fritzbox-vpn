@@ -94,9 +94,10 @@ async def test_migrate_entry_v1_repairs_legacy_entity_ids(
     assert unique_id_to_entity_id[
         vpn_unique_id(connection_uid, UNIQUE_ID_SUFFIX_VPN_UID)
     ].endswith("_vpn_uid")
-    assert unique_id_to_entity_id[
-        vpn_unique_id(connection_uid, UNIQUE_ID_SUFFIX_SWITCH)
-    ] == f"switch.{slug}"
+    assert (
+        unique_id_to_entity_id[vpn_unique_id(connection_uid, UNIQUE_ID_SUFFIX_SWITCH)]
+        == f"switch.{slug}"
+    )
 
 
 @pytest.mark.asyncio
@@ -121,12 +122,16 @@ async def test_migrate_entry_v2_skips_legacy_repair(hass, mock_config_entry) -> 
             entity_registry, mock_config_entry.entry_id
         )
     }
-    assert unique_id_to_entity_id[
-        vpn_unique_id(connection_uid, UNIQUE_ID_SUFFIX_CONNECTED)
-    ] == f"binary_sensor.{slug}"
-    assert unique_id_to_entity_id[
-        vpn_unique_id(connection_uid, UNIQUE_ID_SUFFIX_SWITCH)
-    ] == f"switch.{slug}_vpn"
+    assert (
+        unique_id_to_entity_id[
+            vpn_unique_id(connection_uid, UNIQUE_ID_SUFFIX_CONNECTED)
+        ]
+        == f"binary_sensor.{slug}"
+    )
+    assert (
+        unique_id_to_entity_id[vpn_unique_id(connection_uid, UNIQUE_ID_SUFFIX_SWITCH)]
+        == f"switch.{slug}_vpn"
+    )
 
 
 @pytest.mark.asyncio
@@ -167,7 +172,9 @@ async def test_setup_does_not_rename_entities_after_device_rename(
     assert device is not None
     device_registry.async_update_device(device.id, name_by_user="Renamed VPN")
 
-    repaired = _repair_entity_ids_before_platform_setup(hass, mock_config_entry.entry_id)
+    repaired = _repair_entity_ids_before_platform_setup(
+        hass, mock_config_entry.entry_id
+    )
     assert repaired == 0
 
     assert entity_registry.async_get(connected_entity_id) is not None

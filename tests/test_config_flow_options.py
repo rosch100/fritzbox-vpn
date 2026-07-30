@@ -29,12 +29,15 @@ async def test_options_configure_updates_entry(
     """Options configure step updates data, options, and reloads."""
     mock_config_entry.add_to_hass(hass)
 
-    with patch(
-        "custom_components.fritzbox_vpn.flow_forms.validate_input",
-        new=AsyncMock(return_value={"title": mock_config_entry.title}),
-    ), patch.object(
-        hass.config_entries, "async_reload", new=AsyncMock()
-    ) as reload_mock:
+    with (
+        patch(
+            "custom_components.fritzbox_vpn.flow_forms.validate_input",
+            new=AsyncMock(return_value={"title": mock_config_entry.title}),
+        ),
+        patch.object(
+            hass.config_entries, "async_reload", new=AsyncMock()
+        ) as reload_mock,
+    ):
         result = await hass.config_entries.options.async_init(
             mock_config_entry.entry_id
         )
@@ -109,27 +112,27 @@ async def test_options_cleanup_confirm_removes_entities(
 
     assert result["type"] == FlowResultType.CREATE_ENTRY
     remaining = er.async_entries_for_config_entry(registry, entry.entry_id)
-    assert all(
-        "orphan" not in (e.unique_id or "")
-        for e in remaining
-    )
+    assert all("orphan" not in (e.unique_id or "") for e in remaining)
 
 
 @pytest.mark.asyncio
 async def test_user_autoconfig_from_fritz(hass: HomeAssistant) -> None:
     """User flow auto-creates entry when Fritz integration credentials work."""
-    with patch(
-        "custom_components.fritzbox_vpn.config_flow.get_existing_fritz_config",
-        new=AsyncMock(
-            return_value={
-                CONF_HOST: MOCK_HOST,
-                CONF_USERNAME: MOCK_USERNAME,
-                CONF_PASSWORD: MOCK_PASSWORD,
-            }
+    with (
+        patch(
+            "custom_components.fritzbox_vpn.config_flow.get_existing_fritz_config",
+            new=AsyncMock(
+                return_value={
+                    CONF_HOST: MOCK_HOST,
+                    CONF_USERNAME: MOCK_USERNAME,
+                    CONF_PASSWORD: MOCK_PASSWORD,
+                }
+            ),
         ),
-    ), patch(
-        "custom_components.fritzbox_vpn.flow_forms.validate_input",
-        new=AsyncMock(return_value={"title": "Fritz!Box VPN"}),
+        patch(
+            "custom_components.fritzbox_vpn.flow_forms.validate_input",
+            new=AsyncMock(return_value={"title": "Fritz!Box VPN"}),
+        ),
     ):
         result = await hass.config_entries.flow.async_init(
             DOMAIN, context={"source": SOURCE_USER}
@@ -241,9 +244,7 @@ async def test_options_abort_when_entry_removed(
     mock_config_entry.add_to_hass(hass)
     handler = OptionsFlowHandler(mock_config_entry)
     handler.hass = hass
-    with patch.object(
-        hass.config_entries, "async_get_entry", return_value=None
-    ):
+    with patch.object(hass.config_entries, "async_get_entry", return_value=None):
         result = await handler.async_step_configure()
     assert result["type"] == FlowResultType.ABORT
     assert result["reason"] == "config_entry_not_found"

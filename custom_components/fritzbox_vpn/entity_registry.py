@@ -43,7 +43,9 @@ def connection_uid_from_entity_unique_id(unique_id: str) -> str | None:
     return rest[: -len(suffix) - 1]
 
 
-def expected_object_id_for_device_suffix(device_name: str, unique_id_suffix: str) -> str:
+def expected_object_id_for_device_suffix(
+    device_name: str, unique_id_suffix: str
+) -> str:
     """Stable object_id slug for a VPN device name and platform suffix."""
     if unique_id_suffix == UNIQUE_ID_SUFFIX_SWITCH:
         return slugify(device_name)

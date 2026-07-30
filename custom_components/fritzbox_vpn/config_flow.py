@@ -76,7 +76,9 @@ async def _try_create_entry_from_credentials(
     try:
         info = await flow_forms.validate_input(hass, user_input)
     except Exception as err:
-        flow_forms.set_validation_error(errors, err, log_unknown_details=log_unknown_details)
+        flow_forms.set_validation_error(
+            errors, err, log_unknown_details=log_unknown_details
+        )
         return None
     if unique_id is not None:
         await flow.async_set_unique_id(unique_id)
@@ -107,7 +109,9 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 has_password = bool(password_from_sources(self._existing_config))
                 if has_host and has_username and has_password:
                     try:
-                        info = await flow_forms.validate_input(self.hass, self._existing_config)
+                        info = await flow_forms.validate_input(
+                            self.hass, self._existing_config
+                        )
                         return self.async_create_entry(
                             title=info["title"], data=self._existing_config
                         )
@@ -146,7 +150,9 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         )
         if result is not None:
             return result
-        schema = flow_forms.credentials_schema(*flow_forms.credentials_defaults(user_input))
+        schema = flow_forms.credentials_schema(
+            *flow_forms.credentials_defaults(user_input)
+        )
         return self.async_show_form(step_id="user", data_schema=schema, errors=errors)
 
     async def async_step_ssdp(self, discovery_info: SsdpServiceInfo) -> FlowResult:
@@ -252,7 +258,9 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         return self.async_show_form(
             step_id="reauth_confirm",
-            data_schema=flow_forms.reauth_schema(user_input.get(CONF_USERNAME, username_default)),
+            data_schema=flow_forms.reauth_schema(
+                user_input.get(CONF_USERNAME, username_default)
+            ),
             description_placeholders={"host": host},
             errors=errors,
         )
@@ -282,8 +290,8 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             errors,
             reconfigure_entry.data or {},
         ):
-            config_data, options_data = flow_forms.config_and_options_from_configure_input(
-                user_input
+            config_data, options_data = (
+                flow_forms.config_and_options_from_configure_input(user_input)
             )
             return self.async_update_reload_and_abort(
                 reconfigure_entry,
@@ -485,8 +493,8 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
             errors,
             config_entry.data or {},
         ):
-            config_data, options_data = flow_forms.config_and_options_from_configure_input(
-                user_input
+            config_data, options_data = (
+                flow_forms.config_and_options_from_configure_input(user_input)
             )
             self.hass.config_entries.async_update_entry(
                 config_entry,

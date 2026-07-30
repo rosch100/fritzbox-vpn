@@ -31,9 +31,7 @@ async def test_shadow_entities_removed_on_setup(
         config_entry=mock_config_entry,
     )
 
-    before = er.async_entries_for_config_entry(
-        registry, mock_config_entry.entry_id
-    )
+    before = er.async_entries_for_config_entry(registry, mock_config_entry.entry_id)
     assert any((e.unique_id or "") == shadow_unique_id for e in before)
 
     mock_coordinator = MagicMock()
@@ -58,4 +56,3 @@ async def test_shadow_entities_removed_on_setup(
 
     after = er.async_entries_for_config_entry(registry, mock_config_entry.entry_id)
     assert not any((e.unique_id or "") == shadow_unique_id for e in after)
-

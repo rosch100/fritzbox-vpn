@@ -28,7 +28,9 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 def test_connection_uid_unknown_suffix() -> None:
     """Unique IDs without known suffix return None."""
-    assert connection_uid_from_entity_unique_id(f"{UNIQUE_ID_PREFIX}abc_unknown") is None
+    assert (
+        connection_uid_from_entity_unique_id(f"{UNIQUE_ID_PREFIX}abc_unknown") is None
+    )
 
 
 def test_connection_uid_from_entity_unique_id() -> None:
@@ -36,7 +38,9 @@ def test_connection_uid_from_entity_unique_id() -> None:
     uid = "abc"
     unique = f"{UNIQUE_ID_PREFIX}{uid}_switch"
     assert connection_uid_from_entity_unique_id(unique) == uid
-    assert connection_uid_from_entity_unique_id(f"{UNIQUE_ID_PREFIX}{uid}_status") == uid
+    assert (
+        connection_uid_from_entity_unique_id(f"{UNIQUE_ID_PREFIX}{uid}_status") == uid
+    )
     assert connection_uid_from_entity_unique_id("other") is None
 
 
@@ -249,9 +253,7 @@ async def test_remove_orphaned_entities_removes_device(hass: HomeAssistant) -> N
         identifiers={(DOMAIN, entry.entry_id, "gone")},
         name="Gone VPN",
     )
-    remove_orphaned_entities(
-        hass, entry.entry_id, [entity], remove_from_registry=True
-    )
+    remove_orphaned_entities(hass, entry.entry_id, [entity], remove_from_registry=True)
     assert entity_registry.async_get(entity.entity_id) is None
 
 
@@ -279,9 +281,7 @@ async def test_remove_orphaned_clears_known_uids(hass: HomeAssistant) -> None:
         f"{UNIQUE_ID_PREFIX}gone_switch",
         config_entry=entry,
     )
-    remove_orphaned_entities(
-        hass, entry.entry_id, [entity], remove_from_registry=False
-    )
+    remove_orphaned_entities(hass, entry.entry_id, [entity], remove_from_registry=False)
     assert entry.runtime_data.known_uids_switch == {"keep"}
 
 

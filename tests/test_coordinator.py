@@ -32,14 +32,10 @@ def test_normalize_update_interval_clamps_and_defaults() -> None:
 
 def test_normalize_box_connections_list_and_dict() -> None:
     """boxConnections list/dict payloads normalize to uid-keyed dict."""
-    listed = normalize_box_connections(
-        [{"uid": "a", "active": 1, "name": "A"}]
-    )
+    listed = normalize_box_connections([{"uid": "a", "active": 1, "name": "A"}])
     assert listed["a"]["active"] is True
 
-    keyed = normalize_box_connections(
-        {"b": {"uid": "", "active": "true", "name": "B"}}
-    )
+    keyed = normalize_box_connections({"b": {"uid": "", "active": "true", "name": "B"}})
     assert "b" in keyed
     assert keyed["b"]["active"] is True
 
@@ -101,9 +97,7 @@ async def test_schedule_reauth_only_once(hass: HomeAssistant) -> None:
     mock_entry.state = ConfigEntryState.LOADED
 
     hass.async_create_task = MagicMock()
-    with patch.object(
-        hass.config_entries, "async_get_entry", return_value=mock_entry
-    ):
+    with patch.object(hass.config_entries, "async_get_entry", return_value=mock_entry):
         coordinator._schedule_reauth()
         coordinator._schedule_reauth()
 

@@ -164,7 +164,9 @@ async def test_session_toggle_off_success() -> None:
 @pytest.mark.asyncio
 async def test_session_toggle_unknown_connection() -> None:
     """Toggle returns False when connection UID is missing."""
-    http = QueuedAiohttpSession([*_login_sequence(), json_response({"data": {"init": {}}})])
+    http = QueuedAiohttpSession(
+        [*_login_sequence(), json_response({"data": {"init": {}}})]
+    )
     fb = FritzBoxVPNSession(http, MOCK_HOST, MOCK_USERNAME, MOCK_PASSWORD)
     assert await fb.async_toggle_vpn("missing", True) is False
 
@@ -206,12 +208,9 @@ async def test_session_invalidate_and_close() -> None:
 async def test_pbkdf2_login_when_supported() -> None:
     """PBKDF2 challenge format uses version=2 login."""
     challenge = (
-        "2$5$0123456789abcdef0123456789abcdef"
-        "$5$fedcba9876543210fedcba9876543210"
+        "2$5$0123456789abcdef0123456789abcdef$5$fedcba9876543210fedcba9876543210"
     )
-    pbkdf2_challenge_xml = (
-        f'<?xml version="1.0"?><SessionInfo><Challenge>{challenge}</Challenge></SessionInfo>'
-    )
+    pbkdf2_challenge_xml = f'<?xml version="1.0"?><SessionInfo><Challenge>{challenge}</Challenge></SessionInfo>'
     http = QueuedAiohttpSession(
         [
             MockAiohttpResponse(200, text=pbkdf2_challenge_xml),

@@ -77,7 +77,9 @@ async def test_unload_entry(
     mock_coordinator = AsyncMock()
     mock_coordinator.fritz_session = AsyncMock()
     mock_coordinator.fritz_session.async_close = AsyncMock()
-    mock_config_entry.runtime_data = FritzboxVpnRuntimeData(coordinator=mock_coordinator)
+    mock_config_entry.runtime_data = FritzboxVpnRuntimeData(
+        coordinator=mock_coordinator
+    )
 
     with patch.object(
         hass.config_entries,

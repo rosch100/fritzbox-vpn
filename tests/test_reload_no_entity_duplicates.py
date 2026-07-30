@@ -26,7 +26,9 @@ def _fake_get_vpn_status(connection_data: dict) -> str:
     active = connection_data.get("active", False)
     if not active:
         return STATUS_DISABLED
-    return STATUS_CONNECTED if connection_data.get("connected", False) else STATUS_ENABLED
+    return (
+        STATUS_CONNECTED if connection_data.get("connected", False) else STATUS_ENABLED
+    )
 
 
 def _make_fake_coordinator(hass) -> MagicMock:
@@ -46,9 +48,7 @@ def _make_fake_coordinator(hass) -> MagicMock:
     coordinator.fritz_session = MagicMock()
     coordinator.fritz_session.async_close = AsyncMock()
 
-    coordinator.async_config_entry_first_refresh = AsyncMock(
-        side_effect=lambda: None
-    )
+    coordinator.async_config_entry_first_refresh = AsyncMock(side_effect=lambda: None)
 
     return coordinator
 
@@ -127,4 +127,3 @@ async def test_reload_does_not_duplicate_entity_registry_entries(
             entity_registry, mock_config_entry.entry_id
         )
         _assert_registry_entries(entries_after_second_reload)
-

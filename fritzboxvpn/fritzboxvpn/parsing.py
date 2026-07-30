@@ -136,9 +136,7 @@ def describe_json_value(value: Any, *, max_keys: int = 20) -> dict[str, Any]:
     return {"type": type(value).__name__}
 
 
-def extract_box_connections_from_data(
-    data: dict[str, Any], page: str
-) -> Any:
+def extract_box_connections_from_data(data: dict[str, Any], page: str) -> Any:
     """Extract boxConnections from data.lua JSON (WireGuard page)."""
     if not isinstance(data, dict):
         return None
