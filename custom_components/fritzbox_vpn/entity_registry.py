@@ -224,9 +224,17 @@ def repair_legacy_entity_object_ids(
 
 
 def get_entity_id_suffix_repairs(
-    registry: er.EntityRegistry, entry_id: str
+    registry: er.EntityRegistry,
+    entry_id: str,
+    *,
+    allow_replace_base: bool = False,
 ) -> list[tuple[er.RegistryEntry, str, bool]]:
-    """Repair operations as (suffixed entry, base_entity_id, remove_base_first)."""
+    """Repair operations as (suffixed entry, base_entity_id, remove_base_first).
+
+    By default only renames when the base entity_id is free. Replacing an
+    existing base (delete base, rename ``_2``) causes recorder history
+    migration warnings and can orphan correct entities on every reload.
+    """
     all_entries = er.async_entries_for_config_entry(registry, entry_id)
     by_entity_id = {e.entity_id: e for e in all_entries}
     suffixed_by_base: dict[str, list[er.RegistryEntry]] = {}
@@ -251,18 +259,29 @@ def get_entity_id_suffix_repairs(
             result.append((preferred, base_entity_id, False))
             continue
 
-        if base_entry and base_entry.config_entry_id == entry_id:
+        if allow_replace_base and base_entry and base_entry.config_entry_id == entry_id:
             result.append((preferred, base_entity_id, True))
 
     return result
 
 
 def repair_entity_id_suffixes(
-    hass: HomeAssistant, entry_id: str
+    hass: HomeAssistant,
+    entry_id: str,
+    *,
+    allow_replace_base: bool = False,
 ) -> tuple[int, list[str]]:
-    """Repair suffixed entity IDs (_2, _3, ...) to base IDs."""
+    """Repair suffixed entity IDs (_2, _3, ...) toward base IDs.
+
+    Default (``allow_replace_base=False``): only rename when the base
+    entity_id is free. Opt-in ``allow_replace_base=True`` is destructive:
+    a same-entry base entity may be removed so a ``_2``/``_3`` entry can
+    take the base ID (manual repair / service only — not used on setup).
+    """
     registry = er.async_get(hass)
-    repairs = get_entity_id_suffix_repairs(registry, entry_id)
+    repairs = get_entity_id_suffix_repairs(
+        registry, entry_id, allow_replace_base=allow_replace_base
+    )
     messages: list[str] = []
     for suffixed_entry, base_entity_id, remove_base_first in repairs:
         try:

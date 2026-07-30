@@ -129,11 +129,12 @@ REPEATER_INDICATORS = (
     "fritz!wlanrepeater",
 )
 
-ERROR_INDICATOR_AUTH = ("login failed", "invalid sid")
+# Credential/login failures only — session-expiry "Invalid SID (...)" must not
+# trigger reauth or ConfigEntryAuthFailed (see issue #42).
+ERROR_INDICATOR_AUTH = ("login failed",)
 ERROR_INDICATOR_CONNECT = ("failed to get login page", "connection")
 AUTH_INDICATORS = (
     "login failed",
-    "invalid sid",
     "authentication failed",
     "invalid credentials",
     "unauthorized",

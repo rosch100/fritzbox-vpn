@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, Any
 
+from fritzboxvpn.const import DEFAULT_TIMEOUT
 from requests.exceptions import ConnectionError as RequestsConnectionError
 from requests.exceptions import Timeout as RequestsTimeout
 
@@ -21,6 +22,7 @@ class FritzConnectionVPNSession:
     The integration expects these methods:
     - async_get_vpn_connections() -> dict[connection_uid, connection_payload]
     - async_toggle_vpn(connection_uid, enable) -> bool
+    - invalidate_session()
     - async_close()
     """
 
@@ -46,7 +48,11 @@ class FritzConnectionVPNSession:
         self._fallback_session: Any | None = None
 
     def _ensure_client(self) -> None:
-        if self._mode == "fritzconnection" and self._fc is not None and self._fwg is not None:
+        if (
+            self._mode == "fritzconnection"
+            and self._fc is not None
+            and self._fwg is not None
+        ):
             return
         if self._mode == "fritzboxvpn" and self._fallback_session is not None:
             return
@@ -77,10 +83,13 @@ class FritzConnectionVPNSession:
             self._mode = "fritzboxvpn"
             return
 
+        # Router API discovery happens here — callers must invoke this from a
+        # path that maps Timeout/Connection/auth errors (see async_* methods).
         self._fc = FritzConnection(
             address=self._host,
             user=self._username or None,
             password=self._password,
+            timeout=float(DEFAULT_TIMEOUT),
             use_tls=self._use_tls,
         )
         self._fwg = FritzWireguard(fc=self._fc)
@@ -105,6 +114,24 @@ class FritzConnectionVPNSession:
         self._fc = None
         self._fwg = None
 
+    def invalidate_session(self) -> None:
+        """Drop cached client/session so the next request reconnects.
+
+        Also resets TLS preference to HTTPS. A temporary reboot outage can
+        flip HTTPS→HTTP for the lifetime of this adapter otherwise.
+        """
+        if self._fallback_session is not None:
+            self._fallback_session.invalidate_session()
+        if self._fc is not None:
+            try:
+                self._fc.session.close()
+            except Exception:  # pragma: no cover - best-effort cleanup
+                _LOGGER.debug("Error closing FritzConnection session", exc_info=True)
+        self._fc = None
+        self._fwg = None
+        self._use_tls = True
+        # Keep mode/fallback; only the active transport cache is cleared.
+
     def _get_vpn_connections_sync(self) -> dict[str, Any]:
         self._ensure_client()
         if self._mode != "fritzconnection":
@@ -120,24 +147,26 @@ class FritzConnectionVPNSession:
         return self._fwg.toggle_vpn(connection_uid, enable)
 
     async def async_close(self) -> None:
-        await self._hass.async_add_executor_job(self._ensure_client)
-        if self._mode == "fritzboxvpn":
-            assert self._fallback_session is not None
+        """Close only already-initialized transport; never bootstrap a client."""
+        if self._fallback_session is not None:
             await self._fallback_session.async_close()
             return
-        await self._hass.async_add_executor_job(self._close_sync)
+        if self._fc is not None:
+            await self._hass.async_add_executor_job(self._close_sync)
 
     async def async_get_vpn_connections(self) -> dict[str, Any]:
         """Fetch latest VPN connections with HTTPS->HTTP fallback."""
-        await self._hass.async_add_executor_job(self._ensure_client)
-        if self._mode == "fritzboxvpn":
-            assert self._fallback_session is not None
-            return await self._fallback_session.async_get_vpn_connections()
         try:
+            # Bootstrap (FritzConnection discovery) is inside the guarded path.
+            await self._hass.async_add_executor_job(self._ensure_client)
+            if self._mode == "fritzboxvpn":
+                assert self._fallback_session is not None
+                return await self._fallback_session.async_get_vpn_connections()
             return await self._hass.async_add_executor_job(
                 self._get_vpn_connections_sync
             )
         except RequestsTimeout as err:
+            self.invalidate_session()
             raise TimeoutError(str(err)) from err
         except RequestsConnectionError as err:
             if self._use_tls:
@@ -151,26 +180,28 @@ class FritzConnectionVPNSession:
                 return await self._hass.async_add_executor_job(
                     self._get_vpn_connections_sync
                 )
+            self.invalidate_session()
             raise ConnectionError(f"failed to get login page: {err}") from err
         except Exception as err:
             if self._is_fritz_authorization_error(err):
-                # Coordinator maps auth-indicators by substring matching.
-                raise ValueError(f"Invalid SID: {err}") from err
+                # Real credential failure (not Web-UI SID expiry).
+                raise ValueError(f"Login failed: {err}") from err
             raise
 
     async def async_toggle_vpn(self, connection_uid: str, enable: bool) -> bool:
         """Toggle VPN on/off with HTTPS->HTTP fallback and auth propagation."""
-        await self._hass.async_add_executor_job(self._ensure_client)
-        if self._mode == "fritzboxvpn":
-            assert self._fallback_session is not None
-            return await self._fallback_session.async_toggle_vpn(
-                connection_uid, enable
-            )
         try:
+            await self._hass.async_add_executor_job(self._ensure_client)
+            if self._mode == "fritzboxvpn":
+                assert self._fallback_session is not None
+                return await self._fallback_session.async_toggle_vpn(
+                    connection_uid, enable
+                )
             return await self._hass.async_add_executor_job(
                 self._toggle_vpn_sync, connection_uid, enable
             )
         except RequestsTimeout as err:
+            self.invalidate_session()
             raise TimeoutError(str(err)) from err
         except RequestsConnectionError as err:
             if self._use_tls:
@@ -184,10 +215,10 @@ class FritzConnectionVPNSession:
                 return await self._hass.async_add_executor_job(
                     self._toggle_vpn_sync, connection_uid, enable
                 )
+            self.invalidate_session()
             raise ConnectionError(f"failed to toggle VPN: {err}") from err
         except Exception as err:
             if self._is_fritz_authorization_error(err):
-                # Coordinator may schedule reauth on auth errors.
-                raise ConnectionError(f"invalid sid: {err}") from err
+                # Real credential failure (not Web-UI SID expiry).
+                raise ConnectionError(f"Login failed: {err}") from err
             raise
-

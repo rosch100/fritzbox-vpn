@@ -125,8 +125,14 @@ class FritzBoxVPNCoordinator(DataUpdateCoordinator):
         return STATUS_CONNECTED if connected else STATUS_ENABLED
 
     def _is_auth_error(self, error: Exception) -> bool:
-        """True if error message indicates authentication failure."""
+        """True if error message indicates credential/authentication failure."""
         return any(ind in str(error).lower() for ind in AUTH_INDICATORS)
+
+    def _prepare_session_for_retry(self, error: Exception) -> None:
+        """Drop cached SID/protocol after transient failures so the next poll recovers."""
+        if self._is_auth_error(error):
+            return
+        self.fritz_session.invalidate_session()
 
     def _schedule_reauth(self) -> None:
         """Start re-authentication flow once per auth failure cycle."""
@@ -171,6 +177,7 @@ class FritzBoxVPNCoordinator(DataUpdateCoordinator):
             self._reauth_scheduled = False
             return connections
         except (ConnectionError, ValueError) as err:
+            self._prepare_session_for_retry(err)
             if self._is_auth_error(err):
                 self._schedule_reauth()
                 raise UpdateFailed(f"Error fetching VPN data: {err}") from err
@@ -179,11 +186,13 @@ class FritzBoxVPNCoordinator(DataUpdateCoordinator):
                 retry_after=RETRY_AFTER_SECONDS,
             ) from err
         except TimeoutError as err:
+            self._prepare_session_for_retry(err)
             raise UpdateFailed(
                 f"Error fetching VPN data: {err}",
                 retry_after=RETRY_AFTER_SECONDS,
             ) from err
         except Exception as err:
+            self._prepare_session_for_retry(err)
             if self._is_auth_error(err):
                 self._schedule_reauth()
                 raise UpdateFailed(
