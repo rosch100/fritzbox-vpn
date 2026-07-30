@@ -1,0 +1,139 @@
+"""Regression tests for Fritz!Box reboot / session recovery (#42)."""
+
+from __future__ import annotations
+
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
+from custom_components.fritzbox_vpn.coordinator import FritzBoxVPNCoordinator
+from fritzboxvpn import FritzBoxVPNSession
+from homeassistant.helpers.update_coordinator import UpdateFailed
+
+from tests.aiohttp_mock import MockAiohttpResponse, QueuedAiohttpSession, json_response
+from tests.fixtures import (
+    LOGIN_XML_CHALLENGE,
+    LOGIN_XML_SID,
+    MOCK_DATA_LUA_JSON,
+    MOCK_HOST,
+    MOCK_PASSWORD,
+    MOCK_USERNAME,
+)
+
+
+def _login_sequence() -> list[MockAiohttpResponse]:
+    return [
+        MockAiohttpResponse(200, text=LOGIN_XML_CHALLENGE),
+        MockAiohttpResponse(200, text=LOGIN_XML_CHALLENGE),
+        MockAiohttpResponse(200, text=LOGIN_XML_SID),
+    ]
+
+
+@pytest.mark.asyncio
+async def test_non_ok_vpn_fetch_invalidates_session_and_raises() -> None:
+    """HTTP 502 on data.lua must not soft-succeed with {} and keep a stale SID."""
+    http = QueuedAiohttpSession(
+        [
+            *_login_sequence(),
+            MockAiohttpResponse(502, text="bad gateway"),
+        ]
+    )
+    fb = FritzBoxVPNSession(http, MOCK_HOST, MOCK_USERNAME, MOCK_PASSWORD)
+    with pytest.raises(ConnectionError, match="502"):
+        await fb.async_get_vpn_connections()
+    assert fb.sid is None
+    assert fb.protocol == "https"
+
+
+@pytest.mark.asyncio
+async def test_invalidate_session_resets_protocol_to_https() -> None:
+    """Sticky HTTP fallback must be cleared so reboot recovery retries HTTPS."""
+    fb = FritzBoxVPNSession(
+        QueuedAiohttpSession([]), MOCK_HOST, MOCK_USERNAME, MOCK_PASSWORD
+    )
+    fb.sid = "stale"
+    fb.protocol = "http"
+    fb.invalidate_session()
+    assert fb.sid is None
+    assert fb.protocol == "https"
+
+
+@pytest.mark.asyncio
+async def test_reboot_outage_then_recover_without_reload() -> None:
+    """After 502 outage, next poll can re-login and return VPN data again."""
+    http = QueuedAiohttpSession(
+        [
+            *_login_sequence(),
+            MockAiohttpResponse(502, text="bad gateway"),
+            *_login_sequence(),
+            json_response(MOCK_DATA_LUA_JSON),
+        ]
+    )
+    fb = FritzBoxVPNSession(http, MOCK_HOST, MOCK_USERNAME, MOCK_PASSWORD)
+    with pytest.raises(ConnectionError):
+        await fb.async_get_vpn_connections()
+    connections = await fb.async_get_vpn_connections()
+    assert "conn-abc" in connections
+
+
+@pytest.mark.asyncio
+async def test_coordinator_sid_expiry_does_not_schedule_reauth(
+    hass,
+) -> None:
+    """Session-expiry 'Invalid SID' is not a credential failure."""
+    coordinator = FritzBoxVPNCoordinator(
+        hass,
+        {"host": MOCK_HOST, "username": "u", "password": "p"},
+        None,
+        "entry-1",
+    )
+    coordinator.fritz_session.async_get_vpn_connections = AsyncMock(
+        side_effect=ValueError("Invalid SID (HTTP 403)")
+    )
+    with (
+        patch.object(coordinator, "_schedule_reauth") as schedule_reauth,
+        pytest.raises(UpdateFailed) as exc_info,
+    ):
+        await coordinator._async_update_data()
+    schedule_reauth.assert_not_called()
+    assert exc_info.value.retry_after is not None
+
+
+@pytest.mark.asyncio
+async def test_coordinator_login_failed_still_schedules_reauth(hass) -> None:
+    """Real credential failures still start reauth."""
+    coordinator = FritzBoxVPNCoordinator(
+        hass,
+        {"host": MOCK_HOST, "username": "u", "password": "p"},
+        None,
+        "entry-1",
+    )
+    coordinator.fritz_session.async_get_vpn_connections = AsyncMock(
+        side_effect=ValueError("Login failed: Invalid SID")
+    )
+    mock_entry = MagicMock()
+    mock_entry.async_start_reauth = AsyncMock()
+    from homeassistant.config_entries import ConfigEntryState
+
+    mock_entry.state = ConfigEntryState.LOADED
+    hass.async_create_task = MagicMock()
+    with (
+        patch.object(hass.config_entries, "async_get_entry", return_value=mock_entry),
+        pytest.raises(UpdateFailed),
+    ):
+        await coordinator._async_update_data()
+    hass.async_create_task.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_missing_box_connections_invalidates_and_raises() -> None:
+    """JSON without boxConnections is treated as outage, not empty success."""
+    http = QueuedAiohttpSession(
+        [
+            *_login_sequence(),
+            json_response({"data": {"init": {"other": True}}}),
+        ]
+    )
+    fb = FritzBoxVPNSession(http, MOCK_HOST, MOCK_USERNAME, MOCK_PASSWORD)
+    with pytest.raises(ConnectionError, match="payload missing"):
+        await fb.async_get_vpn_connections()
+    assert fb.sid is None

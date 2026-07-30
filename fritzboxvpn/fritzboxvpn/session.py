@@ -271,8 +271,10 @@ class FritzBoxVPNSession:
             if response.status == HTTP_STATUS_FORBIDDEN:
                 raise ValueError(ERROR_MSG_INVALID_SID_403)
             if response.status != HTTP_STATUS_OK:
-                _LOGGER.warning("Failed to get VPN connections: HTTP %d", response.status)
-                return {}
+                self.invalidate_session()
+                raise ConnectionError(
+                    f"Failed to get VPN connections: HTTP {response.status}"
+                )
 
             content_type = (response.headers.get("Content-Type") or "").lower()
             if CONTENT_TYPE_JSON not in content_type:
@@ -286,7 +288,12 @@ class FritzBoxVPNSession:
             box = extract_box_connections_from_data(data, API_PAGE_SHAREWIREGUARD)
             if box is not None:
                 return normalize_box_connections(box)
-            return {}
+            # Missing boxConnections is typical while the box is rebooting or the
+            # cached SID/protocol is stale — do not soft-succeed with {}.
+            self.invalidate_session()
+            raise ConnectionError(
+                "VPN connections payload missing from Fritz!Box response"
+            )
 
     async def async_get_vpn_connections(self) -> dict[str, Any]:
         """WireGuard VPN connections; cached session, retry once on SID expiry."""
@@ -393,9 +400,14 @@ class FritzBoxVPNSession:
             return False
 
     def invalidate_session(self) -> None:
-        """Invalidate cached SID so next request performs new login."""
+        """Invalidate cached SID and reset protocol so the next request re-logins.
+
+        Protocol is reset to HTTPS because a temporary reboot outage can flip
+        HTTPS→HTTP permanently for the lifetime of this session object.
+        """
         self.sid = None
+        self.protocol = DEFAULT_PROTOCOL
 
     async def async_close(self) -> None:
-        """Clear cached SID."""
-        self.sid = None
+        """Clear cached SID and reset protocol."""
+        self.invalidate_session()

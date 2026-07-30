@@ -164,7 +164,12 @@ async def test_session_toggle_off_success() -> None:
 @pytest.mark.asyncio
 async def test_session_toggle_unknown_connection() -> None:
     """Toggle returns False when connection UID is missing."""
-    http = QueuedAiohttpSession([*_login_sequence(), json_response({"data": {"init": {}}})])
+    http = QueuedAiohttpSession(
+        [
+            *_login_sequence(),
+            json_response({"data": {"init": {"boxConnections": {}}}}),
+        ]
+    )
     fb = FritzBoxVPNSession(http, MOCK_HOST, MOCK_USERNAME, MOCK_PASSWORD)
     assert await fb.async_toggle_vpn("missing", True) is False
 
