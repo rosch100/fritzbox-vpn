@@ -35,8 +35,13 @@ Vor Merge: CI-Jobs `Ruff`, `pytest`, `HACS validate`, `hassfest` (Aggregate-Chec
 
 ## Pull Requests
 
-PRs **direkt als bereit zur Überprüfung** anlegen (nicht als Draft).  
-`gh pr create` / `ManagePullRequest` mit `draft=false` — kein manuelles „Ready for review“.
+**Immer `draft=false`.** PRs nie als Draft anlegen.
+
+- `ManagePullRequest`: `draft=false` (nicht weglassen — Default vieler Agents ist Draft)
+- `gh pr create` ohne `--draft`
+- Falls versehentlich Draft: sofort `gh pr ready`
+
+Kein manuelles „Ready for review“.
 
 ## Core-Vorbereitung
 
