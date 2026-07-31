@@ -72,7 +72,7 @@ Du kannst das Update-Intervall (wie oft die Integration den VPN-Status prüft) i
 
 Das Update-Intervall legt fest, wie oft die Integration die FritzBox abfragt. Niedrigere Werte = häufigere Updates, höhere Werte (bis 3600 s = 1 h) reduzieren Reconnects und Last.
 
-**Reconnects und Last reduzieren:** Die Integration nutzt Session-Caching (ein Login pro Ladevorgang) und bei Abfragefehlern einen 5‑Minuten-Backoff vor dem nächsten Versuch. Für noch weniger Reconnects und FritzBox-Last das Update-Intervall auf 300 Sekunden (5 Min) oder höher setzen; Maximum ist 3600 (1 h).
+**Reconnects und Last reduzieren:** Die Integration nutzt Session-Caching (ein Login pro Ladevorgang) und bei Abfragefehlern einen 60‑Sekunden-Backoff vor dem nächsten Versuch (damit Fritz!Box-Reboots ohne manuelles Reload wieder verfügbar werden). Für noch weniger Reconnects und FritzBox-Last das Update-Intervall auf 300 Sekunden (5 Min) oder höher setzen; Maximum ist 3600 (1 h).
 
 ### Optionen und Dienste
 

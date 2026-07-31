@@ -1,6 +1,6 @@
 [project]
 name = "fritzboxvpn"
-version = "1.0.1"
+version = "1.0.2"
 description = "Async Python library for AVM Fritz!Box WireGuard VPN (Web UI / data.lua API)"
 readme = "README.md"
 requires-python = ">=3.11"

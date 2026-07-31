@@ -17,7 +17,9 @@ HOST_FALLBACK_UNKNOWN = "unknown"
 DEFAULT_UPDATE_INTERVAL = 30
 UPDATE_INTERVAL_MIN = 5
 UPDATE_INTERVAL_MAX = 3600
-RETRY_AFTER_SECONDS = 300
+# Short enough for Fritz!Box reboot recovery; long enough to avoid hammering
+# during temporary outages / login BlockTime (see issue #42).
+RETRY_AFTER_SECONDS = 60
 
 ATTR_UID = "uid"
 ATTR_VPN_UID = "vpn_uid"
