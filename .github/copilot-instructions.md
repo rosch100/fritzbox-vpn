@@ -37,6 +37,10 @@ Flag as blocking when you see:
 
 Prefer suggestions over nits for line length in legacy files (Ruff ignores `E501`).
 
+## Pull requests
+
+Open PRs as **ready for review** (not draft). Agents must use `draft=false` so Copilot/CodeRabbit run without a manual “Ready for review” click.
+
 ## CI expectations
 
 PRs should pass the **CI** workflow jobs: `CI` (aggregate), `Ruff`, `pytest`, `HACS validate`, `hassfest`.

@@ -2,7 +2,9 @@
 
 ## Copilot code review (aktiv)
 
-`copilot-code-review.json` – automatische Copilot-Reviews auf PRs (alle Branches, bei jedem Push).
+`copilot-code-review.json` – automatische Copilot-Reviews auf PRs (alle Branches, bei jedem Push), inkl. Draft-PRs (`review_draft_pull_requests: true`).
+
+PRs sollen beim Anlegen bereits **bereit zur Überprüfung** sein (nicht als Draft); siehe `AGENTS.md`.
 
 ## Required CI checks (aktiv)
 

@@ -33,6 +33,11 @@ python3 -m venv .venv
 
 Vor Merge: CI-Jobs `Ruff`, `pytest`, `HACS validate`, `hassfest` (Aggregate-Check `CI`).
 
+## Pull Requests
+
+PRs **direkt als bereit zur Überprüfung** anlegen (nicht als Draft).  
+`gh pr create` / `ManagePullRequest` mit `draft=false` — kein manuelles „Ready for review“.
+
 ## Core-Vorbereitung
 
 API-Library `fritzboxvpn/` (PyPI vor Core-Merge), Core-Pfad unter `home-assistant-core/homeassistant/components/fritzbox_vpn/`. Details: `docs/pypi-publish.md`, `docs/home-assistant-io/fritzbox_vpn.markdown`.
