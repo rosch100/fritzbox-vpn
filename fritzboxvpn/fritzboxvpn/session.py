@@ -6,7 +6,7 @@ import asyncio
 import hashlib
 import json
 import logging
-from typing import Any
+from typing import Any, NoReturn
 from urllib.parse import urlsplit
 
 from aiohttp import ClientConnectorError, ClientSession, ClientTimeout
@@ -124,12 +124,19 @@ class FritzBoxVPNSession:
             LOGIN_FORM_USERNAME: self.username,
             LOGIN_FORM_RESPONSE: f"{challenge}-{response_hash}",
         }
-        async with self.session.post(
-            login_url, data=login_data, ssl=False, timeout=timeout
-        ) as response:
-            if response.status != HTTP_STATUS_OK:
-                raise ConnectionError(f"Login failed: {response.status}")
-            content = await response.text()
+        # Rebuild after possible HTTPS→HTTP fallback in _fetch_login_page.
+        login_url = f"{self.protocol}://{self.host}{API_LOGIN}"
+        try:
+            async with self.session.post(
+                login_url, data=login_data, ssl=False, timeout=timeout
+            ) as response:
+                if response.status != HTTP_STATUS_OK:
+                    raise ConnectionError(f"Login failed: {response.status}")
+                content = await response.text()
+        except ConnectionError:
+            raise
+        except (ClientConnectorError, OSError) as err:
+            self._raise_transport_error(err)
 
         sid = parse_sid_from_login_response(content)
         if not sid or sid == INVALID_SID_VALUE:
@@ -166,18 +173,28 @@ class FritzBoxVPNSession:
         }
 
         login_url_post = f"{self.protocol}://{self.host}{API_LOGIN}?version=2"
-        async with self.session.post(
-            login_url_post, data=login_data, ssl=False, timeout=timeout
-        ) as response_http:
-            if response_http.status != HTTP_STATUS_OK:
-                return None
-            resp_content = await response_http.text()
+        try:
+            async with self.session.post(
+                login_url_post, data=login_data, ssl=False, timeout=timeout
+            ) as response_http:
+                if response_http.status != HTTP_STATUS_OK:
+                    return None
+                resp_content = await response_http.text()
+        except ConnectionError:
+            raise
+        except (ClientConnectorError, OSError) as err:
+            self._raise_transport_error(err)
 
         sid = parse_sid_from_login_response(resp_content)
         if not sid or sid == INVALID_SID_VALUE:
             return None
         _LOGGER.debug("PBKDF2 login flow succeeded for session generation.")
         return sid
+
+    def _raise_transport_error(self, err: BaseException) -> NoReturn:
+        """Clear SID/protocol and raise ConnectionError for transport failures."""
+        self.invalidate_session()
+        raise ConnectionError(f"Cannot connect to {self.host}: {err}") from err
 
     @staticmethod
     def _calculate_pbkdf2_response(challenge: str, password: str) -> str:
@@ -302,8 +319,7 @@ class FritzBoxVPNSession:
             raise
         except (ClientConnectorError, OSError) as err:
             # Reboot / port-down: clear cached SID+protocol so the next poll recovers.
-            self.invalidate_session()
-            raise ConnectionError(f"Cannot connect to {self.host}: {err}") from err
+            self._raise_transport_error(err)
 
     async def async_get_vpn_connections(self) -> dict[str, Any]:
         """WireGuard VPN connections; cached session, retry once on SID expiry."""

@@ -228,3 +228,67 @@ async def test_coordinator_client_connector_error_uses_short_retry(
     assert exc_info.value.retry_after == RETRY_AFTER_SECONDS
     assert RETRY_AFTER_SECONDS <= 60
     coordinator.fritz_session.invalidate_session.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_md5_login_post_uses_http_after_https_get_fallback() -> None:
+    """After HTTPS GET fails and HTTP login-page succeeds, MD5 POST must use HTTP."""
+    http = QueuedAiohttpSession(
+        [
+            # PBKDF2 probe: HTTPS OK with legacy challenge → fall through to MD5
+            MockAiohttpResponse(200, text=LOGIN_XML_CHALLENGE),
+            # MD5 GET: HTTPS refused → HTTP challenge OK → MD5 POST on HTTP
+            _connector_error(port=443),
+            MockAiohttpResponse(200, text=LOGIN_XML_CHALLENGE),
+            MockAiohttpResponse(200, text=LOGIN_XML_SID),
+        ]
+    )
+    fb = FritzBoxVPNSession(http, MOCK_HOST, MOCK_USERNAME, MOCK_PASSWORD)
+    session, sid = await fb.async_get_session()
+    assert session is http
+    assert sid == "deadbeef"
+    assert fb.protocol == "http"
+    post_urls = [url for method, url, _ in http.requests if method == "POST"]
+    assert post_urls
+    assert all(url.startswith("http://") for url in post_urls)
+    assert not any(url.startswith("https://") for url in post_urls)
+
+
+@pytest.mark.asyncio
+async def test_md5_login_post_connector_error_raises_connection_error() -> None:
+    """MD5 auth POST connect refused maps to ConnectionError and clears session."""
+    http = QueuedAiohttpSession(
+        [
+            MockAiohttpResponse(200, text=LOGIN_XML_CHALLENGE),
+            MockAiohttpResponse(200, text=LOGIN_XML_CHALLENGE),
+            _connector_error(port=443),
+        ]
+    )
+    fb = FritzBoxVPNSession(http, MOCK_HOST, MOCK_USERNAME, MOCK_PASSWORD)
+    with pytest.raises(ConnectionError, match="Cannot connect"):
+        await fb.async_get_session()
+    assert fb.sid is None
+    assert fb.protocol == "https"
+
+
+@pytest.mark.asyncio
+async def test_pbkdf2_login_post_connector_error_raises_connection_error() -> None:
+    """PBKDF2 version=2 auth POST connect refused maps to ConnectionError."""
+    challenge = (
+        "2$5$0123456789abcdef0123456789abcdef$5$fedcba9876543210fedcba9876543210"
+    )
+    pbkdf2_challenge_xml = (
+        f'<?xml version="1.0"?><SessionInfo><Challenge>{challenge}</Challenge>'
+        f"</SessionInfo>"
+    )
+    http = QueuedAiohttpSession(
+        [
+            MockAiohttpResponse(200, text=pbkdf2_challenge_xml),
+            _connector_error(port=443),
+        ]
+    )
+    fb = FritzBoxVPNSession(http, MOCK_HOST, MOCK_USERNAME, MOCK_PASSWORD)
+    with pytest.raises(ConnectionError, match="Cannot connect"):
+        await fb.async_get_session()
+    assert fb.sid is None
+    assert fb.protocol == "https"
