@@ -34,16 +34,19 @@ class MockAiohttpResponse:
 class QueuedAiohttpSession:
     """ClientSession that returns queued responses in order for get/post/put."""
 
-    def __init__(self, responses: list[MockAiohttpResponse]) -> None:
-        self._responses: Iterator[MockAiohttpResponse] = iter(responses)
+    def __init__(self, responses: list[MockAiohttpResponse | BaseException]) -> None:
+        self._responses: Iterator[MockAiohttpResponse | BaseException] = iter(responses)
         self.requests: list[tuple[str, str, dict[str, Any]]] = []
 
     def _dequeue(self, method: str, url: str, **kwargs: Any) -> MockAiohttpResponse:
         self.requests.append((method, url, kwargs))
         try:
-            return next(self._responses)
+            item = next(self._responses)
         except StopIteration as err:
             raise AssertionError(f"No mock response left for {method} {url}") from err
+        if isinstance(item, BaseException):
+            raise item
+        return item
 
     def get(self, url: str, **kwargs: Any) -> MockAiohttpResponse:
         return self._dequeue("GET", url, **kwargs)

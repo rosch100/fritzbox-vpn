@@ -72,7 +72,7 @@ You can configure the update interval (how often the integration checks for VPN 
 
 The update interval determines how frequently the integration polls the FritzBox for VPN status updates. Lower values give more frequent updates; higher values (e.g. 300–3600 s) reduce reconnects. You can set up to 1 hour (3600 s) for minimal load.
 
-**Reducing reconnects and load:** The integration uses session caching (one login per load) and, on fetch errors, a 5‑minute backoff before retrying. To further reduce reconnects and FritzBox load, set the update interval to 300 seconds (5 min) or higher; maximum is 3600 (1 h).
+**Reducing reconnects and load:** The integration uses session caching (one login per load) and, on fetch errors, a 60‑second backoff before retrying (so Fritz!Box reboots recover without a manual reload). To further reduce reconnects and FritzBox load, set the update interval to 300 seconds (5 min) or higher; maximum is 3600 (1 h).
 
 ### Options and services
 

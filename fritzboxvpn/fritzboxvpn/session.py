@@ -6,7 +6,7 @@ import asyncio
 import hashlib
 import json
 import logging
-from typing import Any
+from typing import Any, NoReturn
 from urllib.parse import urlsplit
 
 from aiohttp import ClientConnectorError, ClientSession, ClientTimeout
@@ -83,7 +83,9 @@ class FritzBoxVPNSession:
         sid = None
         try:
             sid = await self._try_get_session_via_pbkdf2(timeout)
-        except (ConnectionError, ValueError):
+        except ValueError:
+            # Challenge/format mismatch only — transport failures must propagate
+            # so reboot outages are not masked as "try MD5 next".
             _LOGGER.debug("PBKDF2 login not usable; falling back to MD5.")
 
         if sid:
@@ -122,12 +124,19 @@ class FritzBoxVPNSession:
             LOGIN_FORM_USERNAME: self.username,
             LOGIN_FORM_RESPONSE: f"{challenge}-{response_hash}",
         }
-        async with self.session.post(
-            login_url, data=login_data, ssl=False, timeout=timeout
-        ) as response:
-            if response.status != HTTP_STATUS_OK:
-                raise ConnectionError(f"Login failed: {response.status}")
-            content = await response.text()
+        # Rebuild after possible HTTPS→HTTP fallback in _fetch_login_page.
+        login_url = f"{self.protocol}://{self.host}{API_LOGIN}"
+        try:
+            async with self.session.post(
+                login_url, data=login_data, ssl=False, timeout=timeout
+            ) as response:
+                if response.status != HTTP_STATUS_OK:
+                    raise ConnectionError(f"Login failed: {response.status}")
+                content = await response.text()
+        except ConnectionError:
+            raise
+        except (ClientConnectorError, OSError) as err:
+            self._raise_transport_error(err)
 
         sid = parse_sid_from_login_response(content)
         if not sid or sid == INVALID_SID_VALUE:
@@ -164,18 +173,28 @@ class FritzBoxVPNSession:
         }
 
         login_url_post = f"{self.protocol}://{self.host}{API_LOGIN}?version=2"
-        async with self.session.post(
-            login_url_post, data=login_data, ssl=False, timeout=timeout
-        ) as response_http:
-            if response_http.status != HTTP_STATUS_OK:
-                return None
-            resp_content = await response_http.text()
+        try:
+            async with self.session.post(
+                login_url_post, data=login_data, ssl=False, timeout=timeout
+            ) as response_http:
+                if response_http.status != HTTP_STATUS_OK:
+                    return None
+                resp_content = await response_http.text()
+        except ConnectionError:
+            raise
+        except (ClientConnectorError, OSError) as err:
+            self._raise_transport_error(err)
 
         sid = parse_sid_from_login_response(resp_content)
         if not sid or sid == INVALID_SID_VALUE:
             return None
         _LOGGER.debug("PBKDF2 login flow succeeded for session generation.")
         return sid
+
+    def _raise_transport_error(self, err: BaseException) -> NoReturn:
+        """Clear SID/protocol and raise ConnectionError for transport failures."""
+        self.invalidate_session()
+        raise ConnectionError(f"Cannot connect to {self.host}: {err}") from err
 
     @staticmethod
     def _calculate_pbkdf2_response(challenge: str, password: str) -> str:
@@ -196,6 +215,29 @@ class FritzBoxVPNSession:
         hash2 = hashlib.pbkdf2_hmac("sha256", hash1, salt2, iter2)
 
         return f"{salt2_hex}${hash2.hex()}"
+
+    async def _get_login_page_http(
+        self, api_path: str, query: str, timeout: ClientTimeout
+    ) -> str:
+        """GET login page over HTTP and switch protocol only after success."""
+        login_url = (
+            f"{PROTOCOL_HTTP}://{self.host}{api_path}{'?' + query if query else ''}"
+        )
+        try:
+            async with self.session.get(
+                login_url, ssl=False, timeout=timeout
+            ) as response:
+                if response.status != HTTP_STATUS_OK:
+                    raise ConnectionError(
+                        f"Failed to get login page: {response.status}"
+                    )
+                content = await response.text()
+        except ConnectionError:
+            raise
+        except (ClientConnectorError, OSError) as err:
+            raise ConnectionError(f"Cannot connect to {self.host}: {err}") from err
+        self.protocol = PROTOCOL_HTTP
+        return content
 
     async def _fetch_login_page(
         self, login_url: str, timeout: ClientTimeout
@@ -220,19 +262,7 @@ class FritzBoxVPNSession:
                         response.status,
                         NAME_FRITZBOX,
                     )
-                    self.protocol = PROTOCOL_HTTP
-                    login_url = (
-                        f"{self.protocol}://{self.host}{api_path}"
-                        f"{'?' + query if query else ''}"
-                    )
-                    async with self.session.get(
-                        login_url, ssl=False, timeout=timeout
-                    ) as retry_response:
-                        if retry_response.status != HTTP_STATUS_OK:
-                            raise ConnectionError(
-                                f"Failed to get login page: {retry_response.status}"
-                            )
-                        return await retry_response.text()
+                    return await self._get_login_page_http(api_path, query, timeout)
                 raise ConnectionError(f"Failed to get login page: {response.status}")
         except (ClientConnectorError, OSError) as err:
             if self.protocol != PROTOCOL_HTTPS:
@@ -241,18 +271,7 @@ class FritzBoxVPNSession:
                 "HTTPS connection failed (%s), falling back to HTTP.",
                 err,
             )
-            self.protocol = PROTOCOL_HTTP
-            login_url = (
-                f"{self.protocol}://{self.host}{api_path}{'?' + query if query else ''}"
-            )
-            async with self.session.get(
-                login_url, ssl=False, timeout=timeout
-            ) as response:
-                if response.status != HTTP_STATUS_OK:
-                    raise ConnectionError(
-                        f"Failed to get login page: {response.status}"
-                    ) from err
-                return await response.text()
+            return await self._get_login_page_http(api_path, query, timeout)
 
     async def _fetch_vpn_connections_once(self) -> dict[str, Any]:
         """Single VPN connections request; raises on outage/missing payload."""
@@ -266,35 +285,41 @@ class FritzBoxVPNSession:
             "no_sidrenew": "",
         }
         timeout = ClientTimeout(total=DEFAULT_TIMEOUT)
-        async with session.post(
-            data_url, data=params, timeout=timeout, ssl=False
-        ) as response:
-            if response.status == HTTP_STATUS_FORBIDDEN:
-                raise ValueError(ERROR_MSG_INVALID_SID_403)
-            if response.status != HTTP_STATUS_OK:
+        try:
+            async with session.post(
+                data_url, data=params, timeout=timeout, ssl=False
+            ) as response:
+                if response.status == HTTP_STATUS_FORBIDDEN:
+                    raise ValueError(ERROR_MSG_INVALID_SID_403)
+                if response.status != HTTP_STATUS_OK:
+                    self.invalidate_session()
+                    raise ConnectionError(
+                        f"Failed to get VPN connections: HTTP {response.status}"
+                    )
+
+                content_type = (response.headers.get("Content-Type") or "").lower()
+                if CONTENT_TYPE_JSON not in content_type:
+                    raise ValueError(ERROR_MSG_INVALID_SID_HTML)
+                try:
+                    body = await response.text()
+                    data = json.loads(body)
+                except (json.JSONDecodeError, TypeError) as err:
+                    raise ValueError(ERROR_MSG_INVALID_SID_HTML) from err
+
+                box = extract_box_connections_from_data(data, API_PAGE_SHAREWIREGUARD)
+                if box is not None:
+                    return normalize_box_connections(box)
+                # Missing boxConnections is typical while the box is rebooting or the
+                # cached SID/protocol is stale — do not soft-succeed with {}.
                 self.invalidate_session()
                 raise ConnectionError(
-                    f"Failed to get VPN connections: HTTP {response.status}"
+                    "VPN connections payload missing from Fritz!Box response"
                 )
-
-            content_type = (response.headers.get("Content-Type") or "").lower()
-            if CONTENT_TYPE_JSON not in content_type:
-                raise ValueError(ERROR_MSG_INVALID_SID_HTML)
-            try:
-                body = await response.text()
-                data = json.loads(body)
-            except (json.JSONDecodeError, TypeError) as err:
-                raise ValueError(ERROR_MSG_INVALID_SID_HTML) from err
-
-            box = extract_box_connections_from_data(data, API_PAGE_SHAREWIREGUARD)
-            if box is not None:
-                return normalize_box_connections(box)
-            # Missing boxConnections is typical while the box is rebooting or the
-            # cached SID/protocol is stale — do not soft-succeed with {}.
-            self.invalidate_session()
-            raise ConnectionError(
-                "VPN connections payload missing from Fritz!Box response"
-            )
+        except ConnectionError:
+            raise
+        except (ClientConnectorError, OSError) as err:
+            # Reboot / port-down: clear cached SID+protocol so the next poll recovers.
+            self._raise_transport_error(err)
 
     async def async_get_vpn_connections(self) -> dict[str, Any]:
         """WireGuard VPN connections; cached session, retry once on SID expiry."""
@@ -307,6 +332,9 @@ class FritzBoxVPNSession:
             raise
         except TimeoutError as err:
             _LOGGER.error("Timeout getting VPN connections: %s", err)
+            raise
+        except ConnectionError as err:
+            _LOGGER.error("Error getting VPN connections: %s", err)
             raise
         except Exception as err:
             _LOGGER.error("Error getting VPN connections: %s", err)
