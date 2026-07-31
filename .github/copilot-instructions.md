@@ -37,6 +37,10 @@ Flag as blocking when you see:
 
 Prefer suggestions over nits for line length in legacy files (Ruff ignores `E501`).
 
+## Pull requests
+
+**Always `draft=false`.** Never open PRs as draft. Pass `draft=false` explicitly to `ManagePullRequest` / do not use `gh pr create --draft`. If a PR is draft by mistake, run `gh pr ready` immediately.
+
 ## CI expectations
 
 PRs should pass the **CI** workflow jobs: `CI` (aggregate), `Ruff`, `pytest`, `HACS validate`, `hassfest`.

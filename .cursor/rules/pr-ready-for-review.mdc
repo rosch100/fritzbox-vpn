@@ -1,0 +1,12 @@
+---
+description: Always open GitHub PRs as ready for review (never draft)
+alwaysApply: true
+---
+
+# Pull requests: never draft
+
+When creating or updating a GitHub pull request in this repository:
+
+- **Always** set `draft=false` (`ManagePullRequest` / `gh pr create --draft=false`).
+- Do **not** open PRs as Draft. Do not rely on a manual “Ready for review” click.
+- If a PR was accidentally created as draft, convert it immediately (`gh pr ready`).
