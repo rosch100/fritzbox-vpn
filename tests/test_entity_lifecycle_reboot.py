@@ -208,9 +208,7 @@ async def test_add_new_skips_uids_already_in_entity_registry(
     )
     assert add_calls == [[]]  # empty initial data
 
-    coordinator.async_set_updated_data(
-        {"conn-abc": MOCK_VPN_CONNECTIONS["conn-abc"]}
-    )
+    coordinator.async_set_updated_data({"conn-abc": MOCK_VPN_CONNECTIONS["conn-abc"]})
     await hass.async_block_till_done()
 
     # UID was adopted into known_uids without a second add.

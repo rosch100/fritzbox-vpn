@@ -344,9 +344,7 @@ def remove_orphaned_entities(
 
     device_registry = dr.async_get(hass)
     for uid in uids_removed:
-        device = device_registry.async_get_device(
-            identifiers={(DOMAIN, entry_id, uid)}
-        )
+        device = device_registry.async_get_device(identifiers={(DOMAIN, entry_id, uid)})
         if device:
             device_registry.async_remove_device(device.id)
             _LOGGER.info(
