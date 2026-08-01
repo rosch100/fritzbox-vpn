@@ -229,7 +229,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: FritzboxVpnConfigEntry) 
             removed_shadow_entities = remove_unexpected_entity_entries(
                 hass,
                 entry.entry_id,
-                current_uids=set(coordinator.data.keys()),
             )
             if removed_shadow_entities:
                 _LOGGER.info(

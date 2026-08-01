@@ -107,7 +107,7 @@ def remove_unexpected_entity_entries(
     hass: HomeAssistant,
     entry_id: str,
     *,
-    current_uids: set[str],
+    current_uids: set[str] | None = None,
 ) -> int:
     """Remove shadow entities with broken unique_id formats.
 
@@ -116,10 +116,9 @@ def remove_unexpected_entity_entries(
     UIDs missing from the current poll are kept (temporary reboot / partial
     lists must not destroy registry rows; see issue #37 residual).
 
-    ``current_uids`` is accepted for API compatibility with setup callers; it is
-    not used to delete valid entries.
+    ``current_uids`` is ignored (kept optional for older call sites).
     """
-    _ = current_uids  # API compat; do not delete based on transient poll sets.
+    _ = current_uids
 
     entity_registry = er.async_get(hass)
     to_remove: list[er.RegistryEntry] = []

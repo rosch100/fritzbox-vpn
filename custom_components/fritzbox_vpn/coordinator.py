@@ -161,9 +161,15 @@ class FritzBoxVPNCoordinator(DataUpdateCoordinator):
     def _remember_connection_names(self, connections: dict[str, Any]) -> None:
         """Cache display names so orphan warnings stay useful after partial polls."""
         for uid, payload in connections.items():
+            if not isinstance(payload, dict):
+                continue
             name = payload.get(API_KEY_NAME)
             if name:
-                self._uid_names[uid] = name
+                self._uid_names[uid] = str(name)
+
+    def _reset_orphan_miss_streaks(self) -> None:
+        """Clear in-progress miss counts so confirmations require consecutive successes."""
+        self._missing_uid_counts.clear()
 
     def _track_missing_uids(self, current_uids: set[str]) -> set[str]:
         """Return UIDs newly confirmed missing after ORPHAN_CONFIRM_POLLS polls."""
@@ -204,6 +210,7 @@ class FritzBoxVPNCoordinator(DataUpdateCoordinator):
             self._reauth_scheduled = False
             return connections
         except (ConnectionError, ValueError) as err:
+            self._reset_orphan_miss_streaks()
             self._prepare_session_for_retry(err)
             if self._is_auth_error(err):
                 self._schedule_reauth()
@@ -213,12 +220,14 @@ class FritzBoxVPNCoordinator(DataUpdateCoordinator):
                 retry_after=RETRY_AFTER_SECONDS,
             ) from err
         except TimeoutError as err:
+            self._reset_orphan_miss_streaks()
             self._prepare_session_for_retry(err)
             raise UpdateFailed(
                 f"Error fetching VPN data: {err}",
                 retry_after=RETRY_AFTER_SECONDS,
             ) from err
         except Exception as err:
+            self._reset_orphan_miss_streaks()
             self._prepare_session_for_retry(err)
             if self._is_auth_error(err):
                 self._schedule_reauth()

@@ -21,6 +21,7 @@ from custom_components.fritzbox_vpn.models import FritzboxVpnRuntimeData
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers.update_coordinator import UpdateFailed
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from tests.fixtures import MOCK_HOST, MOCK_VPN_CONNECTIONS
@@ -97,9 +98,7 @@ async def test_shadow_cleanup_keeps_valid_uids_missing_from_current_poll(
         config_entry=entry,
     )
 
-    removed = remove_unexpected_entity_entries(
-        hass, entry.entry_id, current_uids={"conn-abc"}
-    )
+    removed = remove_unexpected_entity_entries(hass, entry.entry_id)
 
     assert removed == 1
     assert registry.async_get(valid_missing.entity_id) is not None
@@ -125,29 +124,25 @@ async def test_uid_loss_and_return_does_not_readd_entities(
     def _async_add_entities(entities, **kwargs):
         add_calls.append(list(entities))
 
+    def _create_entities(coord, uids):
+        entities = []
+        for uid in uids:
+            entity = MagicMock()
+            entity.unique_id = vpn_unique_id(uid, UNIQUE_ID_SUFFIX_SWITCH)
+            entity._connection_uid = uid
+            entities.append(entity)
+        return entities
+
     await setup_vpn_platform(
         mock_config_entry,
         _async_add_entities,
         platform="switch",
-        create_entities=lambda coord, uids: [
-            MagicMock(unique_id=vpn_unique_id(uid, UNIQUE_ID_SUFFIX_SWITCH))
-            for uid in uids
-        ],
+        create_entities=_create_entities,
     )
     assert len(add_calls) == 1
     assert len(add_calls[0]) == len(MOCK_VPN_CONNECTIONS)
     known = mock_config_entry.runtime_data.known_uids_switch
     assert known == set(MOCK_VPN_CONNECTIONS.keys())
-
-    # Register entities so defense-in-depth can see them in the registry.
-    registry = er.async_get(hass)
-    for uid in MOCK_VPN_CONNECTIONS:
-        registry.async_get_or_create(
-            "switch",
-            DOMAIN,
-            vpn_unique_id(uid, UNIQUE_ID_SUFFIX_SWITCH),
-            config_entry=mock_config_entry,
-        )
 
     # Simulate temporary loss of one connection (reboot partial poll).
     partial = {"conn-abc": MOCK_VPN_CONNECTIONS["conn-abc"]}
@@ -198,14 +193,22 @@ async def test_partial_setup_adds_entities_when_missing_uid_returns(
     def _async_add_entities(entities, **kwargs):
         add_calls.append(list(entities))
 
+    def _create_entities(coord, uids):
+        entities = []
+        for uid in uids:
+            if coord.data and uid not in coord.data:
+                continue
+            entity = MagicMock()
+            entity.unique_id = vpn_unique_id(uid, UNIQUE_ID_SUFFIX_SWITCH)
+            entity._connection_uid = uid
+            entities.append(entity)
+        return entities
+
     await setup_vpn_platform(
         mock_config_entry,
         _async_add_entities,
         platform="switch",
-        create_entities=lambda coord, uids: [
-            MagicMock(unique_id=vpn_unique_id(uid, UNIQUE_ID_SUFFIX_SWITCH))
-            for uid in uids
-        ],
+        create_entities=_create_entities,
     )
     assert len(add_calls) == 1
     assert len(add_calls[0]) == 1
@@ -248,7 +251,50 @@ async def test_coordinator_orphan_warning_debounced(hass: HomeAssistant) -> None
     await coordinator._async_update_data()
     callback.assert_called_once()
     assert callback.call_args.args[1] == {"conn-abc"}
+    assert coordinator._uid_names.get("conn-def") == "Guest VPN"
 
     # Further misses for the same UID must not re-fire the callback.
+    await coordinator._async_update_data()
+    callback.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_coordinator_update_failed_resets_orphan_miss_streak(
+    hass: HomeAssistant,
+) -> None:
+    """Transport failures must reset miss streaks (consecutive successful polls)."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={"host": MOCK_HOST, "username": "u", "password": "p"},
+    )
+    callback = MagicMock()
+    coordinator = FritzBoxVPNCoordinator(
+        hass, entry.data, None, entry.entry_id, on_orphaned_removed=callback
+    )
+    coordinator.async_set_updated_data(dict(MOCK_VPN_CONNECTIONS))
+    coordinator.fritz_session = MagicMock()
+    coordinator.fritz_session.invalidate_session = MagicMock()
+    coordinator.fritz_session.async_get_vpn_connections = AsyncMock(
+        return_value={"conn-abc": MOCK_VPN_CONNECTIONS["conn-abc"]}
+    )
+
+    for _ in range(ORPHAN_CONFIRM_POLLS - 1):
+        await coordinator._async_update_data()
+    assert coordinator._missing_uid_counts.get("conn-def") == ORPHAN_CONFIRM_POLLS - 1
+
+    coordinator.fritz_session.async_get_vpn_connections = AsyncMock(
+        side_effect=ConnectionError("connect refused")
+    )
+    with pytest.raises(UpdateFailed):
+        await coordinator._async_update_data()
+    assert coordinator._missing_uid_counts == {}
+
+    coordinator.fritz_session.async_get_vpn_connections = AsyncMock(
+        return_value={"conn-abc": MOCK_VPN_CONNECTIONS["conn-abc"]}
+    )
+    for _ in range(ORPHAN_CONFIRM_POLLS - 1):
+        await coordinator._async_update_data()
+    callback.assert_not_called()
+
     await coordinator._async_update_data()
     callback.assert_called_once()
