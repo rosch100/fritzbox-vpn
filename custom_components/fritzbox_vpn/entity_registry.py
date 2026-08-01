@@ -109,18 +109,17 @@ def remove_unexpected_entity_entries(
     *,
     current_uids: set[str],
 ) -> int:
-    """Remove entity registry entries that are not provided anymore.
+    """Remove shadow entities with broken unique_id formats.
 
-    This primarily fixes "shadow" entities caused by wrong/broken unique_id
-    generation across upgrades: if an entry's unique_id does not match any of
-    our expected unique_id values for the currently known VPN connections,
-    remove it from the entity registry.
+    Only removes registry entries whose unique_id starts with our prefix but is
+    not a valid ``fritzbox_vpn_{uid}_{suffix}`` value. Valid-format entities for
+    UIDs missing from the current poll are kept (temporary reboot / partial
+    lists must not destroy registry rows; see issue #37 residual).
+
+    ``current_uids`` is accepted for API compatibility with setup callers; it is
+    not used to delete valid entries.
     """
-    expected_unique_ids = {
-        f"{UNIQUE_ID_PREFIX}{uid}_{suffix}"
-        for uid in current_uids
-        for suffix in UNIQUE_ID_SUFFIXES
-    }
+    _ = current_uids  # API compat; do not delete based on transient poll sets.
 
     entity_registry = er.async_get(hass)
     to_remove: list[er.RegistryEntry] = []
@@ -128,7 +127,7 @@ def remove_unexpected_entity_entries(
         unique_id = entry.unique_id or ""
         if not unique_id.startswith(UNIQUE_ID_PREFIX):
             continue
-        if unique_id in expected_unique_ids:
+        if connection_uid_from_entity_unique_id(unique_id) is not None:
             continue
         to_remove.append(entry)
 
@@ -320,50 +319,54 @@ def remove_orphaned_entities(
     *,
     remove_from_registry: bool = True,
 ) -> None:
-    """Clear known_uids and optionally remove entity/device registry entries."""
+    """Optionally remove registry entries; clear known_uids only when removed."""
     if not entries:
         return
 
     uids_removed = uids_from_entity_entries(entries)
 
-    if remove_from_registry:
-        entity_registry = er.async_get(hass)
-        device_ids_affected = set()
-        for entry in entries:
-            if entry.device_id:
-                device_ids_affected.add(entry.device_id)
-            entity_registry.async_remove(entry.entity_id)
+    if not remove_from_registry:
+        # Keep known_uids so platforms do not re-add existing unique_ids when a
+        # connection reappears after a temporary absence (issue #37 residual).
+        return
+
+    entity_registry = er.async_get(hass)
+    device_ids_affected = set()
+    for entry in entries:
+        if entry.device_id:
+            device_ids_affected.add(entry.device_id)
+        entity_registry.async_remove(entry.entity_id)
+        _LOGGER.info(
+            "Removed unavailable entity: %s (%s)",
+            entry.entity_id,
+            entry.unique_id,
+        )
+
+    device_registry = dr.async_get(hass)
+    for uid in uids_removed:
+        device = device_registry.async_get_device(
+            identifiers={(DOMAIN, entry_id, uid)}
+        )
+        if device:
+            device_registry.async_remove_device(device.id)
             _LOGGER.info(
-                "Removed unavailable entity: %s (%s)",
-                entry.entity_id,
-                entry.unique_id,
+                "Removed unavailable device for connection UID: %s (device_id: %s)",
+                uid,
+                device.id,
             )
+            device_ids_affected.discard(device.id)
 
-        device_registry = dr.async_get(hass)
-        for uid in uids_removed:
-            device = device_registry.async_get_device(
-                identifiers={(DOMAIN, entry_id, uid)}
+    for dev_id in device_ids_affected:
+        device = device_registry.async_get(dev_id)
+        if not device:
+            continue
+        if not er.async_entries_for_device(entity_registry, dev_id):
+            device_registry.async_remove_device(dev_id)
+            _LOGGER.info(
+                "Removed empty device (no entities left): %s (device_id: %s)",
+                device.name_by_user or device.name,
+                dev_id,
             )
-            if device:
-                device_registry.async_remove_device(device.id)
-                _LOGGER.info(
-                    "Removed unavailable device for connection UID: %s (device_id: %s)",
-                    uid,
-                    device.id,
-                )
-                device_ids_affected.discard(device.id)
-
-        for dev_id in device_ids_affected:
-            device = device_registry.async_get(dev_id)
-            if not device:
-                continue
-            if not er.async_entries_for_device(entity_registry, dev_id):
-                device_registry.async_remove_device(dev_id)
-                _LOGGER.info(
-                    "Removed empty device (no entities left): %s (device_id: %s)",
-                    device.name_by_user or device.name,
-                    dev_id,
-                )
 
     runtime = runtime_from_hass(hass, entry_id)
     if not uids_removed or runtime is None:

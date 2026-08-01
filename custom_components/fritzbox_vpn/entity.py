@@ -8,6 +8,7 @@ from typing import Any
 
 from fritzboxvpn import API_KEY_ACTIVE, API_KEY_CONNECTED, API_KEY_NAME, API_KEY_UID
 from homeassistant.exceptions import HomeAssistantError
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
@@ -23,6 +24,7 @@ from .const import (
     UNIQUE_ID_PREFIX,
 )
 from .coordinator import FritzBoxVPNCoordinator
+from .entity_registry import connection_uid_from_entity_unique_id
 from .models import FritzboxVpnConfigEntry, RuntimePlatform, runtime_from_entry
 
 _LOGGER = logging.getLogger(__name__)
@@ -227,16 +229,35 @@ async def setup_vpn_platform(
 
     async_add_entities(entities, update_before_add=True)
 
+    def _uids_already_in_registry(uids: set[str]) -> set[str]:
+        """UIDs that already have registry rows for this config entry."""
+        if not uids:
+            return set()
+        registry = er.async_get(coordinator.hass)
+        present: set[str] = set()
+        for reg_entry in er.async_entries_for_config_entry(registry, entry.entry_id):
+            uid = connection_uid_from_entity_unique_id(reg_entry.unique_id or "")
+            if uid in uids:
+                present.add(uid)
+        return present
+
     async def _add_new_entities() -> None:
         async with lock:
             current = set(coordinator.data.keys()) if coordinator.data else set()
             new_uids = current - known_uids
             if not new_uids:
                 return
-            new_entities = create_entities(coordinator, new_uids)
+            # Defense-in-depth: never re-add unique_ids that still exist in the
+            # registry (e.g. after a buggy known_uids clear during reboot).
+            already_registered = _uids_already_in_registry(new_uids)
+            known_uids.update(already_registered)
+            to_add = new_uids - already_registered
+            if not to_add:
+                return
+            new_entities = create_entities(coordinator, to_add)
             if not new_entities:
                 return
-            known_uids.update(new_uids)
+            known_uids.update(to_add)
             async_add_entities(new_entities)
             _LOGGER.info(
                 "New VPN connection(s) detected, added %d %s entities",

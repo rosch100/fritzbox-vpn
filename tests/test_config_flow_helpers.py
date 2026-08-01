@@ -265,7 +265,7 @@ def test_entity_id_helpers_edge_cases() -> None:
 
 @pytest.mark.asyncio
 async def test_remove_orphaned_clears_known_uids(hass: HomeAssistant) -> None:
-    """remove_orphaned_entities subtracts UIDs from integration store."""
+    """remove_orphaned_entities clears known_uids only when removing from registry."""
     entry = MockConfigEntry(domain=DOMAIN, data={"host": "1.2.3.4"})
     entry.add_to_hass(hass)
     runtime = FritzboxVpnRuntimeData(
@@ -282,6 +282,8 @@ async def test_remove_orphaned_clears_known_uids(hass: HomeAssistant) -> None:
         config_entry=entry,
     )
     remove_orphaned_entities(hass, entry.entry_id, [entity], remove_from_registry=False)
+    assert entry.runtime_data.known_uids_switch == {"gone", "keep"}
+    remove_orphaned_entities(hass, entry.entry_id, [entity], remove_from_registry=True)
     assert entry.runtime_data.known_uids_switch == {"keep"}
 
 

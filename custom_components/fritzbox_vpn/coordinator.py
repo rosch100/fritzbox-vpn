@@ -24,6 +24,7 @@ from .const import (
     LOG_MSG_VPN_CONNECTIONS_REMOVED,
     LOG_MSG_VPN_CONNECTIONS_REMOVED_HINT,
     NAME_FRITZBOX,
+    ORPHAN_CONFIRM_POLLS,
     RETRY_AFTER_SECONDS,
     STATUS_CONNECTED,
     STATUS_DISABLED,
@@ -112,6 +113,9 @@ class FritzBoxVPNCoordinator(DataUpdateCoordinator):
         self.entry_id = entry_id
         self._reauth_scheduled = False
         self._on_orphaned_removed = on_orphaned_removed
+        self._seen_uids: set[str] = set()
+        self._missing_uid_counts: dict[str, int] = {}
+        self._confirmed_orphan_uids: set[str] = set()
 
     def get_vpn_status(self, connection_uid: str) -> str:
         """Get the textual status of a VPN connection."""
@@ -153,27 +157,44 @@ class FritzBoxVPNCoordinator(DataUpdateCoordinator):
         if inspect.isawaitable(result):
             await result
 
+    def _track_missing_uids(self, current_uids: set[str]) -> set[str]:
+        """Return UIDs newly confirmed missing after ORPHAN_CONFIRM_POLLS polls."""
+        if self.data:
+            self._seen_uids |= set(self.data.keys())
+        self._seen_uids |= current_uids
+        for uid in current_uids:
+            self._missing_uid_counts.pop(uid, None)
+            self._confirmed_orphan_uids.discard(uid)
+
+        newly_confirmed: set[str] = set()
+        for uid in self._seen_uids - current_uids:
+            count = self._missing_uid_counts.get(uid, 0) + 1
+            self._missing_uid_counts[uid] = count
+            if count >= ORPHAN_CONFIRM_POLLS and uid not in self._confirmed_orphan_uids:
+                self._confirmed_orphan_uids.add(uid)
+                newly_confirmed.add(uid)
+        return newly_confirmed
+
     async def _async_update_data(self) -> dict[str, Any]:
         """Fetch latest VPN data from Fritz!Box."""
-        previous_uids = set(self.data.keys()) if self.data else set()
+        previous_data = self.data if self.data else {}
         try:
             connections = await self.fritz_session.async_get_vpn_connections()
-            if previous_uids:
-                current_uids = set(connections.keys())
-                removed_uids = previous_uids - current_uids
-                if removed_uids:
-                    names = [
-                        self.data.get(uid, {}).get(API_KEY_NAME, uid)
-                        for uid in removed_uids
-                    ]
-                    _LOGGER.warning(
-                        LOG_MSG_VPN_CONNECTIONS_REMOVED,
-                        NAME_FRITZBOX,
-                        names or list(removed_uids),
-                    )
-                    _LOGGER.info(LOG_MSG_VPN_CONNECTIONS_REMOVED_HINT)
-                    if self._on_orphaned_removed and self.entry_id:
-                        self._on_orphaned_removed(self.entry_id, current_uids)
+            current_uids = set(connections.keys())
+            newly_confirmed = self._track_missing_uids(current_uids)
+            if newly_confirmed:
+                names = [
+                    previous_data.get(uid, {}).get(API_KEY_NAME, uid)
+                    for uid in newly_confirmed
+                ]
+                _LOGGER.warning(
+                    LOG_MSG_VPN_CONNECTIONS_REMOVED,
+                    NAME_FRITZBOX,
+                    names or list(newly_confirmed),
+                )
+                _LOGGER.info(LOG_MSG_VPN_CONNECTIONS_REMOVED_HINT)
+                if self._on_orphaned_removed and self.entry_id:
+                    self._on_orphaned_removed(self.entry_id, current_uids)
             self._reauth_scheduled = False
             return connections
         except (ConnectionError, ValueError) as err:

@@ -102,22 +102,6 @@ async def _async_repair_entity_id_suffixes(
             )
 
 
-def _apply_auto_cleanup(
-    hass: HomeAssistant, entry_id: str, current_uids: set[str]
-) -> None:
-    """Clear known_uids for UIDs no longer present; do not remove from registry so entity_id stays stable."""
-    to_remove, err = get_orphaned_entity_entries(
-        hass, entry_id, current_uids=current_uids
-    )
-    if err or not to_remove:
-        return
-    remove_orphaned_entities(hass, entry_id, to_remove, remove_from_registry=False)
-    _LOGGER.info(
-        "Cleared known_uids for %d unavailable connection(s); entity IDs kept",
-        len(to_remove),
-    )
-
-
 def _register_services_if_needed(hass: HomeAssistant) -> None:
     """Register integration services once per HA instance."""
     store = _domain_store(hass)
@@ -215,7 +199,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: FritzboxVpnConfigEntry) 
         entry.data,
         entry.options,
         entry.entry_id,
-        on_orphaned_removed=lambda eid, cu: _apply_auto_cleanup(hass, eid, cu),
     )
 
     try:
