@@ -168,29 +168,30 @@ async def test_uid_loss_and_return_does_not_readd_entities(
 
 
 @pytest.mark.asyncio
-async def test_add_new_skips_uids_already_in_entity_registry(
+async def test_partial_setup_adds_entities_when_missing_uid_returns(
     hass: HomeAssistant, mock_config_entry: MockConfigEntry
 ) -> None:
-    """Defense-in-depth: do not async_add_entities for UIDs already in the registry."""
+    """After setup with a partial poll, returning UIDs must be added (HA restores IDs)."""
     mock_config_entry.add_to_hass(hass)
     coordinator = FritzBoxVPNCoordinator(
         hass, mock_config_entry.data, None, mock_config_entry.entry_id
     )
-    coordinator.async_set_updated_data({})
+    # Simulate reload/setup during reboot: only one connection visible.
+    partial = {"conn-abc": MOCK_VPN_CONNECTIONS["conn-abc"]}
+    coordinator.async_set_updated_data(partial)
     coordinator.last_update_success = True
-    runtime = FritzboxVpnRuntimeData(coordinator=coordinator)
-    # Pretend tracking was cleared incorrectly while registry still has the entity.
-    runtime.known_uids_switch = set()
-    mock_config_entry.runtime_data = runtime
+    mock_config_entry.runtime_data = FritzboxVpnRuntimeData(coordinator=coordinator)
     mock_config_entry.mock_state(hass, ConfigEntryState.LOADED)
 
+    # Registry still has the temporarily missing connection from before reboot.
     registry = er.async_get(hass)
-    registry.async_get_or_create(
-        "switch",
-        DOMAIN,
-        vpn_unique_id("conn-abc", UNIQUE_ID_SUFFIX_SWITCH),
-        config_entry=mock_config_entry,
-    )
+    for uid in MOCK_VPN_CONNECTIONS:
+        registry.async_get_or_create(
+            "switch",
+            DOMAIN,
+            vpn_unique_id(uid, UNIQUE_ID_SUFFIX_SWITCH),
+            config_entry=mock_config_entry,
+        )
 
     add_calls: list[list] = []
 
@@ -206,14 +207,21 @@ async def test_add_new_skips_uids_already_in_entity_registry(
             for uid in uids
         ],
     )
-    assert add_calls == [[]]  # empty initial data
+    assert len(add_calls) == 1
+    assert len(add_calls[0]) == 1
+    assert mock_config_entry.runtime_data.known_uids_switch == {"conn-abc"}
 
-    coordinator.async_set_updated_data({"conn-abc": MOCK_VPN_CONNECTIONS["conn-abc"]})
+    # Full set returns — must add the missing UID (registry presence must not block).
+    coordinator.async_set_updated_data(dict(MOCK_VPN_CONNECTIONS))
     await hass.async_block_till_done()
 
-    # UID was adopted into known_uids without a second add.
-    assert "conn-abc" in mock_config_entry.runtime_data.known_uids_switch
-    assert len(add_calls) == 1
+    assert mock_config_entry.runtime_data.known_uids_switch == set(
+        MOCK_VPN_CONNECTIONS.keys()
+    )
+    assert len(add_calls) == 2
+    assert {e.unique_id for e in add_calls[1]} == {
+        vpn_unique_id("conn-def", UNIQUE_ID_SUFFIX_SWITCH)
+    }
 
 
 @pytest.mark.asyncio

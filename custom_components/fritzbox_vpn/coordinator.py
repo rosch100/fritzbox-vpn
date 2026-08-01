@@ -116,6 +116,7 @@ class FritzBoxVPNCoordinator(DataUpdateCoordinator):
         self._seen_uids: set[str] = set()
         self._missing_uid_counts: dict[str, int] = {}
         self._confirmed_orphan_uids: set[str] = set()
+        self._uid_names: dict[str, str] = {}
 
     def get_vpn_status(self, connection_uid: str) -> str:
         """Get the textual status of a VPN connection."""
@@ -157,10 +158,18 @@ class FritzBoxVPNCoordinator(DataUpdateCoordinator):
         if inspect.isawaitable(result):
             await result
 
+    def _remember_connection_names(self, connections: dict[str, Any]) -> None:
+        """Cache display names so orphan warnings stay useful after partial polls."""
+        for uid, payload in connections.items():
+            name = payload.get(API_KEY_NAME)
+            if name:
+                self._uid_names[uid] = name
+
     def _track_missing_uids(self, current_uids: set[str]) -> set[str]:
         """Return UIDs newly confirmed missing after ORPHAN_CONFIRM_POLLS polls."""
         if self.data:
             self._seen_uids |= set(self.data.keys())
+            self._remember_connection_names(self.data)
         self._seen_uids |= current_uids
         for uid in current_uids:
             self._missing_uid_counts.pop(uid, None)
@@ -177,16 +186,13 @@ class FritzBoxVPNCoordinator(DataUpdateCoordinator):
 
     async def _async_update_data(self) -> dict[str, Any]:
         """Fetch latest VPN data from Fritz!Box."""
-        previous_data = self.data if self.data else {}
         try:
             connections = await self.fritz_session.async_get_vpn_connections()
             current_uids = set(connections.keys())
+            self._remember_connection_names(connections)
             newly_confirmed = self._track_missing_uids(current_uids)
             if newly_confirmed:
-                names = [
-                    previous_data.get(uid, {}).get(API_KEY_NAME, uid)
-                    for uid in newly_confirmed
-                ]
+                names = [self._uid_names.get(uid, uid) for uid in newly_confirmed]
                 _LOGGER.warning(
                     LOG_MSG_VPN_CONNECTIONS_REMOVED,
                     NAME_FRITZBOX,
