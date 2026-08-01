@@ -233,10 +233,27 @@ async def setup_vpn_platform(
             new_uids = current - known_uids
             if not new_uids:
                 return
+            # Add for UIDs not yet tracked in this loaded session. Registry rows
+            # alone must not block this: after setup with a partial poll (reboot),
+            # missing connections still need async_add_entities so HA can restore
+            # the existing unique_id / entity_id. Duplicate live unique_ids are
+            # avoided by never clearing known_uids on temporary absence.
             new_entities = create_entities(coordinator, new_uids)
             if not new_entities:
                 return
-            known_uids.update(new_uids)
+            # Only mark UIDs that were actually built (factory skips absent data).
+            added_uids: set[str] = set()
+            for entity in new_entities:
+                uid = getattr(entity, "_connection_uid", None)
+                if isinstance(uid, str):
+                    added_uids.add(uid)
+            if not added_uids:
+                added_uids = new_uids & (
+                    set(coordinator.data.keys()) if coordinator.data else set()
+                )
+            if not added_uids:
+                return
+            known_uids.update(added_uids)
             async_add_entities(new_entities)
             _LOGGER.info(
                 "New VPN connection(s) detected, added %d %s entities",

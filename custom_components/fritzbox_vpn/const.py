@@ -20,6 +20,9 @@ UPDATE_INTERVAL_MAX = 3600
 # Short enough for Fritz!Box reboot recovery; long enough to avoid hammering
 # during temporary outages / login BlockTime (see issue #42).
 RETRY_AFTER_SECONDS = 60
+# Consecutive successful polls a UID must be missing before we treat it as removed
+# (avoids reboot/partial-list noise; see issue #37 residual).
+ORPHAN_CONFIRM_POLLS = 3
 
 ATTR_UID = "uid"
 ATTR_VPN_UID = "vpn_uid"

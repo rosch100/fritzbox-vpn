@@ -3,6 +3,7 @@
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+from custom_components.fritzbox_vpn.const import ORPHAN_CONFIRM_POLLS
 from custom_components.fritzbox_vpn.coordinator import FritzBoxVPNCoordinator
 from fritzboxvpn.parsing import (
     connection_active_from_api,
@@ -56,7 +57,7 @@ def test_extract_box_connections_alternate_paths() -> None:
 
 @pytest.mark.asyncio
 async def test_coordinator_removed_vpn_triggers_callback(hass: HomeAssistant) -> None:
-    """Removed VPN UIDs invoke on_orphaned_removed callback."""
+    """Removed VPN UIDs invoke on_orphaned_removed after confirm polls."""
     entry = MockConfigEntry(
         domain="fritzbox_vpn",
         data={"host": MOCK_HOST, "username": "u", "password": "p"},
@@ -70,6 +71,10 @@ async def test_coordinator_removed_vpn_triggers_callback(hass: HomeAssistant) ->
     coordinator.fritz_session.async_get_vpn_connections = AsyncMock(
         return_value={"conn-abc": MOCK_VPN_CONNECTIONS["conn-abc"]}
     )
+
+    for _ in range(ORPHAN_CONFIRM_POLLS - 1):
+        await coordinator._async_update_data()
+    callback.assert_not_called()
 
     await coordinator._async_update_data()
     callback.assert_called_once()
