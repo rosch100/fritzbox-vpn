@@ -6,6 +6,13 @@ from typing import Any
 
 from fritzboxvpn import API_KEY_NAME
 
+from .const import UNIQUE_ID_PREFIX
+
+
+def entity_unique_id(connection_uid: str, suffix: str) -> str:
+    """Entity unique_id for a VPN connection and platform suffix (SSOT)."""
+    return f"{UNIQUE_ID_PREFIX}{connection_uid}_{suffix}"
+
 
 def name_bijection_uid_remap(
     old_uids: set[str],

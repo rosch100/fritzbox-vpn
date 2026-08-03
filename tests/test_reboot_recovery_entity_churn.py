@@ -11,9 +11,14 @@ from custom_components.fritzbox_vpn.const import (
     ORPHAN_CONFIRM_POLLS,
     RECOVERY_STABLE_POLLS,
     UNIQUE_ID_PREFIX,
+    UNIQUE_ID_SUFFIX_CONNECTED,
+    UNIQUE_ID_SUFFIX_STATUS,
     UNIQUE_ID_SUFFIX_SWITCH,
 )
-from custom_components.fritzbox_vpn.coordinator import FritzBoxVPNCoordinator
+from custom_components.fritzbox_vpn.coordinator import (
+    FritzBoxVPNCoordinator,
+    recovery_max_seconds,
+)
 from custom_components.fritzbox_vpn.entity import (
     connection_available,
     setup_vpn_platform,
@@ -275,7 +280,17 @@ async def test_uid_remap_prevents_platform_readd(
     )
     assert len(add_calls) == 1
 
-    remap_connection_uids(hass, mock_config_entry.entry_id, {"old-abc": "new-abc"})
+    registry = er.async_get(hass)
+    registry.async_get_or_create(
+        "switch",
+        DOMAIN,
+        vpn_unique_id("old-abc", UNIQUE_ID_SUFFIX_SWITCH),
+        config_entry=mock_config_entry,
+    )
+    applied = remap_connection_uids(
+        hass, mock_config_entry.entry_id, {"old-abc": "new-abc"}
+    )
+    assert applied == {"old-abc": "new-abc"}
     assert mock_config_entry.runtime_data.known_uids_switch == {"new-abc"}
 
     coordinator.async_set_updated_data(
@@ -468,16 +483,263 @@ async def test_recovery_clears_after_window_and_stable_polls(
         await coordinator._async_update_data()
     assert coordinator._in_recovery()
 
-    # Time not elapsed yet: stable polls alone must not clear recovery.
+    # Time not elapsed yet: non-empty polls must not accumulate stable count.
     coordinator.fritz_session.async_get_vpn_connections = AsyncMock(
         return_value=dict(MOCK_VPN_CONNECTIONS)
     )
     for _ in range(RECOVERY_STABLE_POLLS + 1):
         await coordinator._async_update_data()
     assert coordinator._in_recovery()
+    assert coordinator._recovery_stable_polls == 0
 
-    coordinator._recovering_until = 0  # window.monotonic() always >= 0
-    coordinator._recovery_stable_polls = 0
+    coordinator._recovering_until = 0  # time.monotonic() always >= 0
     for _ in range(RECOVERY_STABLE_POLLS):
         await coordinator._async_update_data()
     assert not coordinator._in_recovery()
+
+
+@pytest.mark.asyncio
+async def test_recovery_accepts_empty_after_max_duration(
+    hass: HomeAssistant,
+) -> None:
+    """Permanently empty VPN list clears recovery after the hard max window."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={"host": MOCK_HOST, "username": "u", "password": "p"},
+    )
+    coordinator = _coordinator(hass, entry)
+    coordinator.async_set_updated_data(dict(MOCK_VPN_CONNECTIONS))
+    coordinator._seen_uids = set(MOCK_VPN_CONNECTIONS)
+    coordinator.fritz_session.async_get_vpn_connections = AsyncMock(
+        side_effect=ConnectionError("refused")
+    )
+    with pytest.raises(UpdateFailed):
+        await coordinator._async_update_data()
+    assert coordinator._in_recovery()
+
+    coordinator.fritz_session.async_get_vpn_connections = AsyncMock(return_value={})
+    with pytest.raises(UpdateFailed, match="empty while recovering"):
+        await coordinator._async_update_data()
+    assert coordinator._in_recovery()
+
+    max_seconds = recovery_max_seconds(coordinator._update_interval_seconds)
+    assert coordinator._recovery_started_at is not None
+    coordinator._recovery_started_at = (
+        coordinator._recovery_started_at - max_seconds - 1
+    )
+    result = await coordinator._async_update_data()
+    assert result == {}
+    assert not coordinator._in_recovery()
+
+
+@pytest.mark.asyncio
+async def test_uid_remap_records_only_applied_pairs(
+    hass: HomeAssistant,
+) -> None:
+    """Coordinator _uid_remap must omit pairs skipped by registry conflicts."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={"host": MOCK_HOST, "username": "u", "password": "p"},
+    )
+    entry.add_to_hass(hass)
+    entry.mock_state(hass, ConfigEntryState.LOADED)
+
+    coordinator = _coordinator(hass, entry)
+    old = {
+        "old-abc": {
+            "uid": "old-abc",
+            "name": "Office VPN",
+            "active": True,
+            "connected": False,
+        },
+        "old-def": {
+            "uid": "old-def",
+            "name": "Guest VPN",
+            "active": False,
+            "connected": False,
+        },
+    }
+    coordinator.async_set_updated_data(old)
+    coordinator._seen_uids = set(old)
+    coordinator._remember_connection_names(old)
+    entry.runtime_data = FritzboxVpnRuntimeData(coordinator=coordinator)
+    entry.runtime_data.known_uids_switch = set(old)
+
+    registry = er.async_get(hass)
+    device_registry = dr.async_get(hass)
+    for uid, payload in old.items():
+        registry.async_get_or_create(
+            "switch",
+            DOMAIN,
+            vpn_unique_id(uid, UNIQUE_ID_SUFFIX_SWITCH),
+            config_entry=entry,
+        )
+        registry.async_get_or_create(
+            "binary_sensor",
+            DOMAIN,
+            vpn_unique_id(uid, UNIQUE_ID_SUFFIX_CONNECTED),
+            config_entry=entry,
+        )
+        registry.async_get_or_create(
+            "sensor",
+            DOMAIN,
+            vpn_unique_id(uid, UNIQUE_ID_SUFFIX_STATUS),
+            config_entry=entry,
+        )
+        device_registry.async_get_or_create(
+            config_entry_id=entry.entry_id,
+            identifiers={(DOMAIN, entry.entry_id, uid)},
+            name=payload["name"],
+        )
+    # Full conflict: all platforms for new-def already exist.
+    registry.async_get_or_create(
+        "switch",
+        DOMAIN,
+        vpn_unique_id("new-def", UNIQUE_ID_SUFFIX_SWITCH),
+        suggested_object_id="preexisting_guest",
+        config_entry=entry,
+    )
+    # Partial conflict: old-abc switch remaps, but connected target already exists.
+    # Remap must refuse the whole UID (no partial platform/device apply).
+    registry.async_get_or_create(
+        "binary_sensor",
+        DOMAIN,
+        vpn_unique_id("new-abc", UNIQUE_ID_SUFFIX_CONNECTED),
+        suggested_object_id="preexisting_office_connected",
+        config_entry=entry,
+    )
+
+    coordinator.fritz_session.async_get_vpn_connections = AsyncMock(
+        side_effect=ConnectionError("refused")
+    )
+    with pytest.raises(UpdateFailed):
+        await coordinator._async_update_data()
+
+    new = {
+        "new-abc": {
+            "uid": "new-abc",
+            "name": "Office VPN",
+            "active": True,
+            "connected": False,
+        },
+        "new-def": {
+            "uid": "new-def",
+            "name": "Guest VPN",
+            "active": False,
+            "connected": False,
+        },
+    }
+    coordinator.fritz_session.async_get_vpn_connections = AsyncMock(return_value=new)
+    await coordinator._async_update_data()
+
+    assert "old-abc" not in coordinator._uid_remap
+    assert "old-def" not in coordinator._uid_remap
+    assert coordinator.resolve_connection_uid("old-abc") == "old-abc"
+    assert coordinator.resolve_connection_uid("old-def") == "old-def"
+    assert entry.runtime_data.known_uids_switch == {"old-abc", "old-def"}
+    assert registry.async_get_entity_id(
+        "switch", DOMAIN, vpn_unique_id("old-abc", UNIQUE_ID_SUFFIX_SWITCH)
+    )
+    assert device_registry.async_get_device(
+        identifiers={(DOMAIN, entry.entry_id, "old-abc")}
+    )
+
+
+@pytest.mark.asyncio
+async def test_uid_remap_applies_only_when_all_platforms_and_device_succeed(
+    hass: HomeAssistant,
+) -> None:
+    """Multi-platform + device remap applies only for fully successful UIDs."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={"host": MOCK_HOST, "username": "u", "password": "p"},
+    )
+    entry.add_to_hass(hass)
+    entry.mock_state(hass, ConfigEntryState.LOADED)
+
+    coordinator = _coordinator(hass, entry)
+    old = {
+        "old-abc": {
+            "uid": "old-abc",
+            "name": "Office VPN",
+            "active": True,
+            "connected": False,
+        },
+        "old-def": {
+            "uid": "old-def",
+            "name": "Guest VPN",
+            "active": False,
+            "connected": False,
+        },
+    }
+    coordinator.async_set_updated_data(old)
+    coordinator._seen_uids = set(old)
+    coordinator._remember_connection_names(old)
+    entry.runtime_data = FritzboxVpnRuntimeData(coordinator=coordinator)
+    entry.runtime_data.known_uids_switch = set(old)
+
+    registry = er.async_get(hass)
+    device_registry = dr.async_get(hass)
+    for uid, payload in old.items():
+        registry.async_get_or_create(
+            "switch",
+            DOMAIN,
+            vpn_unique_id(uid, UNIQUE_ID_SUFFIX_SWITCH),
+            config_entry=entry,
+        )
+        registry.async_get_or_create(
+            "binary_sensor",
+            DOMAIN,
+            vpn_unique_id(uid, UNIQUE_ID_SUFFIX_CONNECTED),
+            config_entry=entry,
+        )
+        device_registry.async_get_or_create(
+            config_entry_id=entry.entry_id,
+            identifiers={(DOMAIN, entry.entry_id, uid)},
+            name=payload["name"],
+        )
+    # Device conflict for old-def only; old-abc remaps fully.
+    device_registry.async_get_or_create(
+        config_entry_id=entry.entry_id,
+        identifiers={(DOMAIN, entry.entry_id, "new-def")},
+        name="Conflict Guest",
+    )
+
+    coordinator.fritz_session.async_get_vpn_connections = AsyncMock(
+        side_effect=ConnectionError("refused")
+    )
+    with pytest.raises(UpdateFailed):
+        await coordinator._async_update_data()
+
+    new = {
+        "new-abc": {
+            "uid": "new-abc",
+            "name": "Office VPN",
+            "active": True,
+            "connected": False,
+        },
+        "new-def": {
+            "uid": "new-def",
+            "name": "Guest VPN",
+            "active": False,
+            "connected": False,
+        },
+    }
+    coordinator.fritz_session.async_get_vpn_connections = AsyncMock(return_value=new)
+    await coordinator._async_update_data()
+
+    assert coordinator.resolve_connection_uid("old-abc") == "new-abc"
+    assert "old-def" not in coordinator._uid_remap
+    assert entry.runtime_data.known_uids_switch == {"new-abc", "old-def"}
+    assert registry.async_get_entity_id(
+        "switch", DOMAIN, vpn_unique_id("new-abc", UNIQUE_ID_SUFFIX_SWITCH)
+    )
+    assert registry.async_get_entity_id(
+        "binary_sensor", DOMAIN, vpn_unique_id("new-abc", UNIQUE_ID_SUFFIX_CONNECTED)
+    )
+    assert device_registry.async_get_device(
+        identifiers={(DOMAIN, entry.entry_id, "new-abc")}
+    )
+    assert device_registry.async_get_device(
+        identifiers={(DOMAIN, entry.entry_id, "old-def")}
+    )

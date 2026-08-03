@@ -27,6 +27,9 @@ ORPHAN_CONFIRM_POLLS = 3
 # before orphan tracking resumes (see issue #37 / reboot empty-list churn).
 RECOVERY_STABLE_POLLS = 2
 RECOVERY_MIN_INTERVAL_FACTOR = 3
+# Cap recovery so a permanently empty VPN list cannot block forever
+# (max = factor × minimum recovery window).
+RECOVERY_MAX_WINDOW_FACTOR = 2
 
 ATTR_UID = "uid"
 ATTR_VPN_UID = "vpn_uid"
@@ -70,6 +73,10 @@ LOG_MSG_RECOVERY_CLEARED = (
 LOG_MSG_EMPTY_DURING_RECOVERY = (
     "Empty VPN list from %s while recovering after outage "
     "(seen_uids=%d); treating as outage, not connection removal."
+)
+LOG_MSG_RECOVERY_EMPTY_ACCEPTED = (
+    "Empty VPN list from %s persisted past max recovery (%ss); "
+    "accepting empty result and clearing recovery (seen_uids=%d)."
 )
 LOG_MSG_UID_DELTA = "VPN UID delta on %s: added=%s removed=%s"
 LOG_MSG_UID_REMAP = (

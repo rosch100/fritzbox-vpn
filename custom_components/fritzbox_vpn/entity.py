@@ -20,10 +20,10 @@ from .const import (
     DOMAIN,
     MANUFACTURER_AVM,
     MODEL_WIREGUARD_VPN,
-    UNIQUE_ID_PREFIX,
 )
 from .coordinator import FritzBoxVPNCoordinator
 from .models import FritzboxVpnConfigEntry, RuntimePlatform, runtime_from_entry
+from .uid_identity import entity_unique_id
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -75,7 +75,7 @@ def vpn_entities_for_uids(
 
 def vpn_unique_id(connection_uid: str, suffix: str) -> str:
     """Entity unique_id for a VPN connection and platform suffix."""
-    return f"{UNIQUE_ID_PREFIX}{connection_uid}_{suffix}"
+    return entity_unique_id(connection_uid, suffix)
 
 
 def vpn_device_info(

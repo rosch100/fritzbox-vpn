@@ -27,6 +27,7 @@ from .const import (
     LOG_MSG_EMPTY_DURING_RECOVERY,
     LOG_MSG_RECOVERY_ARMED,
     LOG_MSG_RECOVERY_CLEARED,
+    LOG_MSG_RECOVERY_EMPTY_ACCEPTED,
     LOG_MSG_UID_DELTA,
     LOG_MSG_UID_REMAP,
     LOG_MSG_UID_REMAP_REFUSED,
@@ -34,6 +35,7 @@ from .const import (
     LOG_MSG_VPN_CONNECTIONS_REMOVED_HINT,
     NAME_FRITZBOX,
     ORPHAN_CONFIRM_POLLS,
+    RECOVERY_MAX_WINDOW_FACTOR,
     RECOVERY_MIN_INTERVAL_FACTOR,
     RECOVERY_STABLE_POLLS,
     RETRY_AFTER_SECONDS,
@@ -104,6 +106,11 @@ def recovery_window_seconds(update_interval_seconds: int) -> int:
     )
 
 
+def recovery_max_seconds(update_interval_seconds: int) -> int:
+    """Hard cap so recovery cannot stick forever on a permanently empty list."""
+    return RECOVERY_MAX_WINDOW_FACTOR * recovery_window_seconds(update_interval_seconds)
+
+
 class FritzBoxVPNCoordinator(DataUpdateCoordinator):
     """Coordinator for FritzBox VPN data."""
 
@@ -141,6 +148,7 @@ class FritzBoxVPNCoordinator(DataUpdateCoordinator):
         self._uid_names: dict[str, str] = {}
         self._uid_remap: dict[str, str] = {}
         self._recovering_until: float | None = None
+        self._recovery_started_at: float | None = None
         self._recovery_stable_polls: int = 0
 
     def resolve_connection_uid(self, connection_uid: str) -> str:
@@ -218,6 +226,8 @@ class FritzBoxVPNCoordinator(DataUpdateCoordinator):
         duration = recovery_window_seconds(self._update_interval_seconds)
         until = time.monotonic() + duration
         was_recovering = self._recovering_until is not None
+        if self._recovery_started_at is None:
+            self._recovery_started_at = time.monotonic()
         if self._recovering_until is None or until > self._recovering_until:
             self._recovering_until = until
         self._recovery_stable_polls = 0
@@ -230,6 +240,21 @@ class FritzBoxVPNCoordinator(DataUpdateCoordinator):
                 len(self._seen_uids),
             )
 
+    def _clear_recovery(self) -> None:
+        """Exit recovery window and reset related counters."""
+        self._recovering_until = None
+        self._recovery_started_at = None
+        self._recovery_stable_polls = 0
+
+    def _recovery_max_elapsed(self) -> bool:
+        """True when recovery has exceeded the hard empty-list cap."""
+        if self._recovery_started_at is None:
+            return False
+        return time.monotonic() >= (
+            self._recovery_started_at
+            + recovery_max_seconds(self._update_interval_seconds)
+        )
+
     def _note_successful_poll(self, connections: dict[str, Any]) -> None:
         """Advance or clear recovery based on non-empty successful polls."""
         if self._recovering_until is None:
@@ -237,13 +262,13 @@ class FritzBoxVPNCoordinator(DataUpdateCoordinator):
         if not connections:
             self._recovery_stable_polls = 0
             return
-        self._recovery_stable_polls += 1
-        if (
-            time.monotonic() >= self._recovering_until
-            and self._recovery_stable_polls >= RECOVERY_STABLE_POLLS
-        ):
-            self._recovering_until = None
+        # Only count stable polls after the minimum recovery window elapses.
+        if time.monotonic() < self._recovering_until:
             self._recovery_stable_polls = 0
+            return
+        self._recovery_stable_polls += 1
+        if self._recovery_stable_polls >= RECOVERY_STABLE_POLLS:
+            self._clear_recovery()
             _LOGGER.info(
                 LOG_MSG_RECOVERY_CLEARED,
                 host_from_config(self.config),
@@ -293,8 +318,16 @@ class FritzBoxVPNCoordinator(DataUpdateCoordinator):
             )
             return
 
-        remapped = remap_connection_uids(self.hass, self.entry_id, mapping)
-        for old_uid, new_uid in mapping.items():
+        applied = remap_connection_uids(self.hass, self.entry_id, mapping)
+        skipped = set(mapping) - set(applied)
+        if skipped:
+            _LOGGER.error(
+                "UID remap partially skipped for %s; refused=%s applied=%s",
+                host,
+                sorted(skipped),
+                sorted(applied),
+            )
+        for old_uid, new_uid in applied.items():
             self._uid_remap[old_uid] = new_uid
             self._seen_uids.discard(old_uid)
             self._seen_uids.add(new_uid)
@@ -314,10 +347,10 @@ class FritzBoxVPNCoordinator(DataUpdateCoordinator):
                 new_uid,
                 self._uid_names.get(new_uid, new_uid),
             )
-        if remapped:
+        if applied:
             _LOGGER.info(
-                "Remapped %d entity unique_id(s) after outage recovery for entry %s",
-                remapped,
+                "Remapped %d connection UID(s) after outage recovery for entry %s",
+                len(applied),
                 self.entry_id,
             )
 
@@ -346,17 +379,28 @@ class FritzBoxVPNCoordinator(DataUpdateCoordinator):
             connections = await self.fritz_session.async_get_vpn_connections()
             had_connections = bool(self._seen_uids) or bool(self.data)
             if not connections and self._in_recovery() and had_connections:
-                _LOGGER.warning(
-                    LOG_MSG_EMPTY_DURING_RECOVERY,
-                    host_from_config(self.config),
-                    len(self._seen_uids) or len(self.data or {}),
-                )
-                self._reset_orphan_miss_streaks()
-                self._recovery_stable_polls = 0
-                raise UpdateFailed(
-                    "VPN list empty while recovering after connectivity outage",
-                    retry_after=RETRY_AFTER_SECONDS,
-                )
+                seen_count = len(self._seen_uids) or len(self.data or {})
+                if self._recovery_max_elapsed():
+                    max_seconds = recovery_max_seconds(self._update_interval_seconds)
+                    _LOGGER.warning(
+                        LOG_MSG_RECOVERY_EMPTY_ACCEPTED,
+                        host_from_config(self.config),
+                        max_seconds,
+                        seen_count,
+                    )
+                    self._clear_recovery()
+                else:
+                    _LOGGER.warning(
+                        LOG_MSG_EMPTY_DURING_RECOVERY,
+                        host_from_config(self.config),
+                        seen_count,
+                    )
+                    self._reset_orphan_miss_streaks()
+                    self._recovery_stable_polls = 0
+                    raise UpdateFailed(
+                        "VPN list empty while recovering after connectivity outage",
+                        retry_after=RETRY_AFTER_SECONDS,
+                    )
 
             current_uids = set(connections.keys())
             self._remember_connection_names(connections)
