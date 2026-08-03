@@ -23,6 +23,10 @@ RETRY_AFTER_SECONDS = 60
 # Consecutive successful polls a UID must be missing before we treat it as removed
 # (avoids reboot/partial-list noise; see issue #37 residual).
 ORPHAN_CONFIRM_POLLS = 3
+# After connectivity outage: minimum recovery window and stable non-empty polls
+# before orphan tracking resumes (see issue #37 / reboot empty-list churn).
+RECOVERY_STABLE_POLLS = 2
+RECOVERY_MIN_INTERVAL_FACTOR = 3
 
 ATTR_UID = "uid"
 ATTR_VPN_UID = "vpn_uid"
@@ -48,8 +52,41 @@ SERVICE_REMOVE_UNAVAILABLE_ENTITIES = "remove_unavailable_entities"
 SERVICE_REPAIR_ENTITY_ID_SUFFIXES = "repair_entity_id_suffixes"
 CONF_CONFIG_ENTRY_ID = "config_entry_id"
 
-LOG_MSG_VPN_CONNECTIONS_REMOVED = "VPN connection(s) no longer available on the %s; related entities will show as unavailable: %s"
-LOG_MSG_VPN_CONNECTIONS_REMOVED_HINT = "You can remove obsolete entities under Settings > Devices & Services > Entities (filter by Fritz!Box VPN)."
+LOG_MSG_VPN_CONNECTIONS_REMOVED = (
+    "VPN connection(s) no longer available on the %s; "
+    "related entities will show as unavailable: %s (uids=%s)"
+)
+LOG_MSG_VPN_CONNECTIONS_REMOVED_HINT = (
+    "You can remove obsolete entities under Settings > Devices & Services > "
+    "Entities (filter by Fritz!Box VPN), or use the cleanup option."
+)
+LOG_MSG_RECOVERY_ARMED = (
+    "Connectivity outage for %s; recovery window armed for at least %ss "
+    "(seen_uids=%d). Orphan tracking paused until stable non-empty polls."
+)
+LOG_MSG_RECOVERY_CLEARED = (
+    "Recovery window cleared for %s after %d stable non-empty poll(s)."
+)
+LOG_MSG_EMPTY_DURING_RECOVERY = (
+    "Empty VPN list from %s while recovering after outage "
+    "(seen_uids=%d); treating as outage, not connection removal."
+)
+LOG_MSG_UID_DELTA = "VPN UID delta on %s: added=%s removed=%s"
+LOG_MSG_UID_REMAP = (
+    "VPN connection UID remapped after outage recovery on %s: %s → %s (name=%r)"
+)
+LOG_MSG_UID_REMAP_REFUSED = (
+    "VPN UID set changed after outage on %s but name bijection remap was refused "
+    "(%s). added=%s removed=%s"
+)
+LOG_MSG_SESSION_MODE_FALLBACK = (
+    "FritzWireguard module unavailable; using fritzboxvpn web-API fallback "
+    "for host %s. Prefer installing a fritzconnection build with WireGuard support."
+)
+LOG_MSG_ORPHAN_BASE_MERGE = (
+    "Merged orphan base entity_id with live suffixed entity: %s → %s "
+    "(removed orphan unique_id=%s)"
+)
 
 MANUFACTURER_AVM = "AVM"
 MODEL_FRITZBOX = "Fritz!Box"

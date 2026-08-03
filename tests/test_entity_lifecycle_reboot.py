@@ -288,10 +288,18 @@ async def test_coordinator_update_failed_resets_orphan_miss_streak(
     with pytest.raises(UpdateFailed):
         await coordinator._async_update_data()
     assert coordinator._missing_uid_counts == {}
+    assert coordinator._in_recovery()
 
+    # After outage, orphan confirmation stays paused until recovery clears.
     coordinator.fritz_session.async_get_vpn_connections = AsyncMock(
         return_value={"conn-abc": MOCK_VPN_CONNECTIONS["conn-abc"]}
     )
+    for _ in range(ORPHAN_CONFIRM_POLLS):
+        await coordinator._async_update_data()
+    callback.assert_not_called()
+
+    coordinator._recovering_until = None
+    coordinator._recovery_stable_polls = 0
     for _ in range(ORPHAN_CONFIRM_POLLS - 1):
         await coordinator._async_update_data()
     callback.assert_not_called()

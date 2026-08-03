@@ -25,6 +25,7 @@ def _coordinator(**overrides):
     )
     coordinator.toggle_vpn = AsyncMock(return_value=overrides.get("toggle_ok", True))
     coordinator.async_request_refresh = AsyncMock()
+    coordinator.resolve_connection_uid = lambda uid: uid
     return coordinator
 
 

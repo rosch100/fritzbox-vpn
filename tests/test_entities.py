@@ -27,6 +27,7 @@ def _mock_coordinator() -> MagicMock:
     coordinator.get_vpn_status = MagicMock(return_value=STATUS_ENABLED)
     coordinator.toggle_vpn = AsyncMock(return_value=True)
     coordinator.async_request_refresh = AsyncMock()
+    coordinator.resolve_connection_uid = lambda uid: uid
     return coordinator
 
 
