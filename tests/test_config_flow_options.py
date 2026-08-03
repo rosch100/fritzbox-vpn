@@ -197,11 +197,10 @@ async def test_options_repair_entity_ids_confirm(hass: HomeAssistant) -> None:
     assert result["type"] == FlowResultType.CREATE_ENTRY
 
 
-@pytest.mark.asyncio
 async def test_options_shows_repair_for_orphan_base_merge_only(
     hass: HomeAssistant,
 ) -> None:
-    """Repair action appears when only orphan-base+_2 merges are pending."""
+    """Repair merges orphan base+_2 and completes with base entity_id."""
     entry = MockConfigEntry(
         domain=DOMAIN,
         data={
@@ -242,16 +241,28 @@ async def test_options_shows_repair_for_orphan_base_merge_only(
         config_entry=entry,
     )
 
-    result = await hass.config_entries.options.async_init(entry.entry_id)
-    assert result["type"] == FlowResultType.FORM
-    assert result["step_id"] == "init"
+    with patch.object(hass.config_entries, "async_reload", new=AsyncMock()):
+        result = await hass.config_entries.options.async_init(entry.entry_id)
+        assert result["type"] == FlowResultType.FORM
+        assert result["step_id"] == "init"
 
-    result = await hass.config_entries.options.async_configure(
-        result["flow_id"],
-        {"action": OPTIONS_ACTION_REPAIR_ENTITY_IDS},
-    )
-    assert result["type"] == FlowResultType.FORM
-    assert result["step_id"] == "repair_entity_ids_confirm"
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"],
+            {"action": OPTIONS_ACTION_REPAIR_ENTITY_IDS},
+        )
+        assert result["type"] == FlowResultType.FORM
+        assert result["step_id"] == "repair_entity_ids_confirm"
+
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"],
+            {"confirm": True},
+        )
+
+    assert result["type"] == FlowResultType.CREATE_ENTRY
+    assert registry.async_get("switch.office_vpn_2") is None
+    healed = registry.async_get("switch.office_vpn")
+    assert healed is not None
+    assert healed.unique_id == f"{UNIQUE_ID_PREFIX}vpn_new_switch"
 
 
 @pytest.mark.asyncio

@@ -18,15 +18,11 @@ from .const import (
     UNIQUE_ID_SUFFIXES,
 )
 from .models import runtime_from_hass
+from .uid_identity import entity_unique_id
 
 _LOGGER = logging.getLogger(__name__)
 
 _ENTITY_ID_OBJECT_ID_SUFFIX_RE = re.compile(r"^(.+)_(\d+)$")
-
-
-def _entity_unique_id(connection_uid: str, suffix: str) -> str:
-    """Build entity unique_id (SSOT format; avoids importing entity.py)."""
-    return f"{UNIQUE_ID_PREFIX}{connection_uid}_{suffix}"
 
 
 def unique_id_suffix_from_entity_unique_id(unique_id: str) -> str | None:
@@ -325,14 +321,18 @@ def remap_connection_uids(
     hass: HomeAssistant,
     entry_id: str,
     old_to_new: dict[str, str],
-) -> int:
-    """Remap entity unique_ids and device identifiers; update runtime known_uids."""
+) -> dict[str, str]:
+    """Remap entity unique_ids and device identifiers; update runtime known_uids.
+
+    Returns the subset of ``old_to_new`` that was actually applied (entity and/or
+    device remap succeeded). Callers must only record applied pairs.
+    """
     if not old_to_new:
-        return 0
+        return {}
 
     entity_registry = er.async_get(hass)
     device_registry = dr.async_get(hass)
-    remapped_entities = 0
+    entity_remapped_uids: set[str] = set()
 
     for entry in list(er.async_entries_for_config_entry(entity_registry, entry_id)):
         unique_id = entry.unique_id or ""
@@ -341,7 +341,7 @@ def remap_connection_uids(
         if old_uid is None or suffix is None or old_uid not in old_to_new:
             continue
         new_uid = old_to_new[old_uid]
-        new_unique_id = _entity_unique_id(new_uid, suffix)
+        new_unique_id = entity_unique_id(new_uid, suffix)
         if entity_registry.async_get_entity_id(entry.domain, DOMAIN, new_unique_id):
             _LOGGER.error(
                 "Cannot remap unique_id %s → %s; target already exists",
@@ -352,8 +352,9 @@ def remap_connection_uids(
         entity_registry.async_update_entity(
             entry.entity_id, new_unique_id=new_unique_id
         )
-        remapped_entities += 1
+        entity_remapped_uids.add(old_uid)
 
+    device_remapped_uids: set[str] = set()
     for old_uid, new_uid in old_to_new.items():
         device = device_registry.async_get_device(
             identifiers={(DOMAIN, entry_id, old_uid)}
@@ -374,12 +375,18 @@ def remap_connection_uids(
         new_identifiers.discard((DOMAIN, entry_id, old_uid))
         new_identifiers.add((DOMAIN, entry_id, new_uid))
         device_registry.async_update_device(device.id, new_identifiers=new_identifiers)
+        device_remapped_uids.add(old_uid)
+
+    applied = {
+        old_uid: old_to_new[old_uid]
+        for old_uid in entity_remapped_uids | device_remapped_uids
+    }
 
     runtime = runtime_from_hass(hass, entry_id)
-    if runtime is not None:
-        runtime.remap_known_uids(old_to_new)
+    if runtime is not None and applied:
+        runtime.remap_known_uids(applied)
 
-    return remapped_entities
+    return applied
 
 
 def get_orphan_base_suffix_merges(
