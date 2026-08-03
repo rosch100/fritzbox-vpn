@@ -324,15 +324,18 @@ def remap_connection_uids(
 ) -> dict[str, str]:
     """Remap entity unique_ids and device identifiers; update runtime known_uids.
 
-    Returns the subset of ``old_to_new`` that was actually applied (entity and/or
-    device remap succeeded). Callers must only record applied pairs.
+    Returns only UIDs for which every matching entity (all platforms) and the
+    device (when present) can remap without conflict. Partial successes are not
+    applied or returned.
     """
     if not old_to_new:
         return {}
 
     entity_registry = er.async_get(hass)
     device_registry = dr.async_get(hass)
-    entity_remapped_uids: set[str] = set()
+    planned_entities: dict[str, list[tuple[er.RegistryEntry, str]]] = {}
+    planned_devices: dict[str, dr.DeviceEntry] = {}
+    conflicted: set[str] = set()
 
     for entry in list(er.async_entries_for_config_entry(entity_registry, entry_id)):
         unique_id = entry.unique_id or ""
@@ -348,13 +351,10 @@ def remap_connection_uids(
                 unique_id,
                 new_unique_id,
             )
+            conflicted.add(old_uid)
             continue
-        entity_registry.async_update_entity(
-            entry.entity_id, new_unique_id=new_unique_id
-        )
-        entity_remapped_uids.add(old_uid)
+        planned_entities.setdefault(old_uid, []).append((entry, new_unique_id))
 
-    device_remapped_uids: set[str] = set()
     for old_uid, new_uid in old_to_new.items():
         device = device_registry.async_get_device(
             identifiers={(DOMAIN, entry_id, old_uid)}
@@ -370,17 +370,30 @@ def remap_connection_uids(
                 old_uid,
                 new_uid,
             )
+            conflicted.add(old_uid)
             continue
-        new_identifiers = set(device.identifiers)
-        new_identifiers.discard((DOMAIN, entry_id, old_uid))
-        new_identifiers.add((DOMAIN, entry_id, new_uid))
-        device_registry.async_update_device(device.id, new_identifiers=new_identifiers)
-        device_remapped_uids.add(old_uid)
+        planned_devices[old_uid] = device
 
-    applied = {
-        old_uid: old_to_new[old_uid]
-        for old_uid in entity_remapped_uids | device_remapped_uids
-    }
+    applied: dict[str, str] = {}
+    for old_uid, new_uid in old_to_new.items():
+        if old_uid in conflicted:
+            continue
+        entity_plans = planned_entities.get(old_uid, [])
+        device = planned_devices.get(old_uid)
+        if not entity_plans and device is None:
+            continue
+        for entry, new_unique_id in entity_plans:
+            entity_registry.async_update_entity(
+                entry.entity_id, new_unique_id=new_unique_id
+            )
+        if device is not None:
+            new_identifiers = set(device.identifiers)
+            new_identifiers.discard((DOMAIN, entry_id, old_uid))
+            new_identifiers.add((DOMAIN, entry_id, new_uid))
+            device_registry.async_update_device(
+                device.id, new_identifiers=new_identifiers
+            )
+        applied[old_uid] = new_uid
 
     runtime = runtime_from_hass(hass, entry_id)
     if runtime is not None and applied:

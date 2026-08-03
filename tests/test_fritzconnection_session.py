@@ -153,14 +153,14 @@ async def test_toggle_vpn_https_and_http_fail_raises_connection_error() -> None:
     """When HTTPS and HTTP both fail on toggle, raise ConnectionError."""
     hass = MagicMock()
     session = FritzConnectionVPNSession(hass, "1.2.3.4", "u", "p", use_tls=True)
-
-    def ensure() -> None:
-        raise RequestsConnectionError("down")
-
-    session._ensure_client = ensure  # type: ignore[method-assign]
+    session._mode = "fritzconnection"
+    session._ensure_client = MagicMock()  # type: ignore[method-assign]
     session._close_sync = MagicMock()  # type: ignore[method-assign]
     session._toggle_vpn_sync = MagicMock(  # type: ignore[method-assign]
-        side_effect=RequestsConnectionError("http down")
+        side_effect=[
+            RequestsConnectionError("https down"),
+            RequestsConnectionError("http down"),
+        ]
     )
 
     async def run_job(fn, *args):
@@ -170,4 +170,6 @@ async def test_toggle_vpn_https_and_http_fail_raises_connection_error() -> None:
 
     with pytest.raises(ConnectionError, match="failed to toggle VPN"):
         await session.async_toggle_vpn("conn-abc", True)
+    assert session._toggle_vpn_sync.call_count == 2
+    session._close_sync.assert_called_once()
     assert session._use_tls is True
