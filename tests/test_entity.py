@@ -24,6 +24,7 @@ def test_connection_available_and_data() -> None:
     coordinator = MagicMock()
     coordinator.last_update_success = True
     coordinator.data = MOCK_VPN_CONNECTIONS
+    coordinator.resolve_connection_uid = lambda uid: uid
     assert connection_available(coordinator, "conn-abc") is True
     assert connection_data(coordinator, "missing") is None
 
@@ -33,6 +34,7 @@ def test_vpn_switch_attributes() -> None:
     coordinator = MagicMock()
     coordinator.data = MOCK_VPN_CONNECTIONS
     coordinator.get_vpn_status = MagicMock(return_value="enabled")
+    coordinator.resolve_connection_uid = lambda uid: uid
     attrs = vpn_switch_attributes(coordinator, "conn-abc")
     assert attrs["name"] == "Office VPN"
     assert attrs["status"] == "enabled"

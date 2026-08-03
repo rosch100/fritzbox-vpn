@@ -12,6 +12,7 @@ from homeassistant.util import slugify
 
 from .const import (
     DOMAIN,
+    LOG_MSG_ORPHAN_BASE_MERGE,
     UNIQUE_ID_PREFIX,
     UNIQUE_ID_SUFFIX_SWITCH,
     UNIQUE_ID_SUFFIXES,
@@ -21,6 +22,11 @@ from .models import runtime_from_hass
 _LOGGER = logging.getLogger(__name__)
 
 _ENTITY_ID_OBJECT_ID_SUFFIX_RE = re.compile(r"^(.+)_(\d+)$")
+
+
+def _entity_unique_id(connection_uid: str, suffix: str) -> str:
+    """Build entity unique_id (SSOT format; avoids importing entity.py)."""
+    return f"{UNIQUE_ID_PREFIX}{connection_uid}_{suffix}"
 
 
 def unique_id_suffix_from_entity_unique_id(unique_id: str) -> str | None:
@@ -305,10 +311,189 @@ def repair_entity_id_suffixes(
 
 
 def repair_entity_ids(hass: HomeAssistant, entry_id: str) -> tuple[int, list[str]]:
-    """Repair legacy object_id suffixes and numeric entity_id suffixes (_2, _3, ...)."""
+    """Repair legacy IDs, orphan-base+_2 merges, and free-base numeric suffixes."""
     legacy_count, legacy_messages = repair_legacy_entity_object_ids(hass, entry_id)
+    merge_count, merge_messages = repair_orphan_base_suffix_merges(hass, entry_id)
     suffix_count, suffix_messages = repair_entity_id_suffixes(hass, entry_id)
-    return (legacy_count + suffix_count, legacy_messages + suffix_messages)
+    return (
+        legacy_count + merge_count + suffix_count,
+        legacy_messages + merge_messages + suffix_messages,
+    )
+
+
+def remap_connection_uids(
+    hass: HomeAssistant,
+    entry_id: str,
+    old_to_new: dict[str, str],
+) -> int:
+    """Remap entity unique_ids and device identifiers; update runtime known_uids."""
+    if not old_to_new:
+        return 0
+
+    entity_registry = er.async_get(hass)
+    device_registry = dr.async_get(hass)
+    remapped_entities = 0
+
+    for entry in list(er.async_entries_for_config_entry(entity_registry, entry_id)):
+        unique_id = entry.unique_id or ""
+        old_uid = connection_uid_from_entity_unique_id(unique_id)
+        suffix = unique_id_suffix_from_entity_unique_id(unique_id)
+        if old_uid is None or suffix is None or old_uid not in old_to_new:
+            continue
+        new_uid = old_to_new[old_uid]
+        new_unique_id = _entity_unique_id(new_uid, suffix)
+        if entity_registry.async_get_entity_id(entry.domain, DOMAIN, new_unique_id):
+            _LOGGER.error(
+                "Cannot remap unique_id %s → %s; target already exists",
+                unique_id,
+                new_unique_id,
+            )
+            continue
+        entity_registry.async_update_entity(
+            entry.entity_id, new_unique_id=new_unique_id
+        )
+        remapped_entities += 1
+
+    for old_uid, new_uid in old_to_new.items():
+        device = device_registry.async_get_device(
+            identifiers={(DOMAIN, entry_id, old_uid)}
+        )
+        if device is None:
+            continue
+        existing_new = device_registry.async_get_device(
+            identifiers={(DOMAIN, entry_id, new_uid)}
+        )
+        if existing_new is not None and existing_new.id != device.id:
+            _LOGGER.error(
+                "Cannot remap device UID %s → %s; target device already exists",
+                old_uid,
+                new_uid,
+            )
+            continue
+        new_identifiers = set(device.identifiers)
+        new_identifiers.discard((DOMAIN, entry_id, old_uid))
+        new_identifiers.add((DOMAIN, entry_id, new_uid))
+        device_registry.async_update_device(device.id, new_identifiers=new_identifiers)
+
+    runtime = runtime_from_hass(hass, entry_id)
+    if runtime is not None:
+        runtime.remap_known_uids(old_to_new)
+
+    return remapped_entities
+
+
+def get_orphan_base_suffix_merges(
+    hass: HomeAssistant,
+    entry_id: str,
+    current_uids: set[str] | None = None,
+) -> list[tuple[er.RegistryEntry, er.RegistryEntry, str]]:
+    """Orphan base + live ``_2`` pairs eligible for merge.
+
+    Base unique_id UID must be absent from ``current_uids``; suffixed entry UID
+    must be present. Narrower than ``allow_replace_base=True``.
+    """
+    if current_uids is None:
+        current_uids, error_key = resolve_current_uids(hass, entry_id)
+        if error_key is not None or current_uids is None:
+            return []
+
+    registry = er.async_get(hass)
+    all_entries = er.async_entries_for_config_entry(registry, entry_id)
+    by_entity_id = {e.entity_id: e for e in all_entries}
+    result: list[tuple[er.RegistryEntry, er.RegistryEntry, str]] = []
+
+    for entry in all_entries:
+        base_entity_id = entity_id_base(entry.entity_id)
+        if not base_entity_id:
+            continue
+        base_entry = by_entity_id.get(base_entity_id)
+        if base_entry is None or base_entry.config_entry_id != entry_id:
+            continue
+        base_uid = connection_uid_from_entity_unique_id(base_entry.unique_id or "")
+        live_uid = connection_uid_from_entity_unique_id(entry.unique_id or "")
+        if base_uid is None or live_uid is None:
+            continue
+        if base_uid in current_uids:
+            continue
+        if live_uid not in current_uids:
+            continue
+        if base_uid == live_uid:
+            continue
+        result.append((base_entry, entry, base_entity_id))
+
+    # Prefer lowest numeric suffix per base when multiple exist.
+    preferred: dict[str, tuple[er.RegistryEntry, er.RegistryEntry, str]] = {}
+    for base_entry, suffixed_entry, base_entity_id in result:
+        existing = preferred.get(base_entity_id)
+        if existing is None:
+            preferred[base_entity_id] = (base_entry, suffixed_entry, base_entity_id)
+            continue
+        _, prev_suffixed, _ = existing
+        prev_n = entity_id_suffix_number(prev_suffixed.entity_id) or 10_000
+        cur_n = entity_id_suffix_number(suffixed_entry.entity_id) or 10_000
+        if cur_n < prev_n:
+            preferred[base_entity_id] = (base_entry, suffixed_entry, base_entity_id)
+    return list(preferred.values())
+
+
+def repair_orphan_base_suffix_merges(
+    hass: HomeAssistant,
+    entry_id: str,
+    current_uids: set[str] | None = None,
+) -> tuple[int, list[str]]:
+    """Remove orphan base registry rows and rename live ``_2`` entities to base IDs."""
+    merges = get_orphan_base_suffix_merges(hass, entry_id, current_uids)
+    if not merges:
+        return (0, [])
+
+    registry = er.async_get(hass)
+    device_registry = dr.async_get(hass)
+    messages: list[str] = []
+    orphan_uids: set[str] = set()
+    for base_entry, suffixed_entry, base_entity_id in merges:
+        try:
+            orphan_unique_id = base_entry.unique_id
+            orphan_uid = connection_uid_from_entity_unique_id(orphan_unique_id or "")
+            if orphan_uid is not None:
+                orphan_uids.add(orphan_uid)
+            registry.async_remove(base_entry.entity_id)
+            registry.async_update_entity(
+                suffixed_entry.entity_id, new_entity_id=base_entity_id
+            )
+            messages.append(f"{suffixed_entry.entity_id} → {base_entity_id}")
+            _LOGGER.warning(
+                LOG_MSG_ORPHAN_BASE_MERGE,
+                suffixed_entry.entity_id,
+                base_entity_id,
+                orphan_unique_id,
+            )
+        except Exception as err:
+            _LOGGER.warning(
+                "Failed orphan-base merge %s → %s: %s",
+                suffixed_entry.entity_id,
+                base_entity_id,
+                err,
+            )
+
+    for uid in orphan_uids:
+        device = device_registry.async_get_device(identifiers={(DOMAIN, entry_id, uid)})
+        if device is None:
+            continue
+        if er.async_entries_for_device(registry, device.id):
+            continue
+        device_registry.async_remove_device(device.id)
+        _LOGGER.info("Removed empty device after orphan-base merge for UID %s", uid)
+
+    return (len(messages), messages)
+
+
+def count_repairable_entity_issues(hass: HomeAssistant, entry_id: str) -> int:
+    """Pending legacy, orphan-base merge, and free-base suffix repairs."""
+    registry = er.async_get(hass)
+    legacy = get_legacy_entity_object_id_repairs(hass, entry_id)
+    merges = get_orphan_base_suffix_merges(hass, entry_id)
+    suffixes = get_entity_id_suffix_repairs(registry, entry_id)
+    return len(legacy) + len(merges) + len(suffixes)
 
 
 def remove_orphaned_entities(

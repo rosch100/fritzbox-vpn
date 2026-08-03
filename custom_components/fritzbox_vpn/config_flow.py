@@ -30,8 +30,10 @@ from .const import (
     password_from_sources,
 )
 from .entity_registry import (
+    count_repairable_entity_issues,
     get_entity_id_suffix_repairs,
     get_legacy_entity_object_id_repairs,
+    get_orphan_base_suffix_merges,
     get_orphaned_entity_entries,
     remove_orphaned_entities,
     repair_entity_ids,
@@ -330,20 +332,12 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
             to_remove, error_key = get_orphaned_entity_entries(
                 self.hass, self._config_entry.entry_id
             )
-            registry = er.async_get(self.hass)
-            legacy_repairs = get_legacy_entity_object_id_repairs(
+            repair_count = count_repairable_entity_issues(
                 self.hass, self._config_entry.entry_id
             )
-            suffix_repairs = get_entity_id_suffix_repairs(
-                registry, self._config_entry.entry_id
-            )
             has_cleanup_action = error_key is None and bool(to_remove)
-            has_repair_action = bool(legacy_repairs) or bool(suffix_repairs)
-            return (
-                has_cleanup_action,
-                has_repair_action,
-                len(legacy_repairs) + len(suffix_repairs),
-            )
+            has_repair_action = repair_count > 0
+            return (has_cleanup_action, has_repair_action, repair_count)
         except Exception as err:
             _LOGGER.exception(
                 "Failed to evaluate available options actions for entry %s: %s",
@@ -449,8 +443,9 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
         entry_id = config_entry.entry_id
         registry = er.async_get(self.hass)
         legacy_repairs = get_legacy_entity_object_id_repairs(self.hass, entry_id)
+        merge_repairs = get_orphan_base_suffix_merges(self.hass, entry_id)
         suffix_repairs = get_entity_id_suffix_repairs(registry, entry_id)
-        pending = [*legacy_repairs, *suffix_repairs]
+        pending = [*legacy_repairs, *merge_repairs, *suffix_repairs]
 
         async def on_repair(confirmed_entry_id: str) -> None:
             count, _ = repair_entity_ids(self.hass, confirmed_entry_id)

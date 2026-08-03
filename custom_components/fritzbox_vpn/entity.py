@@ -99,16 +99,20 @@ def connection_available(
     """True when the coordinator has data for this VPN connection."""
     if not coordinator.last_update_success or not coordinator.data:
         return False
-    return connection_uid in coordinator.data
+    resolved = coordinator.resolve_connection_uid(connection_uid)
+    return resolved in coordinator.data
 
 
 def connection_data(
     coordinator: FritzBoxVPNCoordinator, connection_uid: str
 ) -> dict[str, Any] | None:
     """VPN connection payload from coordinator data, if present."""
-    if not coordinator.data or connection_uid not in coordinator.data:
+    if not coordinator.data:
         return None
-    return coordinator.data[connection_uid]
+    resolved = coordinator.resolve_connection_uid(connection_uid)
+    if resolved not in coordinator.data:
+        return None
+    return coordinator.data[resolved]
 
 
 def vpn_switch_attributes(
@@ -118,13 +122,14 @@ def vpn_switch_attributes(
     conn = connection_data(coordinator, connection_uid)
     if conn is None:
         return {}
+    resolved = coordinator.resolve_connection_uid(connection_uid)
     return {
         API_KEY_NAME: conn.get(API_KEY_NAME),
-        ATTR_UID: connection_uid,
+        ATTR_UID: resolved,
         ATTR_VPN_UID: conn.get(API_KEY_UID),
         API_KEY_ACTIVE: conn.get(API_KEY_ACTIVE, False),
         API_KEY_CONNECTED: conn.get(API_KEY_CONNECTED, False),
-        ATTR_STATUS: coordinator.get_vpn_status(connection_uid),
+        ATTR_STATUS: coordinator.get_vpn_status(resolved),
     }
 
 

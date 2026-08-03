@@ -31,6 +31,7 @@ from .entity_registry import (
     repair_entity_id_suffixes,
     repair_entity_ids,
     repair_legacy_entity_object_ids,
+    repair_orphan_base_suffix_merges,
 )
 from .models import FritzboxVpnConfigEntry, FritzboxVpnRuntimeData
 
@@ -157,14 +158,20 @@ def _cleanup_empty_connection_devices(hass: HomeAssistant, entry_id: str) -> int
 
 
 def _repair_entity_ids_before_platform_setup(hass: HomeAssistant, entry_id: str) -> int:
-    """Repair numeric entity_id suffixes (_2, _3, …) before platform setup."""
+    """Heal orphan-base+_2 pairs, then non-destructive numeric suffix repairs."""
+    merge_count, _ = repair_orphan_base_suffix_merges(hass, entry_id)
+    if merge_count:
+        _LOGGER.warning(
+            "Merged %d orphan base/_2 entity pair(s) before platform setup",
+            merge_count,
+        )
     repaired_count, _ = repair_entity_id_suffixes(hass, entry_id)
     if repaired_count:
         _LOGGER.info(
             "Repaired %d numeric entity ID suffix(es) before platform setup",
             repaired_count,
         )
-    return repaired_count
+    return merge_count + repaired_count
 
 
 async def async_migrate_entry(

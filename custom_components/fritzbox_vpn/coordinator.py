@@ -1,7 +1,10 @@
 """DataUpdateCoordinator for FritzBox VPN integration."""
 
+from __future__ import annotations
+
 import inspect
 import logging
+import time
 from collections.abc import Callable
 from datetime import timedelta
 from typing import Any
@@ -21,10 +24,18 @@ from .const import (
     CONF_UPDATE_INTERVAL,
     DEFAULT_UPDATE_INTERVAL,
     DOMAIN,
+    LOG_MSG_EMPTY_DURING_RECOVERY,
+    LOG_MSG_RECOVERY_ARMED,
+    LOG_MSG_RECOVERY_CLEARED,
+    LOG_MSG_UID_DELTA,
+    LOG_MSG_UID_REMAP,
+    LOG_MSG_UID_REMAP_REFUSED,
     LOG_MSG_VPN_CONNECTIONS_REMOVED,
     LOG_MSG_VPN_CONNECTIONS_REMOVED_HINT,
     NAME_FRITZBOX,
     ORPHAN_CONFIRM_POLLS,
+    RECOVERY_MIN_INTERVAL_FACTOR,
+    RECOVERY_STABLE_POLLS,
     RETRY_AFTER_SECONDS,
     STATUS_CONNECTED,
     STATUS_DISABLED,
@@ -34,7 +45,9 @@ from .const import (
     UPDATE_INTERVAL_MIN,
     host_from_config,
 )
+from .entity_registry import remap_connection_uids
 from .fritzconnection_session import FritzConnectionVPNSession
+from .uid_identity import name_bijection_uid_remap
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -83,6 +96,14 @@ def _resolve_update_interval_seconds(
     return normalize_update_interval(value)
 
 
+def recovery_window_seconds(update_interval_seconds: int) -> int:
+    """Minimum recovery window after connectivity outage."""
+    return max(
+        RECOVERY_MIN_INTERVAL_FACTOR * update_interval_seconds,
+        RECOVERY_MIN_INTERVAL_FACTOR * RETRY_AFTER_SECONDS,
+    )
+
+
 class FritzBoxVPNCoordinator(DataUpdateCoordinator):
     """Coordinator for FritzBox VPN data."""
 
@@ -95,6 +116,7 @@ class FritzBoxVPNCoordinator(DataUpdateCoordinator):
         on_orphaned_removed: Callable[[str, set[str]], None] | None = None,
     ):
         update_interval_seconds = _resolve_update_interval_seconds(config, options)
+        self._update_interval_seconds = update_interval_seconds
 
         super().__init__(
             hass,
@@ -117,12 +139,25 @@ class FritzBoxVPNCoordinator(DataUpdateCoordinator):
         self._missing_uid_counts: dict[str, int] = {}
         self._confirmed_orphan_uids: set[str] = set()
         self._uid_names: dict[str, str] = {}
+        self._uid_remap: dict[str, str] = {}
+        self._recovering_until: float | None = None
+        self._recovery_stable_polls: int = 0
+
+    def resolve_connection_uid(self, connection_uid: str) -> str:
+        """Map a pre-remap entity UID to the current coordinator data key."""
+        uid = connection_uid
+        seen: set[str] = set()
+        while uid in self._uid_remap and uid not in seen:
+            seen.add(uid)
+            uid = self._uid_remap[uid]
+        return uid
 
     def get_vpn_status(self, connection_uid: str) -> str:
         """Get the textual status of a VPN connection."""
-        if not self.data or connection_uid not in self.data:
+        resolved = self.resolve_connection_uid(connection_uid)
+        if not self.data or resolved not in self.data:
             return STATUS_UNKNOWN
-        conn = self.data[connection_uid]
+        conn = self.data[resolved]
         active = conn.get(API_KEY_ACTIVE, False)
         connected = conn.get(API_KEY_CONNECTED, False)
         if not active:
@@ -171,6 +206,121 @@ class FritzBoxVPNCoordinator(DataUpdateCoordinator):
         """Clear in-progress miss counts so confirmations require consecutive successes."""
         self._missing_uid_counts.clear()
 
+    def _in_recovery(self) -> bool:
+        """True while post-outage recovery window is active."""
+        return self._recovering_until is not None
+
+    def _arm_recovery(self) -> None:
+        """Start or extend the post-outage recovery window."""
+        if self.data:
+            self._seen_uids |= set(self.data.keys())
+            self._remember_connection_names(self.data)
+        duration = recovery_window_seconds(self._update_interval_seconds)
+        until = time.monotonic() + duration
+        was_recovering = self._recovering_until is not None
+        if self._recovering_until is None or until > self._recovering_until:
+            self._recovering_until = until
+        self._recovery_stable_polls = 0
+        self._reset_orphan_miss_streaks()
+        if not was_recovering:
+            _LOGGER.warning(
+                LOG_MSG_RECOVERY_ARMED,
+                host_from_config(self.config),
+                duration,
+                len(self._seen_uids),
+            )
+
+    def _note_successful_poll(self, connections: dict[str, Any]) -> None:
+        """Advance or clear recovery based on non-empty successful polls."""
+        if self._recovering_until is None:
+            return
+        if not connections:
+            self._recovery_stable_polls = 0
+            return
+        self._recovery_stable_polls += 1
+        if (
+            time.monotonic() >= self._recovering_until
+            and self._recovery_stable_polls >= RECOVERY_STABLE_POLLS
+        ):
+            self._recovering_until = None
+            self._recovery_stable_polls = 0
+            _LOGGER.info(
+                LOG_MSG_RECOVERY_CLEARED,
+                host_from_config(self.config),
+                RECOVERY_STABLE_POLLS,
+            )
+
+    def _log_uid_delta(self, current_uids: set[str]) -> None:
+        """Log added/removed UIDs with cached names when the set changes."""
+        if not self._seen_uids:
+            return
+        added = sorted(current_uids - self._seen_uids)
+        removed = sorted(self._seen_uids - current_uids)
+        if not added and not removed:
+            return
+
+        def _labeled(uids: list[str]) -> list[str]:
+            return [f"{self._uid_names.get(uid, uid)} ({uid})" for uid in uids]
+
+        _LOGGER.info(
+            LOG_MSG_UID_DELTA,
+            host_from_config(self.config),
+            _labeled(added),
+            _labeled(removed),
+        )
+
+    def _apply_uid_remap_if_needed(self, connections: dict[str, Any]) -> None:
+        """During recovery, remap registry UIDs when names form a 1:1 bijection."""
+        if not self._in_recovery() or not self.entry_id or not connections:
+            return
+        current_uids = set(connections.keys())
+        removed = self._seen_uids - current_uids
+        added = current_uids - self._seen_uids
+        if not removed or not added:
+            return
+
+        mapping, reason = name_bijection_uid_remap(
+            removed, added, self._uid_names, connections
+        )
+        host = host_from_config(self.config)
+        if mapping is None:
+            _LOGGER.error(
+                LOG_MSG_UID_REMAP_REFUSED,
+                host,
+                reason or "unknown",
+                sorted(added),
+                sorted(removed),
+            )
+            return
+
+        remapped = remap_connection_uids(self.hass, self.entry_id, mapping)
+        for old_uid, new_uid in mapping.items():
+            self._uid_remap[old_uid] = new_uid
+            self._seen_uids.discard(old_uid)
+            self._seen_uids.add(new_uid)
+            name = self._uid_names.pop(old_uid, None)
+            if name is not None:
+                self._uid_names[new_uid] = name
+            else:
+                payload = connections.get(new_uid)
+                if isinstance(payload, dict) and payload.get(API_KEY_NAME):
+                    self._uid_names[new_uid] = str(payload[API_KEY_NAME])
+            self._missing_uid_counts.pop(old_uid, None)
+            self._confirmed_orphan_uids.discard(old_uid)
+            _LOGGER.warning(
+                LOG_MSG_UID_REMAP,
+                host,
+                old_uid,
+                new_uid,
+                self._uid_names.get(new_uid, new_uid),
+            )
+        if remapped:
+            _LOGGER.info(
+                "Remapped %d entity unique_id(s) after outage recovery for entry %s",
+                remapped,
+                self.entry_id,
+            )
+
     def _track_missing_uids(self, current_uids: set[str]) -> set[str]:
         """Return UIDs newly confirmed missing after ORPHAN_CONFIRM_POLLS polls."""
         if self.data:
@@ -194,46 +344,76 @@ class FritzBoxVPNCoordinator(DataUpdateCoordinator):
         """Fetch latest VPN data from Fritz!Box."""
         try:
             connections = await self.fritz_session.async_get_vpn_connections()
+            had_connections = bool(self._seen_uids) or bool(self.data)
+            if not connections and self._in_recovery() and had_connections:
+                _LOGGER.warning(
+                    LOG_MSG_EMPTY_DURING_RECOVERY,
+                    host_from_config(self.config),
+                    len(self._seen_uids) or len(self.data or {}),
+                )
+                self._reset_orphan_miss_streaks()
+                self._recovery_stable_polls = 0
+                raise UpdateFailed(
+                    "VPN list empty while recovering after connectivity outage",
+                    retry_after=RETRY_AFTER_SECONDS,
+                )
+
             current_uids = set(connections.keys())
             self._remember_connection_names(connections)
-            newly_confirmed = self._track_missing_uids(current_uids)
+            self._log_uid_delta(current_uids)
+            self._apply_uid_remap_if_needed(connections)
+
+            if self._in_recovery():
+                self._reset_orphan_miss_streaks()
+                if self.data:
+                    self._seen_uids |= set(self.data.keys())
+                self._seen_uids |= current_uids
+                newly_confirmed: set[str] = set()
+            else:
+                newly_confirmed = self._track_missing_uids(current_uids)
+
             if newly_confirmed:
                 names = [self._uid_names.get(uid, uid) for uid in newly_confirmed]
                 _LOGGER.warning(
                     LOG_MSG_VPN_CONNECTIONS_REMOVED,
                     NAME_FRITZBOX,
                     names or list(newly_confirmed),
+                    sorted(newly_confirmed),
                 )
                 _LOGGER.info(LOG_MSG_VPN_CONNECTIONS_REMOVED_HINT)
                 if self._on_orphaned_removed and self.entry_id:
                     self._on_orphaned_removed(self.entry_id, current_uids)
+
+            self._note_successful_poll(connections)
             self._reauth_scheduled = False
             return connections
+        except UpdateFailed:
+            raise
         except (ConnectionError, ValueError) as err:
-            self._reset_orphan_miss_streaks()
             self._prepare_session_for_retry(err)
             if self._is_auth_error(err):
                 self._schedule_reauth()
                 raise UpdateFailed(f"Error fetching VPN data: {err}") from err
+            self._arm_recovery()
             raise UpdateFailed(
                 f"Error fetching VPN data: {err}",
                 retry_after=RETRY_AFTER_SECONDS,
             ) from err
         except TimeoutError as err:
-            self._reset_orphan_miss_streaks()
+            self._arm_recovery()
             self._prepare_session_for_retry(err)
             raise UpdateFailed(
                 f"Error fetching VPN data: {err}",
                 retry_after=RETRY_AFTER_SECONDS,
             ) from err
         except Exception as err:
-            self._reset_orphan_miss_streaks()
             self._prepare_session_for_retry(err)
             if self._is_auth_error(err):
                 self._schedule_reauth()
                 raise UpdateFailed(
                     f"Unexpected error fetching VPN data: {err}"
                 ) from err
+            self._arm_recovery()
             _LOGGER.exception("Unexpected error fetching VPN data")
             raise UpdateFailed(
                 f"Unexpected error fetching VPN data: {err}",
@@ -242,8 +422,9 @@ class FritzBoxVPNCoordinator(DataUpdateCoordinator):
 
     async def toggle_vpn(self, connection_uid: str, enable: bool) -> bool:
         """Toggle VPN on/off; schedule reauth on authentication errors."""
+        resolved = self.resolve_connection_uid(connection_uid)
         try:
-            return await self.fritz_session.async_toggle_vpn(connection_uid, enable)
+            return await self.fritz_session.async_toggle_vpn(resolved, enable)
         except Exception as err:
             if self._is_auth_error(err):
                 self._schedule_reauth()

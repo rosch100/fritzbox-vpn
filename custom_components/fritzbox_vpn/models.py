@@ -4,12 +4,13 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import dataclass, field
-from typing import Literal, TypeAlias
+from typing import TYPE_CHECKING, Literal, TypeAlias
 
 from homeassistant.config_entries import ConfigEntry, ConfigEntryState
 from homeassistant.core import HomeAssistant
 
-from .coordinator import FritzBoxVPNCoordinator
+if TYPE_CHECKING:
+    from .coordinator import FritzBoxVPNCoordinator
 
 RuntimePlatform = Literal["switch", "sensor", "binary_sensor"]
 
@@ -43,6 +44,20 @@ class FritzboxVpnRuntimeData:
         self.known_uids_switch -= uids
         self.known_uids_sensor -= uids
         self.known_uids_binary_sensor -= uids
+
+    def remap_known_uids(self, old_to_new: dict[str, str]) -> None:
+        """Replace tracked UIDs in existing set objects (platform closures keep refs)."""
+        if not old_to_new:
+            return
+        for known in (
+            self.known_uids_switch,
+            self.known_uids_sensor,
+            self.known_uids_binary_sensor,
+        ):
+            for old_uid, new_uid in old_to_new.items():
+                if old_uid in known:
+                    known.discard(old_uid)
+                    known.add(new_uid)
 
 
 FritzboxVpnConfigEntry: TypeAlias = ConfigEntry[FritzboxVpnRuntimeData | None]

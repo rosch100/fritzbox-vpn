@@ -119,3 +119,30 @@ async def test_get_vpn_connections_https_fallback_on_bootstrap_connection_error(
     assert data == {"a": {"uid": "a"}}
     assert session._use_tls is False
     assert calls["ensure"] >= 2
+
+
+@pytest.mark.asyncio
+async def test_get_vpn_connections_https_and_http_fail_raises_connection_error() -> (
+    None
+):
+    """When HTTPS and HTTP both fail, raise ConnectionError (not raw requests)."""
+    hass = MagicMock()
+    session = FritzConnectionVPNSession(hass, "1.2.3.4", "u", "p", use_tls=True)
+
+    def ensure() -> None:
+        raise RequestsConnectionError("down")
+
+    session._ensure_client = ensure  # type: ignore[method-assign]
+    session._close_sync = MagicMock()  # type: ignore[method-assign]
+    session._get_vpn_connections_sync = MagicMock(  # type: ignore[method-assign]
+        side_effect=RequestsConnectionError("http down")
+    )
+
+    async def run_job(fn, *args):
+        return fn(*args)
+
+    hass.async_add_executor_job = AsyncMock(side_effect=run_job)
+
+    with pytest.raises(ConnectionError, match="failed to get login page"):
+        await session.async_get_vpn_connections()
+    assert session._use_tls is True

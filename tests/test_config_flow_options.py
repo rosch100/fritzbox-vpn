@@ -11,8 +11,10 @@ from custom_components.fritzbox_vpn.const import (
     OPTIONS_ACTION_REPAIR_ENTITY_IDS,
     UNIQUE_ID_PREFIX,
 )
+from custom_components.fritzbox_vpn.coordinator import FritzBoxVPNCoordinator
 from custom_components.fritzbox_vpn.flow_forms import CannotConnect
-from homeassistant.config_entries import SOURCE_USER
+from custom_components.fritzbox_vpn.models import FritzboxVpnRuntimeData
+from homeassistant.config_entries import SOURCE_USER, ConfigEntryState
 from homeassistant.const import CONF_HOST, CONF_PASSWORD, CONF_USERNAME
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
@@ -193,6 +195,63 @@ async def test_options_repair_entity_ids_confirm(hass: HomeAssistant) -> None:
         )
 
     assert result["type"] == FlowResultType.CREATE_ENTRY
+
+
+@pytest.mark.asyncio
+async def test_options_shows_repair_for_orphan_base_merge_only(
+    hass: HomeAssistant,
+) -> None:
+    """Repair action appears when only orphan-base+_2 merges are pending."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={
+            CONF_HOST: MOCK_HOST,
+            CONF_USERNAME: MOCK_USERNAME,
+            CONF_PASSWORD: MOCK_PASSWORD,
+        },
+    )
+    entry.add_to_hass(hass)
+    entry.mock_state(hass, ConfigEntryState.LOADED)
+    coordinator = FritzBoxVPNCoordinator(hass, entry.data, None, entry.entry_id)
+    coordinator.fritz_session.async_close = AsyncMock()
+    coordinator.async_set_updated_data(
+        {
+            "vpn_new": {
+                "uid": "vpn_new",
+                "name": "Office VPN",
+                "active": True,
+                "connected": False,
+            }
+        }
+    )
+    entry.runtime_data = FritzboxVpnRuntimeData(coordinator=coordinator)
+
+    registry = er.async_get(hass)
+    registry.async_get_or_create(
+        "switch",
+        DOMAIN,
+        f"{UNIQUE_ID_PREFIX}vpn_old_switch",
+        suggested_object_id="office_vpn",
+        config_entry=entry,
+    )
+    registry.async_get_or_create(
+        "switch",
+        DOMAIN,
+        f"{UNIQUE_ID_PREFIX}vpn_new_switch",
+        suggested_object_id="office_vpn_2",
+        config_entry=entry,
+    )
+
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    assert result["type"] == FlowResultType.FORM
+    assert result["step_id"] == "init"
+
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"],
+        {"action": OPTIONS_ACTION_REPAIR_ENTITY_IDS},
+    )
+    assert result["type"] == FlowResultType.FORM
+    assert result["step_id"] == "repair_entity_ids_confirm"
 
 
 @pytest.mark.asyncio
