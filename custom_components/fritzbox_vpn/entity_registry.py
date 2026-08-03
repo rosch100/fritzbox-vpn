@@ -349,7 +349,9 @@ def remap_connection_uids(
                 new_unique_id,
             )
             continue
-        entity_registry.async_update_entity(entry.entity_id, new_unique_id=new_unique_id)
+        entity_registry.async_update_entity(
+            entry.entity_id, new_unique_id=new_unique_id
+        )
         remapped_entities += 1
 
     for old_uid, new_uid in old_to_new.items():

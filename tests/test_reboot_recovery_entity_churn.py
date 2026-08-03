@@ -243,7 +243,11 @@ async def test_uid_remap_prevents_platform_readd(
         hass, mock_config_entry.data, None, mock_config_entry.entry_id
     )
     old = {
-        "old-abc": {**MOCK_VPN_CONNECTIONS["conn-abc"], "uid": "old-abc", "name": "Office VPN"},
+        "old-abc": {
+            **MOCK_VPN_CONNECTIONS["conn-abc"],
+            "uid": "old-abc",
+            "name": "Office VPN",
+        },
     }
     coordinator.async_set_updated_data(old)
     coordinator.last_update_success = True

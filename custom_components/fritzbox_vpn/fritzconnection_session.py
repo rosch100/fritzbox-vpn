@@ -203,9 +203,7 @@ class FritzConnectionVPNSession:
                     raise TimeoutError(str(retry_err)) from retry_err
                 except RequestsConnectionError as retry_err:
                     self.invalidate_session()
-                    raise ConnectionError(
-                        f"{fail_message}: {retry_err}"
-                    ) from retry_err
+                    raise ConnectionError(f"{fail_message}: {retry_err}") from retry_err
                 except Exception as retry_err:
                     if self._is_fritz_authorization_error(retry_err):
                         self._raise_auth_error(
