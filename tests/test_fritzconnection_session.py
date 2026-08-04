@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import logging
 import sys
 import types
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from custom_components.fritzbox_vpn.const import LOG_MSG_SESSION_MODE_FALLBACK
 from custom_components.fritzbox_vpn.fritzconnection_session import (
     FritzConnectionVPNSession,
 )
@@ -77,6 +79,59 @@ def test_ensure_client_passes_timeout_to_fritzconnection() -> None:
         use_tls=True,
     )
     assert session._mode == "fritzconnection"
+
+
+def test_ensure_client_falls_back_to_fritzboxvpn_without_warning(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Missing FritzWireguard uses web-API fallback and logs at INFO only."""
+    hass = MagicMock()
+    session = FritzConnectionVPNSession(hass, "192.168.20.1", "u", "p")
+    fake_fallback = MagicMock()
+    clientsession = MagicMock()
+
+    fc_mod = types.ModuleType("fritzconnection")
+    fc_mod.FritzConnection = MagicMock()
+    lib_mod = types.ModuleType("fritzconnection.lib")
+    lib_mod.__path__ = []  # type: ignore[attr-defined]
+
+    with (
+        patch.dict(
+            sys.modules,
+            {
+                "fritzconnection": fc_mod,
+                "fritzconnection.lib": lib_mod,
+                # None → import raises ModuleNotFoundError (PEP 302).
+                "fritzconnection.lib.fritzwireguard": None,
+            },
+        ),
+        patch(
+            "fritzboxvpn.FritzBoxVPNSession",
+            return_value=fake_fallback,
+        ) as fallback_cls,
+        patch(
+            "homeassistant.helpers.aiohttp_client.async_get_clientsession",
+            return_value=clientsession,
+        ),
+        caplog.at_level(logging.INFO),
+    ):
+        session._ensure_client()
+
+    assert session._mode == "fritzboxvpn"
+    assert session._fallback_session is fake_fallback
+    fallback_cls.assert_called_once_with(
+        clientsession,
+        "192.168.20.1",
+        "u",
+        "p",
+        protocol="https",
+    )
+    expected = LOG_MSG_SESSION_MODE_FALLBACK % "192.168.20.1"
+    assert expected in caplog.text
+    assert not any(
+        r.levelno >= logging.WARNING and expected in r.getMessage()
+        for r in caplog.records
+    )
 
 
 @pytest.mark.asyncio

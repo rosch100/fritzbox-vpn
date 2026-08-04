@@ -89,7 +89,9 @@ class FritzConnectionVPNSession:
             self._mode = "fritzboxvpn"
             if not self._fallback_mode_logged:
                 self._fallback_mode_logged = True
-                _LOGGER.warning(LOG_MSG_SESSION_MODE_FALLBACK, self._host)
+                # INFO: HA surfaces custom-integration WARNINGs as red "errors".
+                # Missing FritzWireguard is an expected path, not a failure.
+                _LOGGER.info(LOG_MSG_SESSION_MODE_FALLBACK, self._host)
             return
 
         # Router API discovery happens here — callers must invoke this from a
