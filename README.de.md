@@ -82,7 +82,7 @@ Nach einem Router-Reboot oder längerem Ausschalten solltest du die Integration 
 
 1. Beim **ersten fehlgeschlagenen Verbindungsversuch** zur Fritz!Box startet ein Recovery-Fenster (mindestens **180 Sekunden** bei Standardeinstellungen; länger, wenn das Update-Intervall über 60 s liegt). Jeder weitere Fehlversuch kann das Fenster **verlängern**.
 2. Während der Recovery gilt eine vorübergehend leere oder unvollständige VPN-Liste **nicht** als „Verbindungen gelöscht“. So entstehen keine verwaisten Entitäten und keine `_2`/`_3`-Duplikate.
-3. Sobald die Box wieder erreichbar ist und die VPN-Namen zu den bisherigen passen, werden geänderte Connection-UIDs **an Ort und Stelle remappt** (gleiche Geräte/Entitäten).
+3. Sobald die Box wieder erreichbar ist und die VPN-Namen zu den bisherigen **eindeutig (1:1)** passen, werden geänderte Connection-UIDs **an Ort und Stelle remappt** (gleiche Geräte/Entitäten).
 4. Erst wenn das Mindestfenster vorbei ist **und** einige stabile, nicht-leere Abfragen gelungen sind, läuft die Orphan-Bereinigung wieder. Eine wirklich auf der Box gelöschte VPN wird erst nach mehreren fehlenden Polls bestätigt.
 5. Bleibt die VPN-Liste lange leer, obwohl die Box wieder antwortet (Harte Obergrenze: etwa **das Doppelte** des Mindest-Recovery-Fensters), endet die Recovery, damit nichts ewig hängen bleibt. Mehrstündiger Stromausfall ist unproblematisch: Recovery bleibt während des Ausfalls aktiv; Remapping läuft, wenn die Box zurück ist.
 
@@ -207,7 +207,7 @@ Unter **Einstellungen → Geräte & Dienste → Fritz!Box VPN → ⋮ → Diagno
 | **Authentifizierung fehlgeschlagen** | Zugangsdaten; TR-064 aktiv; **Erneut anmelden**, wenn angeboten |
 | **Verbindung fehlgeschlagen** | IP/Hostname; Erreichbarkeit von HA; ggf. HTTP statt HTTPS |
 | **Keine VPN-Entitäten** | WireGuard auf der Fritz!Box eingerichtet; Integration neu laden |
-| **Entitäten unavailable nach Fritz!Box-Reboot** | 1–3 Minuten warten, nachdem die Box wieder da ist; **nicht** sofort neu laden. Siehe [Fritz!Box-Reboot und Verbindungsausfälle](#fritzbox-reboot-und-verbindungsausfälle) |
+| **Entitäten unavailable nach Fritz!Box-Reboot** | Beim Standard-Update-Intervall 1–3 Minuten warten, nachdem die Box wieder da ist (bei größerem Intervall ggf. länger); **nicht** sofort neu laden. Siehe [Fritz!Box-Reboot und Verbindungsausfälle](#fritzbox-reboot-und-verbindungsausfälle) |
 | **Entitäten unavailable (VPN auf der Box gelöscht)** | **Unavailable-Entitäten entfernen** in den Optionen |
 | **Entitäts-IDs mit `_2`** | Nach einem Reboot zuerst auf automatische Recovery warten; sonst **Entitäts-ID-Suffixe reparieren** in den Optionen |
 | **Log: Fritzconnection WireGuard support unavailable** | Nur Info: die Integration nutzt den Web-API-Pfad. Kein Fehler |

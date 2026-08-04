@@ -82,7 +82,7 @@ After a router reboot or longer power-off, you should **not** need to reload the
 
 1. On the **first failed connection** to the Fritz!Box, a recovery window starts (at least **180 seconds** with the default settings; longer if your update interval is above 60 s). Each further failed poll can **extend** that window.
 2. While recovery is active, a temporarily empty or incomplete VPN list is **not** treated as “connections deleted”. That avoids orphaned entities and `_2` / `_3` duplicates.
-3. When the box is reachable again and VPN names match the previous ones, connection UIDs that changed after reboot are **remapped** in place (same devices/entities).
+3. When the box is reachable again and VPN names match the previous ones **uniquely (1:1)**, connection UIDs that changed after reboot are **remapped** in place (same devices/entities).
 4. Only after the minimum window has elapsed **and** a few stable non-empty polls succeed does orphan cleanup resume. A VPN that was really removed on the box is confirmed only after several consecutive misses.
 5. If the VPN list stays empty for a long time after the box answers again (hard cap: about **twice** the minimum recovery window), recovery ends so cleanup cannot hang forever. A multi-hour power-off is fine: recovery stays active for the outage; remapping runs when the box returns.
 
@@ -207,7 +207,7 @@ Under **Settings → Devices & Services → Fritz!Box VPN → ⋮ → Download d
 | **Invalid authentication** | Username/password; TR-064 enabled; complete **Reauthenticate** flow when prompted |
 | **Cannot connect** | Correct IP/hostname; HA can reach the Fritz!Box; try HTTP if HTTPS fails |
 | **No VPN entities** | WireGuard connections configured on the Fritz!Box; reload integration |
-| **Entities unavailable after Fritz!Box reboot** | Wait 1–3 minutes after the box is back; do **not** reload immediately. See [Fritz!Box reboot and connectivity outages](#fritzbox-reboot-and-connectivity-outages) |
+| **Entities unavailable after Fritz!Box reboot** | With the default update interval, wait 1–3 minutes after the box is back (longer if you configured a larger interval); do **not** reload immediately. See [Fritz!Box reboot and connectivity outages](#fritzbox-reboot-and-connectivity-outages) |
 | **Entities unavailable (VPN deleted on router)** | Use **Remove unavailable entities** in options |
 | **Entity IDs with `_2` suffix** | Prefer waiting for automatic recovery after a reboot; otherwise use **Repair entity ID suffixes** in options |
 | **Log: Fritzconnection WireGuard support unavailable** | Info only: the integration uses its web-API path. Not an error |

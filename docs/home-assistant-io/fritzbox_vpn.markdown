@@ -111,7 +111,7 @@ While recovery is active:
 
 - A temporarily empty or incomplete VPN list is treated as an outage, not as deleted connections
 - Orphan cleanup is paused so entities are not removed and `_2` / `_3` duplicates are not created
-- When the router returns and VPN **names** still match, changed connection UIDs are **remapped** onto the existing devices and entities
+- When the router returns and VPN **names** match uniquely **(1:1)**, changed connection UIDs are **remapped** onto the existing devices and entities
 
 Recovery ends after the minimum window has elapsed and a few stable non-empty polls succeed. A connection that was really removed on the router is confirmed only after several consecutive misses. If the VPN list stays empty long after the box answers again (about twice the minimum recovery window), recovery clears so cleanup cannot hang forever. Long maintenance power-offs are supported the same way: wait for the box to return; no manual reload is required.
 
@@ -177,9 +177,10 @@ Repairs entity IDs that received a numeric suffix after faulty deactivation (for
 | **Invalid authentication** | Username and password; TR-064 enabled; complete **Reauthenticate** when prompted |
 | **Cannot connect** | Correct IP or hostname; Home Assistant can reach the FRITZ!Box; HTTPS vs HTTP |
 | **No VPN entities** | WireGuard connections configured in the FRITZ!Box UI; reload the integration |
-| **Entities unavailable after FRITZ!Box reboot** | Wait 1–3 minutes after the box is back; do not reload immediately — see [Connectivity outages and FRITZ!Box reboot](#connectivity-outages-and-fritzbox-reboot) |
+| **Entities unavailable after FRITZ!Box reboot** | With the default update interval, wait 1–3 minutes after the box is back (longer if you configured a larger interval); do not reload immediately — see [Connectivity outages and FRITZ!Box reboot](#connectivity-outages-and-fritzbox-reboot) |
 | **Entities unavailable (VPN deleted on router)** | Use **Remove unavailable entities** in options |
 | **Entity IDs with `_2` suffix** | After a reboot, wait for automatic recovery; otherwise use **Repair entity ID suffixes** in options |
+| **Log: Fritzconnection WireGuard support unavailable** | Info only: the integration uses its web-API path. Not an error |
 
 Enable debug logging from the integration card (**⋮** → **Enable debug logging**), reproduce the issue, then disable debug logging to download logs.
 
