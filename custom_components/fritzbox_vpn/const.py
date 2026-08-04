@@ -87,8 +87,8 @@ LOG_MSG_UID_REMAP_REFUSED = (
     "(%s). added=%s removed=%s"
 )
 LOG_MSG_SESSION_MODE_FALLBACK = (
-    "FritzWireguard module unavailable; using fritzboxvpn web-API fallback "
-    "for host %s. Prefer installing a fritzconnection build with WireGuard support."
+    "FritzWireguard not in this fritzconnection build; using fritzboxvpn web-API "
+    "for host %s (expected fallback, not an error)."
 )
 LOG_MSG_ORPHAN_BASE_MERGE = (
     "Merged orphan base entity_id with live suffixed entity: %s → %s "
