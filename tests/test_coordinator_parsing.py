@@ -34,9 +34,7 @@ def test_parse_login_xml() -> None:
 
 def test_extract_box_connections() -> None:
     """Extract boxConnections from data.lua JSON."""
-    box = extract_box_connections_from_data(
-        MOCK_DATA_LUA_JSON, API_PAGE_SHAREWIREGUARD
-    )
+    box = extract_box_connections_from_data(MOCK_DATA_LUA_JSON, API_PAGE_SHAREWIREGUARD)
     assert box is not None
     assert "conn-abc" in box
 
