@@ -139,11 +139,12 @@ async def test_coordinator_login_failed_still_schedules_reauth(hass) -> None:
 
 @pytest.mark.asyncio
 async def test_missing_box_connections_invalidates_and_raises() -> None:
-    """JSON without boxConnections is treated as outage, not empty success."""
+    """JSON without boxConnections/REST listing is treated as outage, not empty success."""
     http = QueuedAiohttpSession(
         [
             *_login_sequence(),
             json_response({"data": {"init": {"other": True}}}),
+            MockAiohttpResponse(404, text="not found"),
         ]
     )
     fb = FritzBoxVPNSession(http, MOCK_HOST, MOCK_USERNAME, MOCK_PASSWORD)

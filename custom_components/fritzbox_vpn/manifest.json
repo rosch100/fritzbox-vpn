@@ -10,11 +10,11 @@
   "issue_tracker": "https://github.com/rosch100/fritzbox-vpn/issues",
   "loggers": ["fritzboxvpn"],
   "quality_scale": "gold",
-  "requirements": ["fritzboxvpn==1.0.2", "fritzconnection"],
+  "requirements": ["fritzboxvpn==1.0.3", "fritzconnection"],
   "ssdp": [
     {
       "st": "urn:schemas-upnp-org:device:fritzbox:1"
     }
   ],
-  "version": "1.2.4"
+  "version": "1.2.5b1"
 }

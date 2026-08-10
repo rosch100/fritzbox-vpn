@@ -2,14 +2,27 @@
 
 from custom_components.fritzbox_vpn.coordinator import _resolve_update_interval_seconds
 from fritzboxvpn import FritzBoxVPNSession
+from fritzboxvpn.const import (
+    API_KEY_ACTIVE,
+    API_KEY_CONNECTED,
+    API_KEY_NAME,
+    API_PAGE_SHAREWIREGUARD,
+)
 from fritzboxvpn.parsing import (
     extract_box_connections_from_data,
+    extract_wireguard_connections_from_rest,
+    normalize_box_connections,
     parse_blocktime_from_login_xml,
     parse_challenge_from_login_xml,
     parse_sid_from_login_response,
 )
 
-from tests.fixtures import LOGIN_XML_CHALLENGE, LOGIN_XML_SID, MOCK_DATA_LUA_JSON
+from tests.fixtures import (
+    LOGIN_XML_CHALLENGE,
+    LOGIN_XML_SID,
+    MOCK_DATA_LUA_JSON,
+    MOCK_REST_VPN_JSON,
+)
 
 
 def test_parse_login_xml() -> None:
@@ -21,9 +34,31 @@ def test_parse_login_xml() -> None:
 
 def test_extract_box_connections() -> None:
     """Extract boxConnections from data.lua JSON."""
-    box = extract_box_connections_from_data(MOCK_DATA_LUA_JSON, "shareWireguard")
+    box = extract_box_connections_from_data(
+        MOCK_DATA_LUA_JSON, API_PAGE_SHAREWIREGUARD
+    )
     assert box is not None
     assert "conn-abc" in box
+
+
+def test_extract_wireguard_connections_from_rest_fritzos_840() -> None:
+    """FRITZ!OS 8.40 REST payload yields only WireGuard connections."""
+    box = extract_wireguard_connections_from_rest(MOCK_REST_VPN_JSON)
+    assert box is not None
+    connections = normalize_box_connections(box)
+    assert set(connections) == {"conn-abc", "conn-def"}
+    assert connections["conn-abc"][API_KEY_NAME] == "Office VPN"
+    assert connections["conn-abc"][API_KEY_ACTIVE] is True
+    assert connections["conn-abc"][API_KEY_CONNECTED] is True
+    assert connections["conn-def"][API_KEY_ACTIVE] is False
+    assert connections["conn-def"][API_KEY_CONNECTED] is False
+    assert "ipsec-1" not in connections
+
+
+def test_extract_wireguard_connections_from_rest_missing_payload() -> None:
+    """Missing connection list is an explicit miss, not an empty success."""
+    assert extract_wireguard_connections_from_rest({"other": []}) is None
+    assert extract_wireguard_connections_from_rest({}) is None
 
 
 def test_resolve_update_interval() -> None:

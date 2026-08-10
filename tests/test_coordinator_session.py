@@ -3,7 +3,15 @@
 from unittest.mock import AsyncMock, patch
 
 import pytest
+from aiohttp import hdrs
 from fritzboxvpn import FritzBoxVPNSession
+from fritzboxvpn.const import (
+    API_DATA,
+    API_VPN_ROOT,
+    AUTH_HEADER_PREFIX,
+    HEADER_CLIENT_NAME,
+    HEADER_VALUE_CLIENT_NAME,
+)
 
 from tests.aiohttp_mock import MockAiohttpResponse, QueuedAiohttpSession, json_response
 from tests.fixtures import (
@@ -12,6 +20,7 @@ from tests.fixtures import (
     MOCK_DATA_LUA_JSON,
     MOCK_HOST,
     MOCK_PASSWORD,
+    MOCK_REST_VPN_JSON,
     MOCK_USERNAME,
 )
 
@@ -225,3 +234,54 @@ async def test_pbkdf2_login_when_supported() -> None:
     connections = await fb.async_get_vpn_connections()
     assert "conn-abc" in connections
     assert any("version=2" in url for _, url, _ in http.requests)
+
+
+@pytest.mark.asyncio
+async def test_session_fritzos_840_rest_listing_after_data_lua_miss() -> None:
+    """FRITZ!OS 8.40: data.lua without boxConnections falls back to REST listing."""
+    data_lua_without_box = {"data": {"init": {"pageTitle": "VPN"}}}
+    http = QueuedAiohttpSession(
+        [
+            *_login_sequence(),
+            json_response(data_lua_without_box),
+            json_response(MOCK_REST_VPN_JSON),
+        ]
+    )
+    fb = FritzBoxVPNSession(http, MOCK_HOST, MOCK_USERNAME, MOCK_PASSWORD)
+    connections = await fb.async_get_vpn_connections()
+    assert set(connections) == {"conn-abc", "conn-def"}
+    assert connections["conn-abc"]["active"] is True
+    assert connections["conn-abc"]["connected"] is True
+
+    rest_gets = [
+        (method, url, kwargs)
+        for method, url, kwargs in http.requests
+        if method == "GET" and API_VPN_ROOT in url
+    ]
+    assert len(rest_gets) == 1
+    headers = rest_gets[0][2].get("headers") or {}
+    assert headers.get(hdrs.AUTHORIZATION) == f"{AUTH_HEADER_PREFIX}deadbeef"
+    assert headers.get(HEADER_CLIENT_NAME) == HEADER_VALUE_CLIENT_NAME
+
+
+@pytest.mark.asyncio
+async def test_session_fritzos_840_rest_mode_skips_data_lua_on_next_poll() -> None:
+    """After REST listing succeeds once, subsequent polls use REST only."""
+    data_lua_without_box = {"data": {"init": {"pageTitle": "VPN"}}}
+    http = QueuedAiohttpSession(
+        [
+            *_login_sequence(),
+            json_response(data_lua_without_box),
+            json_response(MOCK_REST_VPN_JSON),
+            json_response(MOCK_REST_VPN_JSON),
+        ]
+    )
+    fb = FritzBoxVPNSession(http, MOCK_HOST, MOCK_USERNAME, MOCK_PASSWORD)
+    assert "conn-abc" in await fb.async_get_vpn_connections()
+    assert "conn-abc" in await fb.async_get_vpn_connections()
+    data_lua_posts = [
+        url
+        for method, url, _ in http.requests
+        if method == "POST" and url.endswith(API_DATA)
+    ]
+    assert len(data_lua_posts) == 1
