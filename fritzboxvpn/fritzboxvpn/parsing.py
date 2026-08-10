@@ -7,16 +7,25 @@ import xml.etree.ElementTree as ET
 from typing import Any
 
 from .const import (
+    ACCESS_TYPE_WIREGUARD,
     ACTIVE_STATE_STRINGS_TRUE,
+    API_KEY_ACCESS_TYPE,
     API_KEY_ACTIVATED,
     API_KEY_ACTIVE,
     API_KEY_BOX_CONNECTIONS,
+    API_KEY_CONNECTED,
+    API_KEY_CONNECTED_SINCE,
+    API_KEY_CONNECTION,
     API_KEY_DATA,
     API_KEY_INIT,
+    API_KEY_NAME,
+    API_KEY_STATE,
     API_KEY_UID,
+    API_KEY_UID_REST,
     LOGIN_TAG_BLOCKTIME,
     LOGIN_TAG_CHALLENGE,
     LOGIN_TAG_SID,
+    WIREGUARD_STATE_READY,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -188,3 +197,68 @@ def extract_box_connections_from_data(data: dict[str, Any], page: str) -> Any:
         },
     )
     return None
+
+
+def _connection_connected_from_rest(conn: dict[str, Any]) -> bool:
+    """Connected flag from FRITZ!OS 8.40 REST connection fields."""
+    state = conn.get(API_KEY_STATE)
+    if isinstance(state, str) and state.strip() == WIREGUARD_STATE_READY:
+        return True
+    raw_since = conn.get(API_KEY_CONNECTED_SINCE)
+    if raw_since is None:
+        return False
+    try:
+        return int(raw_since) != 0
+    except (TypeError, ValueError):
+        return False
+
+
+def _rest_wireguard_entry(conn: dict[str, Any]) -> dict[str, Any] | None:
+    """Map one REST connection to the shared boxConnections entry shape."""
+    access_type = conn.get(API_KEY_ACCESS_TYPE)
+    if str(access_type).strip() != ACCESS_TYPE_WIREGUARD:
+        return None
+    uid = conn.get(API_KEY_UID)
+    if uid is None:
+        uid = conn.get(API_KEY_UID_REST)
+    activated = conn.get(API_KEY_ACTIVATED)
+    return {
+        API_KEY_UID: uid,
+        API_KEY_NAME: conn.get(API_KEY_NAME),
+        API_KEY_ACTIVATED: activated,
+        API_KEY_ACTIVE: conn.get(API_KEY_ACTIVE, activated),
+        API_KEY_CONNECTED: _connection_connected_from_rest(conn),
+    }
+
+
+def extract_wireguard_connections_from_rest(
+    data: dict[str, Any],
+) -> list[dict[str, Any]] | None:
+    """Extract WireGuard connections from GET /api/v0/generic/vpn JSON.
+
+    Returns None when the REST listing contract is absent. An empty list means
+    the endpoint answered with zero WireGuard connections.
+    """
+    if not isinstance(data, dict):
+        return None
+    raw_connections = data.get(API_KEY_CONNECTION)
+    if raw_connections is None:
+        _LOGGER.debug(
+            "Could not extract connection list from REST VPN JSON. structure summary=%s",
+            {
+                "data_keys": list(data.keys())[:50],
+                "connection": describe_json_value(data.get(API_KEY_CONNECTION)),
+            },
+        )
+        return None
+    if not isinstance(raw_connections, list):
+        return None
+
+    result: list[dict[str, Any]] = []
+    for conn in raw_connections:
+        if not isinstance(conn, dict):
+            continue
+        entry = _rest_wireguard_entry(conn)
+        if entry is not None:
+            result.append(entry)
+    return result

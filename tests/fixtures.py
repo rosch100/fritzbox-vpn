@@ -1,4 +1,4 @@
-"""Shared test data for FritzBox VPN tests."""
+"""Shared external-contract test data for FritzBox VPN tests."""
 
 MOCK_HOST = "192.168.178.1"
 MOCK_USERNAME = "ha-user"
@@ -42,4 +42,35 @@ MOCK_DATA_LUA_JSON = {
             }
         }
     }
+}
+
+# FRITZ!OS 8.40+ REST listing (GET /api/v0/generic/vpn).
+# Derived from Labor firmware 8.40-135099 (5690 Pro) Web UI.
+MOCK_REST_VPN_JSON = {
+    "connection": [
+        {
+            "UID": "conn-abc",
+            "name": "Office VPN",
+            "activated": "1",
+            "access_type": "4",
+            "state": "ready",
+            "connected_since": "1710000000",
+        },
+        {
+            "UID": "ipsec-1",
+            "name": "IPSec Peer",
+            "activated": "1",
+            "access_type": "1",
+            "state": "ready",
+            "connected_since": "1710000000",
+        },
+        {
+            "UID": "conn-def",
+            "name": "Guest VPN",
+            "activated": "0",
+            "access_type": "4",
+            "state": "notActive",
+            "connected_since": "0",
+        },
+    ]
 }

@@ -9,7 +9,13 @@ import logging
 from typing import Any, NoReturn
 from urllib.parse import urlsplit
 
-from aiohttp import ClientConnectorError, ClientSession, ClientTimeout
+from aiohttp import (
+    ClientConnectorError,
+    ClientResponse,
+    ClientSession,
+    ClientTimeout,
+    hdrs,
+)
 
 from .const import (
     API_DATA,
@@ -20,6 +26,7 @@ from .const import (
     API_LOGIN,
     API_PAGE_SHAREWIREGUARD,
     API_VPN_CONNECTION,
+    API_VPN_ROOT,
     AUTH_HEADER_PREFIX,
     CONTENT_TYPE_JSON,
     DEFAULT_NAME_UNKNOWN,
@@ -29,11 +36,18 @@ from .const import (
     ERROR_MSG_INVALID_SID_403,
     ERROR_MSG_INVALID_SID_HTML,
     ERROR_MSG_LOGIN_FAILED_SID,
+    ERROR_MSG_VPN_PAYLOAD_MISSING,
+    HEADER_CLIENT_NAME,
     HEADER_VALUE_APPLICATION_JSON,
+    HEADER_VALUE_CLIENT_NAME,
     HTTP_STATUS_FORBIDDEN,
+    HTTP_STATUS_NOT_FOUND,
     HTTP_STATUS_OK,
     HTTPS_FALLBACK_STATUS_CODES,
     INVALID_SID_VALUE,
+    LISTING_MODE_DATA_LUA,
+    LISTING_MODE_REST,
+    LISTING_PROBE_ORDER,
     LOG_LABEL_ACTIVATED,
     LOG_LABEL_DEACTIVATED,
     LOGIN_FORM_RESPONSE,
@@ -46,6 +60,7 @@ from .const import (
 )
 from .parsing import (
     extract_box_connections_from_data,
+    extract_wireguard_connections_from_rest,
     normalize_box_connections,
     parse_blocktime_from_login_xml,
     parse_challenge_from_login_xml,
@@ -72,6 +87,68 @@ class FritzBoxVPNSession:
         self.password = password
         self.protocol = protocol if protocol in PROTOCOLS_ALLOWED else DEFAULT_PROTOCOL
         self.sid: str | None = None
+        self._listing_mode: str | None = None
+
+    def _base_url(self) -> str:
+        """Protocol + host origin for REST URLs and browser-like headers."""
+        return f"{self.protocol}://{self.host}"
+
+    def _login_url(self, *, version2: bool = False) -> str:
+        """login_sid.lua URL; optionally FRITZ!OS version=2 (PBKDF2)."""
+        url = f"{self._base_url()}{API_LOGIN}"
+        if version2:
+            return f"{url}?version=2"
+        return url
+
+    def _rest_headers(self, sid: str, *, mutation: bool = False) -> dict[str, str]:
+        """Headers required by FRITZ!OS REST helpers (AVM-SID + WebGUI client)."""
+        headers = {
+            hdrs.AUTHORIZATION: f"{AUTH_HEADER_PREFIX}{sid}",
+            hdrs.CONTENT_TYPE: HEADER_VALUE_APPLICATION_JSON,
+            hdrs.ACCEPT: HEADER_VALUE_APPLICATION_JSON,
+            HEADER_CLIENT_NAME: HEADER_VALUE_CLIENT_NAME,
+        }
+        if mutation:
+            base = self._base_url()
+            headers[hdrs.ACCEPT] = "*/*"
+            headers[hdrs.ORIGIN] = base
+            headers[hdrs.REFERER] = f"{base}/"
+        return headers
+
+    @staticmethod
+    async def _response_json_dict(
+        response: ClientResponse, *, require_json: bool = False
+    ) -> dict[str, Any] | None:
+        """Parse response body as a JSON object; None when contract is absent."""
+        content_type = (response.headers.get(hdrs.CONTENT_TYPE) or "").lower()
+        if CONTENT_TYPE_JSON not in content_type:
+            if require_json:
+                raise ValueError(ERROR_MSG_INVALID_SID_HTML)
+            return None
+        try:
+            data = json.loads(await response.text())
+        except (json.JSONDecodeError, TypeError) as err:
+            if require_json:
+                raise ValueError(ERROR_MSG_INVALID_SID_HTML) from err
+            return None
+        if isinstance(data, dict):
+            return data
+        return None
+
+    def _validate_vpn_listing_status(
+        self,
+        response: ClientResponse,
+        *,
+        source: str,
+    ) -> None:
+        """Validate a successful listing response or raise its explicit error."""
+        if response.status == HTTP_STATUS_FORBIDDEN:
+            raise ValueError(ERROR_MSG_INVALID_SID_403)
+        if response.status != HTTP_STATUS_OK:
+            self.invalidate_session()
+            raise ConnectionError(
+                f"Failed to get VPN connections{source}: HTTP {response.status}"
+            )
 
     async def async_get_session(self) -> tuple[ClientSession, str]:
         """Return session and SID; reuse cached SID if valid."""
@@ -98,7 +175,7 @@ class FritzBoxVPNSession:
                 "falling back to MD5."
             )
 
-        login_url = f"{self.protocol}://{self.host}{API_LOGIN}"
+        login_url = self._login_url()
         try:
             content = await self._fetch_login_page(login_url, timeout)
         except (ConnectionError, ValueError) as err:
@@ -125,7 +202,7 @@ class FritzBoxVPNSession:
             LOGIN_FORM_RESPONSE: f"{challenge}-{response_hash}",
         }
         # Rebuild after possible HTTPS→HTTP fallback in _fetch_login_page.
-        login_url = f"{self.protocol}://{self.host}{API_LOGIN}"
+        login_url = self._login_url()
         try:
             async with self.session.post(
                 login_url, data=login_data, ssl=False, timeout=timeout
@@ -149,8 +226,7 @@ class FritzBoxVPNSession:
     async def _try_get_session_via_pbkdf2(self, timeout: ClientTimeout) -> str | None:
         """Return valid SID via pbkdf2 challenge-response, or None if unsupported."""
         _LOGGER.debug("Trying PBKDF2 login flow (login_sid.lua?version=2).")
-        login_url_get = f"{self.protocol}://{self.host}{API_LOGIN}?version=2"
-        content = await self._fetch_login_page(login_url_get, timeout)
+        content = await self._fetch_login_page(self._login_url(version2=True), timeout)
         if not content:
             return None
 
@@ -172,10 +248,12 @@ class FritzBoxVPNSession:
             LOGIN_FORM_RESPONSE: response,
         }
 
-        login_url_post = f"{self.protocol}://{self.host}{API_LOGIN}?version=2"
         try:
             async with self.session.post(
-                login_url_post, data=login_data, ssl=False, timeout=timeout
+                self._login_url(version2=True),
+                data=login_data,
+                ssl=False,
+                timeout=timeout,
             ) as response_http:
                 if response_http.status != HTTP_STATUS_OK:
                     return None
@@ -273,10 +351,45 @@ class FritzBoxVPNSession:
             )
             return await self._get_login_page_http(api_path, query, timeout)
 
-    async def _fetch_vpn_connections_once(self) -> dict[str, Any]:
-        """Single VPN connections request; raises on outage/missing payload."""
-        session, sid = await self.async_get_session()
-        data_url = f"{self.protocol}://{self.host}{API_DATA}"
+    async def _fetch_listing_by_mode(
+        self, mode: str, session: ClientSession, sid: str
+    ) -> dict[str, Any] | None:
+        """Dispatch to the listing implementation for a cached/probed mode."""
+        if mode == LISTING_MODE_REST:
+            return await self._fetch_vpn_connections_via_rest(session, sid)
+        if mode == LISTING_MODE_DATA_LUA:
+            return await self._fetch_vpn_connections_via_data_lua(session, sid)
+        raise ValueError(f"Unknown VPN listing mode: {mode}")
+
+    async def _fetch_vpn_connections_via_rest(
+        self, session: ClientSession, sid: str
+    ) -> dict[str, Any] | None:
+        """GET /api/v0/generic/vpn; None when the REST listing contract is absent."""
+        timeout = ClientTimeout(total=DEFAULT_TIMEOUT)
+        try:
+            async with session.get(
+                f"{self._base_url()}{API_VPN_ROOT}",
+                headers=self._rest_headers(sid),
+                timeout=timeout,
+                ssl=False,
+            ) as response:
+                if response.status == HTTP_STATUS_NOT_FOUND:
+                    return None
+                self._validate_vpn_listing_status(response, source=" via REST")
+                data = await self._response_json_dict(response)
+                if data is None:
+                    return None
+                box = extract_wireguard_connections_from_rest(data)
+                if box is None:
+                    return None
+                return normalize_box_connections(box)
+        except (ClientConnectorError, OSError) as err:
+            self._raise_transport_error(err)
+
+    async def _fetch_vpn_connections_via_data_lua(
+        self, session: ClientSession, sid: str
+    ) -> dict[str, Any] | None:
+        """POST /data.lua shareWireguard; None when boxConnections is absent."""
         params = {
             "sid": sid,
             "xhr": "1",
@@ -287,39 +400,46 @@ class FritzBoxVPNSession:
         timeout = ClientTimeout(total=DEFAULT_TIMEOUT)
         try:
             async with session.post(
-                data_url, data=params, timeout=timeout, ssl=False
+                f"{self._base_url()}{API_DATA}",
+                data=params,
+                timeout=timeout,
+                ssl=False,
             ) as response:
-                if response.status == HTTP_STATUS_FORBIDDEN:
-                    raise ValueError(ERROR_MSG_INVALID_SID_403)
-                if response.status != HTTP_STATUS_OK:
-                    self.invalidate_session()
-                    raise ConnectionError(
-                        f"Failed to get VPN connections: HTTP {response.status}"
-                    )
-
-                content_type = (response.headers.get("Content-Type") or "").lower()
-                if CONTENT_TYPE_JSON not in content_type:
-                    raise ValueError(ERROR_MSG_INVALID_SID_HTML)
-                try:
-                    body = await response.text()
-                    data = json.loads(body)
-                except (json.JSONDecodeError, TypeError) as err:
-                    raise ValueError(ERROR_MSG_INVALID_SID_HTML) from err
-
+                self._validate_vpn_listing_status(response, source="")
+                data = await self._response_json_dict(response, require_json=True)
+                if data is None:
+                    return None
                 box = extract_box_connections_from_data(data, API_PAGE_SHAREWIREGUARD)
-                if box is not None:
-                    return normalize_box_connections(box)
-                # Missing boxConnections is typical while the box is rebooting or the
-                # cached SID/protocol is stale — do not soft-succeed with {}.
-                self.invalidate_session()
-                raise ConnectionError(
-                    "VPN connections payload missing from Fritz!Box response"
-                )
-        except ConnectionError:
-            raise
+                if box is None:
+                    return None
+                return normalize_box_connections(box)
         except (ClientConnectorError, OSError) as err:
             # Reboot / port-down: clear cached SID+protocol so the next poll recovers.
             self._raise_transport_error(err)
+
+    async def _fetch_vpn_connections_once(self) -> dict[str, Any]:
+        """Single VPN connections request; raises on outage/missing payload."""
+        session, sid = await self.async_get_session()
+        preferred = self._listing_mode
+
+        if preferred is not None:
+            result = await self._fetch_listing_by_mode(preferred, session, sid)
+            if result is not None:
+                return result
+            self._listing_mode = None
+
+        for mode in LISTING_PROBE_ORDER:
+            if mode == preferred:
+                continue
+            result = await self._fetch_listing_by_mode(mode, session, sid)
+            if result is not None:
+                self._listing_mode = mode
+                return result
+
+        # Missing payloads are typical while the box is rebooting or the
+        # cached SID/protocol is stale — do not soft-succeed with {}.
+        self.invalidate_session()
+        raise ConnectionError(ERROR_MSG_VPN_PAYLOAD_MISSING)
 
     async def async_get_vpn_connections(self) -> dict[str, Any]:
         """WireGuard VPN connections; cached session, retry once on SID expiry."""
@@ -363,15 +483,8 @@ class FritzBoxVPNSession:
             return True
 
         session, sid = await self.async_get_session()
-        base = f"{self.protocol}://{self.host}"
-        api_url = f"{base}{API_VPN_CONNECTION.format(uid=vpn_uid)}"
-        headers = {
-            "Content-Type": HEADER_VALUE_APPLICATION_JSON,
-            "Authorization": f"{AUTH_HEADER_PREFIX}{sid}",
-            "Accept": "*/*",
-            "Origin": base,
-            "Referer": f"{base}/",
-        }
+        api_url = f"{self._base_url()}{API_VPN_CONNECTION.format(uid=vpn_uid)}"
+        headers = self._rest_headers(sid, mutation=True)
         request_body = {API_KEY_ACTIVATED: 1 if enable else 0}
 
         timeout = ClientTimeout(total=DEFAULT_TIMEOUT)
@@ -433,9 +546,11 @@ class FritzBoxVPNSession:
 
         Protocol is reset to HTTPS because a temporary reboot outage can flip
         HTTPS→HTTP permanently for the lifetime of this session object.
+        Listing mode is cleared so a firmware/API change is rediscovered.
         """
         self.sid = None
         self.protocol = DEFAULT_PROTOCOL
+        self._listing_mode = None
 
     async def async_close(self) -> None:
         """Clear cached SID and reset protocol."""
