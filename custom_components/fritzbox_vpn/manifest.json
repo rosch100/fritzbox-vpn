@@ -1,20 +1,29 @@
 {
   "domain": "fritzbox_vpn",
   "name": "Fritz!Box VPN",
-  "codeowners": ["@rosch100"],
+  "codeowners": [
+    "@rosch100"
+  ],
   "config_flow": true,
-  "dependencies": ["ssdp"],
+  "dependencies": [
+    "ssdp"
+  ],
   "documentation": "https://github.com/rosch100/fritzbox-vpn",
   "integration_type": "device",
   "iot_class": "local_polling",
   "issue_tracker": "https://github.com/rosch100/fritzbox-vpn/issues",
-  "loggers": ["fritzboxvpn"],
+  "loggers": [
+    "fritzboxvpn"
+  ],
   "quality_scale": "gold",
-  "requirements": ["fritzboxvpn==1.0.3", "fritzconnection"],
+  "requirements": [
+    "fritzboxvpn==1.0.3",
+    "fritzconnection"
+  ],
   "ssdp": [
     {
       "st": "urn:schemas-upnp-org:device:fritzbox:1"
     }
   ],
-  "version": "1.2.5b1"
+  "version": "1.2.5"
 }
