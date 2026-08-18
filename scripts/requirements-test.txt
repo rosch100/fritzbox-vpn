@@ -1,11 +1,12 @@
-# Test dependencies (see .github/workflows/ci.yml — Python 3.13)
-# Pin to minimum HA from hacs.json / manifest (2026.1.0)
+# Test dependencies (see .github/workflows/ci.yml — Python 3.14)
+# HA 2026.6.0 is the CVE floor (CVE-2026-64825, CVE-2026-54317).
+# pytest-homeassistant-custom-component pins a matching HA release.
 -e ./fritzboxvpn
 aiohttp>=3.8.0
 # manifest.json depends on ssdp; HA's ssdp component imports async_upnp_client
 async-upnp-client>=0.33.0
-homeassistant>=2026.1.0,<2026.2.0
+homeassistant==2026.8.2
 pytest>=8.0
 pytest-asyncio>=0.24
 pytest-cov>=5.0
-pytest-homeassistant-custom-component>=0.13.0
+pytest-homeassistant-custom-component==0.13.356
