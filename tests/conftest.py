@@ -1,6 +1,8 @@
 """Pytest fixtures for FritzBox VPN tests."""
 
+from collections.abc import Generator
 from pathlib import Path
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from custom_components.fritzbox_vpn.coordinator import FritzBoxVPNCoordinator
@@ -24,6 +26,22 @@ def hass_config_dir() -> str:
 @pytest.fixture(autouse=True)
 def enable_custom_integrations_fixture(enable_custom_integrations) -> None:
     """Rescan custom_components from hass_config_dir."""
+
+
+@pytest.fixture(autouse=True)
+def mock_ssdp_network() -> Generator[None]:
+    """Do not open SSDP multicast sockets when tests load the ssdp dependency."""
+    with (
+        patch(
+            "homeassistant.components.ssdp.scanner.Scanner.async_start",
+            new_callable=AsyncMock,
+        ),
+        patch(
+            "homeassistant.components.ssdp.server.Server.async_start",
+            new_callable=AsyncMock,
+        ),
+    ):
+        yield
 
 
 @pytest.fixture

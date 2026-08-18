@@ -7,7 +7,7 @@ Home Assistant custom integration for WireGuard VPN on AVM Fritz!Box routers.
 Always run these before approving changes:
 
 ```bash
-python3 -m venv .venv
+python3.14 -m venv .venv
 .venv/bin/pip install -r scripts/requirements-test.txt
 .venv/bin/ruff check custom_components tests
 .venv/bin/pytest tests/ --cov -q

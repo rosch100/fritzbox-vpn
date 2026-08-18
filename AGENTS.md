@@ -25,7 +25,7 @@ Kurzreferenz für **Coding-Agents** (Cursor, Copilot): projektspezifische Invari
 Ziel **Gold** (`custom_components/fritzbox_vpn/quality_scale.yaml`), Coverage ≥ 85 %.
 
 ```bash
-python3 -m venv .venv
+python3.14 -m venv .venv
 .venv/bin/pip install -r scripts/requirements-test.txt
 .venv/bin/ruff check custom_components tests
 .venv/bin/pytest tests/ --cov=custom_components/fritzbox_vpn -q
