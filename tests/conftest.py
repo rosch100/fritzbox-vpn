@@ -25,7 +25,9 @@ def hass_config_dir() -> str:
 
 @pytest.fixture(autouse=True)
 def enable_custom_integrations_fixture(enable_custom_integrations) -> None:
-    """Rescan custom_components from hass_config_dir."""
+    """
+    Enable and rescan custom integrations for the test environment.
+    """
 
 
 @pytest.fixture(autouse=True)
