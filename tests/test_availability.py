@@ -21,7 +21,10 @@ def test_normalize_availability_mode_defaults() -> None:
     """Unknown values fall back to graceful default."""
     assert normalize_availability_mode(None) == DEFAULT_AVAILABILITY_MODE
     assert normalize_availability_mode("invalid") == DEFAULT_AVAILABILITY_MODE
-    assert normalize_availability_mode(AVAILABILITY_MODE_STRICT) == AVAILABILITY_MODE_STRICT
+    assert (
+        normalize_availability_mode(AVAILABILITY_MODE_STRICT)
+        == AVAILABILITY_MODE_STRICT
+    )
 
 
 def test_resolve_availability_mode_precedence() -> None:
@@ -34,7 +37,9 @@ def test_resolve_availability_mode_precedence() -> None:
         == AVAILABILITY_MODE_PERSISTENT
     )
     assert (
-        resolve_availability_mode({CONF_AVAILABILITY_MODE: AVAILABILITY_MODE_STRICT}, {})
+        resolve_availability_mode(
+            {CONF_AVAILABILITY_MODE: AVAILABILITY_MODE_STRICT}, {}
+        )
         == AVAILABILITY_MODE_STRICT
     )
 
