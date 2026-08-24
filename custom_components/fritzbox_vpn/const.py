@@ -11,6 +11,20 @@ NAME_FRITZBOX = fritzboxvpn_const.NAME_FRITZBOX
 
 DOMAIN = "fritzbox_vpn"
 CONF_UPDATE_INTERVAL = "update_interval"
+CONF_AVAILABILITY_MODE = "availability_mode"
+
+AVAILABILITY_MODE_STRICT = "strict"
+AVAILABILITY_MODE_GRACEFUL = "graceful"
+AVAILABILITY_MODE_PERSISTENT = "persistent"
+AVAILABILITY_MODES = (
+    AVAILABILITY_MODE_STRICT,
+    AVAILABILITY_MODE_GRACEFUL,
+    AVAILABILITY_MODE_PERSISTENT,
+)
+DEFAULT_AVAILABILITY_MODE = AVAILABILITY_MODE_GRACEFUL
+AVAILABILITY_GRACE_MIN_SECONDS = 60
+AVAILABILITY_GRACE_INTERVAL_FACTOR = 2
+AVAILABILITY_GRACE_MAX_FAILURES = 2
 
 DEFAULT_HOST = "192.168.178.1"
 HOST_FALLBACK_UNKNOWN = "unknown"
@@ -85,6 +99,10 @@ LOG_MSG_UID_REMAP = (
 LOG_MSG_UID_REMAP_REFUSED = (
     "VPN UID set changed after outage on %s but name bijection remap was refused "
     "(%s). added=%s removed=%s"
+)
+LOG_MSG_AVAILABILITY_STALE = (
+    "VPN entity data for %s is stale after %d consecutive poll failure(s); "
+    "entities will show as unavailable until the next successful poll."
 )
 LOG_MSG_SESSION_MODE_FALLBACK = (
     "Fritzconnection WireGuard support unavailable; using fritzboxvpn web-API "

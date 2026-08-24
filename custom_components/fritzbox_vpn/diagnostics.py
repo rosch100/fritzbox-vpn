@@ -7,6 +7,7 @@ from homeassistant.components.diagnostics import async_redact_data
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
 from homeassistant.core import HomeAssistant
 
+from .availability import resolve_availability_mode
 from .const import CONF_UPDATE_INTERVAL, host_from_config
 from .coordinator import normalize_update_interval
 from .models import FritzboxVpnConfigEntry, runtime_from_entry
@@ -23,14 +24,19 @@ async def async_get_config_entry_diagnostics(
     update_interval = normalize_update_interval(
         options.get(CONF_UPDATE_INTERVAL) or entry.data.get(CONF_UPDATE_INTERVAL)
     )
+    availability_mode = resolve_availability_mode(entry.data, options)
 
     last_update_success: bool | None = None
+    entities_trusted: bool | None = None
+    consecutive_poll_failures: int | None = None
     vpn_connections: list[dict[str, Any]] = []
 
     runtime = runtime_from_entry(entry)
     if runtime is not None:
         coordinator = runtime.coordinator
         last_update_success = coordinator.last_update_success
+        entities_trusted = coordinator.entities_trusted()
+        consecutive_poll_failures = coordinator.consecutive_poll_failures
         if coordinator.data:
             for uid, conn in coordinator.data.items():
                 if not isinstance(conn, dict):
@@ -48,7 +54,10 @@ async def async_get_config_entry_diagnostics(
         "entry": async_redact_data(entry.as_dict(), TO_REDACT),
         "host": host,
         "update_interval_seconds": update_interval,
+        "availability_mode": availability_mode,
         "last_update_success": last_update_success,
+        "entities_trusted": entities_trusted,
+        "consecutive_poll_failures": consecutive_poll_failures,
         "vpn_connection_count": len(vpn_connections),
         "vpn_connections": vpn_connections,
     }

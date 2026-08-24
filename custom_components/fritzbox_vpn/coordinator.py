@@ -6,7 +6,7 @@ import inspect
 import logging
 import time
 from collections.abc import Callable
-from datetime import timedelta
+from datetime import datetime, timedelta
 from typing import Any
 
 from fritzboxvpn import (
@@ -18,12 +18,16 @@ from homeassistant.config_entries import ConfigEntryState
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
+from homeassistant.util import dt as dt_util
 
+from .availability import entities_trusted as compute_entities_trusted
+from .availability import resolve_availability_mode
 from .const import (
     AUTH_INDICATORS,
     CONF_UPDATE_INTERVAL,
     DEFAULT_UPDATE_INTERVAL,
     DOMAIN,
+    LOG_MSG_AVAILABILITY_STALE,
     LOG_MSG_EMPTY_DURING_RECOVERY,
     LOG_MSG_RECOVERY_ARMED,
     LOG_MSG_RECOVERY_CLEARED,
@@ -124,6 +128,10 @@ class FritzBoxVPNCoordinator(DataUpdateCoordinator):
     ):
         update_interval_seconds = _resolve_update_interval_seconds(config, options)
         self._update_interval_seconds = update_interval_seconds
+        self._availability_mode = resolve_availability_mode(config, options)
+        self._consecutive_poll_failures = 0
+        self._last_successful_poll: datetime | None = None
+        self._availability_stale_logged = False
 
         super().__init__(
             hass,
@@ -151,6 +159,16 @@ class FritzBoxVPNCoordinator(DataUpdateCoordinator):
         self._recovery_started_at: float | None = None
         self._recovery_stable_polls: int = 0
 
+    @property
+    def availability_mode(self) -> str:
+        """Configured entity availability mode for this entry."""
+        return self._availability_mode
+
+    @property
+    def consecutive_poll_failures(self) -> int:
+        """Consecutive transient poll failures since the last success."""
+        return self._consecutive_poll_failures
+
     def resolve_connection_uid(self, connection_uid: str) -> str:
         """Map a pre-remap entity UID to the current coordinator data key."""
         uid = connection_uid
@@ -159,6 +177,36 @@ class FritzBoxVPNCoordinator(DataUpdateCoordinator):
             seen.add(uid)
             uid = self._uid_remap[uid]
         return uid
+
+    def entities_trusted(self) -> bool:
+        """True when entities may stay available despite a failed poll."""
+        return compute_entities_trusted(
+            mode=self._availability_mode,
+            last_update_success=self.last_update_success,
+            has_data=bool(self.data),
+            consecutive_failures=self._consecutive_poll_failures,
+            last_successful_poll=self._last_successful_poll,
+            update_interval_seconds=self._update_interval_seconds,
+            reauth_scheduled=self._reauth_scheduled,
+        )
+
+    def _note_poll_success(self) -> None:
+        """Record a successful poll for availability grace."""
+        self._consecutive_poll_failures = 0
+        self._last_successful_poll = dt_util.utcnow()
+        self._availability_stale_logged = False
+
+    def _note_poll_failure(self) -> None:
+        """Record a transient poll failure and log when grace is exceeded."""
+        self._consecutive_poll_failures += 1
+        if self.entities_trusted() or self._availability_stale_logged:
+            return
+        self._availability_stale_logged = True
+        _LOGGER.warning(
+            LOG_MSG_AVAILABILITY_STALE,
+            host_from_config(self.config),
+            self._consecutive_poll_failures,
+        )
 
     def get_vpn_status(self, connection_uid: str) -> str:
         """Get the textual status of a VPN connection."""
@@ -397,6 +445,7 @@ class FritzBoxVPNCoordinator(DataUpdateCoordinator):
                     )
                     self._reset_orphan_miss_streaks()
                     self._recovery_stable_polls = 0
+                    self._note_poll_failure()
                     raise UpdateFailed(
                         "VPN list empty while recovering after connectivity outage",
                         retry_after=RETRY_AFTER_SECONDS,
@@ -429,6 +478,7 @@ class FritzBoxVPNCoordinator(DataUpdateCoordinator):
                     self._on_orphaned_removed(self.entry_id, current_uids)
 
             self._note_successful_poll(connections)
+            self._note_poll_success()
             self._reauth_scheduled = False
             return connections
         except UpdateFailed:
@@ -439,6 +489,7 @@ class FritzBoxVPNCoordinator(DataUpdateCoordinator):
                 self._schedule_reauth()
                 raise UpdateFailed(f"Error fetching VPN data: {err}") from err
             self._arm_recovery()
+            self._note_poll_failure()
             raise UpdateFailed(
                 f"Error fetching VPN data: {err}",
                 retry_after=RETRY_AFTER_SECONDS,
@@ -446,6 +497,7 @@ class FritzBoxVPNCoordinator(DataUpdateCoordinator):
         except TimeoutError as err:
             self._arm_recovery()
             self._prepare_session_for_retry(err)
+            self._note_poll_failure()
             raise UpdateFailed(
                 f"Error fetching VPN data: {err}",
                 retry_after=RETRY_AFTER_SECONDS,
@@ -459,6 +511,7 @@ class FritzBoxVPNCoordinator(DataUpdateCoordinator):
                 ) from err
             self._arm_recovery()
             _LOGGER.exception("Unexpected error fetching VPN data")
+            self._note_poll_failure()
             raise UpdateFailed(
                 f"Unexpected error fetching VPN data: {err}",
                 retry_after=RETRY_AFTER_SECONDS,

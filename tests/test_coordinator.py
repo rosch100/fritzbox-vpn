@@ -146,3 +146,28 @@ async def test_coordinator_connection_error_retry(hass: HomeAssistant) -> None:
     with pytest.raises(UpdateFailed) as exc_info:
         await coordinator._async_update_data()
     assert exc_info.value.retry_after is not None
+
+
+@pytest.mark.asyncio
+async def test_coordinator_graceful_keeps_entities_trusted_after_failure(
+    hass: HomeAssistant,
+) -> None:
+    """Graceful mode keeps entities trusted after one transient poll failure."""
+    coordinator = FritzBoxVPNCoordinator(
+        hass,
+        {"host": MOCK_HOST, "username": "u", "password": "p"},
+        None,
+        None,
+    )
+    coordinator.async_set_updated_data(MOCK_VPN_CONNECTIONS)
+    coordinator._note_poll_success()
+    coordinator.last_update_success = False
+
+    coordinator.fritz_session.async_get_vpn_connections = AsyncMock(
+        side_effect=ConnectionError("timeout")
+    )
+    with pytest.raises(UpdateFailed):
+        await coordinator._async_update_data()
+
+    assert coordinator.entities_trusted() is True
+    assert coordinator.consecutive_poll_failures == 1
