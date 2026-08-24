@@ -150,7 +150,7 @@
     },
     "availability_mode": {
       "options": {
-        "strict": "Strikt — unavailable beim ersten Poll-Fehler",
+        "strict": "Strikt — nicht verfügbar beim ersten Poll-Fehler",
         "graceful": "Graceful — letzten Zustand bei kurzen Ausfällen behalten (Standard)",
         "persistent": "Persistent — letzten Zustand bis Auth-Fehler oder VPN fehlt"
       }

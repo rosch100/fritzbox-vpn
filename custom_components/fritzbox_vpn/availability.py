@@ -29,8 +29,8 @@ def normalize_availability_mode(value: Any) -> str:
         return value
     if value is not None:
         _LOGGER.warning(
-            "Invalid availability_mode value %r, using default %s",
-            value,
+            "Invalid availability_mode value of type %s, using default %s",
+            type(value).__name__,
             DEFAULT_AVAILABILITY_MODE,
         )
     return DEFAULT_AVAILABILITY_MODE
