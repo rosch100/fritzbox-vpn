@@ -52,12 +52,14 @@
           "host": "FritzBox IP Address",
           "username": "Username",
           "password": "Password (leave empty to keep current password)",
-          "update_interval": "Update interval (seconds, 5–3600, max. 1 h)"
+          "update_interval": "Update interval (seconds, 5–3600, max. 1 h)",
+          "availability_mode": "Entity availability during poll failures"
         },
         "data_description": {
           "host": "FritzBox IP address or hostname",
           "password": "Password used to authenticate against the FritzBox",
           "update_interval": "Update interval in seconds",
+          "availability_mode": "How entities behave when a poll fails temporarily",
           "username": "Username used to authenticate against the FritzBox"
         }
       }
@@ -96,12 +98,14 @@
           "host": "FritzBox IP Address",
           "username": "Username",
           "password": "Password (leave empty to keep current password)",
-          "update_interval": "Update interval (seconds, 5–3600, max. 1 h)"
+          "update_interval": "Update interval (seconds, 5–3600, max. 1 h)",
+          "availability_mode": "Entity availability during poll failures"
         },
         "data_description": {
           "host": "FritzBox IP address or hostname",
           "password": "Password used to authenticate against the FritzBox",
           "update_interval": "Update interval in seconds",
+          "availability_mode": "How entities behave when a poll fails temporarily",
           "username": "Username used to authenticate against the FritzBox"
         }
       },
@@ -139,9 +143,16 @@
   "selector": {
     "options_action": {
       "options": {
-        "configure": "Configure (host, user, update interval)",
+        "configure": "Configure (host, user, update interval, availability)",
         "cleanup": "Remove unavailable entities",
         "repair_entity_ids": "Repair entity IDs"
+      }
+    },
+    "availability_mode": {
+      "options": {
+        "strict": "Strict — unavailable on first poll failure",
+        "graceful": "Graceful — keep last state during short outages (default)",
+        "persistent": "Persistent — keep last state until auth failure or missing VPN"
       }
     }
   },

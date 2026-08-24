@@ -96,8 +96,8 @@ def vpn_device_info(
 def connection_available(
     coordinator: FritzBoxVPNCoordinator, connection_uid: str
 ) -> bool:
-    """True when the coordinator has data for this VPN connection."""
-    if not coordinator.last_update_success or not coordinator.data:
+    """True when the coordinator has trusted data for this VPN connection."""
+    if not coordinator.data or not coordinator.entities_trusted():
         return False
     resolved = coordinator.resolve_connection_uid(connection_uid)
     return resolved in coordinator.data

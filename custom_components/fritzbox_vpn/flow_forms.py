@@ -11,9 +11,14 @@ import voluptuous as vol
 from homeassistant.const import CONF_HOST, CONF_PASSWORD, CONF_USERNAME
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
+from homeassistant.helpers import selector
 
+from .availability import normalize_availability_mode
 from .const import (
+    AVAILABILITY_MODES,
+    CONF_AVAILABILITY_MODE,
     CONF_UPDATE_INTERVAL,
+    DEFAULT_AVAILABILITY_MODE,
     DEFAULT_HOST,
     DEFAULT_UPDATE_INTERVAL,
     ERROR_INDICATOR_AUTH,
@@ -130,6 +135,9 @@ def configure_schema(
     default_update_interval = normalize_update_interval(
         current_options.get(CONF_UPDATE_INTERVAL, DEFAULT_UPDATE_INTERVAL)
     )
+    default_availability_mode = normalize_availability_mode(
+        current_options.get(CONF_AVAILABILITY_MODE, DEFAULT_AVAILABILITY_MODE)
+    )
     return vol.Schema(
         {
             vol.Required(CONF_HOST, default=host_default): str,
@@ -140,6 +148,15 @@ def configure_schema(
             ): vol.All(
                 vol.Coerce(int),
                 vol.Range(min=UPDATE_INTERVAL_MIN, max=UPDATE_INTERVAL_MAX),
+            ),
+            vol.Required(
+                CONF_AVAILABILITY_MODE, default=default_availability_mode
+            ): selector.SelectSelector(
+                selector.SelectSelectorConfig(
+                    options=list(AVAILABILITY_MODES),
+                    translation_key="availability_mode",
+                    mode=selector.SelectSelectorMode.DROPDOWN,
+                )
             ),
         }
     )
@@ -197,7 +214,10 @@ def config_and_options_from_configure_input(
     options_data = {
         CONF_UPDATE_INTERVAL: normalize_update_interval(
             user_input.get(CONF_UPDATE_INTERVAL, DEFAULT_UPDATE_INTERVAL)
-        )
+        ),
+        CONF_AVAILABILITY_MODE: normalize_availability_mode(
+            user_input.get(CONF_AVAILABILITY_MODE, DEFAULT_AVAILABILITY_MODE)
+        ),
     }
     return config_data, options_data
 

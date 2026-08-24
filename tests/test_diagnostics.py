@@ -24,6 +24,8 @@ async def test_diagnostics_redacts_credentials(
         {
             "last_update_success": True,
             "data": MOCK_VPN_CONNECTIONS,
+            "entities_trusted": lambda self: True,
+            "consecutive_poll_failures": 0,
         },
     )()
     mock_config_entry.runtime_data = FritzboxVpnRuntimeData(
@@ -47,7 +49,12 @@ async def test_diagnostics_skips_non_dict_connections(
     mock_coordinator = type(
         "C",
         (),
-        {"last_update_success": True, "data": {"bad": "value"}},
+        {
+            "last_update_success": True,
+            "data": {"bad": "value"},
+            "entities_trusted": lambda self: True,
+            "consecutive_poll_failures": 0,
+        },
     )()
     mock_config_entry.runtime_data = FritzboxVpnRuntimeData(
         coordinator=mock_coordinator

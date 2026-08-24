@@ -20,13 +20,22 @@ def test_vpn_unique_id() -> None:
 
 
 def test_connection_available_and_data() -> None:
-    """Availability follows coordinator success and UID membership."""
+    """Availability follows coordinator trust and UID membership."""
     coordinator = MagicMock()
-    coordinator.last_update_success = True
+    coordinator.entities_trusted = MagicMock(return_value=True)
     coordinator.data = MOCK_VPN_CONNECTIONS
     coordinator.resolve_connection_uid = lambda uid: uid
     assert connection_available(coordinator, "conn-abc") is True
     assert connection_data(coordinator, "missing") is None
+
+
+def test_connection_available_respects_entities_trusted() -> None:
+    """Entities stay available in graceful mode while coordinator data is trusted."""
+    coordinator = MagicMock()
+    coordinator.entities_trusted = MagicMock(return_value=False)
+    coordinator.data = MOCK_VPN_CONNECTIONS
+    coordinator.resolve_connection_uid = lambda uid: uid
+    assert connection_available(coordinator, "conn-abc") is False
 
 
 def test_vpn_switch_attributes() -> None:

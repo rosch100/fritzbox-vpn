@@ -52,12 +52,14 @@
           "host": "FritzBox IP-Adresse",
           "username": "Benutzername",
           "password": "Passwort (leer lassen, um das aktuelle Passwort beizubehalten)",
-          "update_interval": "Update-Intervall (Sekunden, 5–3600, max. 1 h)"
+          "update_interval": "Update-Intervall (Sekunden, 5–3600, max. 1 h)",
+          "availability_mode": "Entitäts-Verfügbarkeit bei Poll-Fehlern"
         },
         "data_description": {
           "host": "FritzBox IP-Adresse oder Hostname",
           "password": "Passwort zur Authentifizierung gegen die FritzBox",
           "update_interval": "Update-Intervall in Sekunden",
+          "availability_mode": "Verhalten der Entitäten bei kurzzeitigen Poll-Fehlern",
           "username": "Benutzername zur Authentifizierung gegen die FritzBox"
         }
       }
@@ -96,12 +98,14 @@
           "host": "FritzBox IP-Adresse",
           "username": "Benutzername",
           "password": "Passwort (leer lassen, um aktuelles Passwort beizubehalten)",
-          "update_interval": "Update-Intervall (Sekunden, 5–3600, max. 1 h)"
+          "update_interval": "Update-Intervall (Sekunden, 5–3600, max. 1 h)",
+          "availability_mode": "Entitäts-Verfügbarkeit bei Poll-Fehlern"
         },
         "data_description": {
           "host": "FritzBox IP-Adresse oder Hostname",
           "password": "Passwort zur Authentifizierung gegen die FritzBox",
           "update_interval": "Update-Intervall in Sekunden",
+          "availability_mode": "Verhalten der Entitäten bei kurzzeitigen Poll-Fehlern",
           "username": "Benutzername zur Authentifizierung gegen die FritzBox"
         }
       },
@@ -139,9 +143,16 @@
   "selector": {
     "options_action": {
       "options": {
-        "configure": "Konfigurieren (Host, Benutzer, Update-Intervall)",
+        "configure": "Konfigurieren (Host, Benutzer, Update-Intervall, Verfügbarkeit)",
         "cleanup": "Nicht verfügbare Entitäten entfernen",
         "repair_entity_ids": "Entitäts-IDs reparieren"
+      }
+    },
+    "availability_mode": {
+      "options": {
+        "strict": "Strikt — unavailable beim ersten Poll-Fehler",
+        "graceful": "Graceful — letzten Zustand bei kurzen Ausfällen behalten (Standard)",
+        "persistent": "Persistent — letzten Zustand bis Auth-Fehler oder VPN fehlt"
       }
     }
   },
