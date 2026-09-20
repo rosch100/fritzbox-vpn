@@ -15,6 +15,13 @@ fi
 python3 - "$EVENT_NAME" "$EVENT_PATH" <<'PY'
 import hashlib, hmac, json, os, pathlib, sys, urllib.error, urllib.request
 
+def is_issue_dev_wake_label(label_name):
+    if not isinstance(label_name, str) or not label_name:
+        return False
+    if label_name in ("kind/error", "kind/feature", "kind/feedback"):
+        return True
+    return label_name.startswith("issue-dev/")
+
 event_name, event_path = sys.argv[1], sys.argv[2]
 payload = pathlib.Path(event_path).read_text(encoding="utf-8")
 secret = os.environ.get("ISSUE_DEV_WEBHOOK_SECRET", "").strip()
@@ -43,8 +50,16 @@ for lab in (issue.get("labels") or pull.get("labels") or []):
     if isinstance(lab, dict) and lab.get("name"):
         labels.append(lab["name"])
 kind = "manual_wake"
+action = data.get("action")
 if event_name == "issues":
-    kind = "issue_opened" if data.get("action") == "opened" else "issue_labeled"
+    if action in ("labeled", "unlabeled"):
+        triggering = (data.get("label") or {}).get("name")
+        if not is_issue_dev_wake_label(triggering):
+            print(json.dumps({"skipped": True, "reason": "unrelated-label"}))
+            sys.exit(0)
+        kind = "issue_labeled"
+    else:
+        kind = "issue_opened"
 elif event_name == "issue_comment":
     kind = "issue_comment"
 elif event_name == "pull_request":
@@ -62,6 +77,10 @@ if not run_id:
 if not attempt:
     print("GITHUB_RUN_ATTEMPT fehlt", file=sys.stderr)
     sys.exit(1)
+pr_number = pull.get("number")
+if pr_number is None and isinstance(issue.get("pull_request"), dict):
+    pr_number = issue.get("number")
+
 delivery_id = f"github/{owner}/{name}/{kind}/{run_id}-{attempt}"
 envelope = {
     "deliveryId": delivery_id,
@@ -70,7 +89,7 @@ envelope = {
     "repo": name,
     "kind": kind,
     "issueNumber": issue.get("number"),
-    "prNumber": pull.get("number"),
+    "prNumber": pr_number,
     "commentBody": comment.get("body"),
     "labels": labels,
     "skillHint": (
