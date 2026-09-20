@@ -1,0 +1,52 @@
+name: Issue-Dev Wake
+
+# Consumer template for GitHub repos in issue-dev/repos.json (githubRepos).
+# Copy to `.github/workflows/issue-dev-wake.yml` in that consumer.
+# Requires Scripts/issue-dev-forward.sh in the consumer repo.
+# The forwarder sends the complete envelope in the webhook body, so the
+# dispatcher does not depend on a runner-local inbox path.
+# Secrets: ISSUE_DEV_WEBHOOK_SECRET (optional), ISSUE_DEV_GROK_WEBHOOK_URL, ISSUE_DEV_GROK_WEBHOOK_KEY.
+
+on:
+  issues:
+    types: [opened, labeled, unlabeled]
+  issue_comment:
+    types: [created]
+  pull_request:
+    types: [opened, synchronize, closed]
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+  repository_dispatch:
+    types: [issue-dev-wake]
+  workflow_dispatch: {}
+
+concurrency:
+  group: issue-dev-wake-${{ github.event.issue.number || github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  issues: read
+  pull-requests: read
+
+jobs:
+  forward:
+    name: Forward to Issue-Dev inbox / Grok
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    if: github.event.repository.fork == false
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Forward wake
+        env:
+          ISSUE_DEV_WEBHOOK_SECRET: ${{ secrets.ISSUE_DEV_WEBHOOK_SECRET }}
+          ISSUE_DEV_GROK_WEBHOOK_URL: ${{ secrets.ISSUE_DEV_GROK_WEBHOOK_URL }}
+          ISSUE_DEV_GROK_WEBHOOK_KEY: ${{ secrets.ISSUE_DEV_GROK_WEBHOOK_KEY }}
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
+          GITHUB_EVENT_PATH: ${{ github.event_path }}
+        run: bash ./Scripts/issue-dev-forward.sh
