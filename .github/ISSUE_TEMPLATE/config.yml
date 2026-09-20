@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Documentation
+    url: https://github.com/rosch100/fritzbox-vpn/blob/main/README.md
+    about: Installation, configuration, troubleshooting

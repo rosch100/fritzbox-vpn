@@ -1,0 +1,61 @@
+name: Feature request
+description: Suggest an enhancement for Fritz!Box VPN
+title: "[Feature]: "
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the idea.
+
+        Do not include logs, credentials, personal example data, or WireGuard key material.
+  - type: checkboxes
+    id: searched-issues
+    attributes:
+      label: Existing issues
+      description: Search https://github.com/rosch100/fritzbox-vpn/issues before filing.
+      options:
+        - label: I have searched existing issues
+          required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem / motivation
+      description: What is missing or painful today.
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed solution
+      description: What you would like the integration to do.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives
+      description: Other approaches you considered.
+    validations:
+      required: false
+  - type: dropdown
+    id: affected-flow
+    attributes:
+      label: Affected flow
+      options:
+        - Setup/SSDP
+        - Switch (VPN on/off)
+        - Status/Connected
+        - Availability/recovery
+        - Options/services
+        - Core/PyPI
+        - Other
+    validations:
+      required: false
+  - type: checkboxes
+    id: confirm-no-secrets
+    attributes:
+      label: No credentials or personal examples
+      options:
+        - label: I am not posting credentials, personal example data, or key material
+          required: true
