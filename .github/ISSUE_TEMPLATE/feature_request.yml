@@ -6,21 +6,13 @@ body:
   - type: markdown
     attributes:
       value: |
-        Thanks for the idea.
+        Search [existing issues](https://github.com/rosch100/fritzbox-vpn/issues) first.
 
-        Do not include logs, credentials, personal example data, or WireGuard key material.
-  - type: checkboxes
-    id: searched-issues
-    attributes:
-      label: Existing issues
-      description: Search https://github.com/rosch100/fritzbox-vpn/issues before filing.
-      options:
-        - label: I have searched existing issues
-          required: true
+        Do not include logs, credentials, or WireGuard key material.
   - type: textarea
     id: problem
     attributes:
-      label: Problem / motivation
+      label: The problem
       description: What is missing or painful today.
     validations:
       required: true
@@ -32,30 +24,7 @@ body:
     validations:
       required: true
   - type: textarea
-    id: alternatives
+    id: additional
     attributes:
-      label: Alternatives
-      description: Other approaches you considered.
-    validations:
-      required: false
-  - type: dropdown
-    id: affected-flow
-    attributes:
-      label: Affected flow
-      options:
-        - Setup/SSDP
-        - Switch (VPN on/off)
-        - Status/Connected
-        - Availability/recovery
-        - Options/services
-        - Core/PyPI
-        - Other
-    validations:
-      required: false
-  - type: checkboxes
-    id: confirm-no-secrets
-    attributes:
-      label: No credentials or personal examples
-      options:
-        - label: I am not posting credentials, personal example data, or key material
-          required: true
+      label: Additional information
+      description: Alternatives you considered, or anything else.
