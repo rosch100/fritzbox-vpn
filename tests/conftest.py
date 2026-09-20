@@ -71,6 +71,8 @@ async def coordinator_with_data(
         mock_config_entry.entry_id,
     )
     coordinator.async_set_updated_data(MOCK_VPN_CONNECTIONS)
-    mock_config_entry.runtime_data = FritzboxVpnRuntimeData(coordinator=coordinator)
+    mock_config_entry.runtime_data = FritzboxVpnRuntimeData(
+        coordinator=coordinator, parent_device_id="parent-device"
+    )
     mock_config_entry.mock_state(hass, ConfigEntryState.LOADED)
     return coordinator

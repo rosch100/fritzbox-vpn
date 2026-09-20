@@ -20,6 +20,7 @@ class FritzboxVpnRuntimeData:
     """Per-config-entry runtime state."""
 
     coordinator: FritzBoxVPNCoordinator
+    parent_device_id: str | None = None
     known_uids_switch: set[str] = field(default_factory=set)
     known_uids_sensor: set[str] = field(default_factory=set)
     known_uids_binary_sensor: set[str] = field(default_factory=set)

@@ -229,7 +229,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: FritzboxVpnConfigEntry) 
             f"Timeout/Error connecting to {NAME_FRITZBOX}: {err}"
         ) from err
 
-    entry.runtime_data = FritzboxVpnRuntimeData(coordinator=coordinator)
+    runtime = FritzboxVpnRuntimeData(coordinator=coordinator)
+    entry.runtime_data = runtime
 
     if coordinator.data:
         try:
@@ -259,6 +260,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: FritzboxVpnConfigEntry) 
         model=MODEL_FRITZBOX,
         configuration_url=f"https://{host}",
     )
+    runtime.parent_device_id = parent_device.id
     _LOGGER.info(
         "Created parent device: %s (ID: %s)", parent_device.name, parent_device.id
     )
