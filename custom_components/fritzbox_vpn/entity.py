@@ -7,6 +7,7 @@ from collections.abc import Callable
 from typing import Any
 
 from fritzboxvpn import API_KEY_ACTIVE, API_KEY_CONNECTED, API_KEY_NAME, API_KEY_UID
+from homeassistant.core import callback
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -78,19 +79,41 @@ def vpn_unique_id(connection_uid: str, suffix: str) -> str:
     return entity_unique_id(connection_uid, suffix)
 
 
+def device_info_supports_via_device_id() -> bool:
+    """True when this Home Assistant build accepts DeviceInfo.via_device_id."""
+    return "via_device_id" in DeviceInfo.__annotations__
+
+
+def parent_device_id_from_entry(entry: FritzboxVpnConfigEntry) -> str | None:
+    """Parent Fritz!Box device id stored at config-entry setup, if any."""
+    runtime = runtime_from_entry(entry)
+    if runtime is None:
+        return None
+    return runtime.parent_device_id
+
+
 def vpn_device_info(
     entry: FritzboxVpnConfigEntry,
     connection_uid: str,
     connection_payload: dict[str, Any],
+    parent_device_id: str | None,
 ) -> DeviceInfo:
     """Device registry entry for one WireGuard VPN connection."""
-    return DeviceInfo(
+    info = DeviceInfo(
         identifiers={(DOMAIN, entry.entry_id, connection_uid)},
         name=connection_payload.get(API_KEY_NAME, DEFAULT_NAME_UNKNOWN),
         manufacturer=MANUFACTURER_AVM,
         model=MODEL_WIREGUARD_VPN,
-        via_device=(DOMAIN, entry.entry_id),
     )
+    if device_info_supports_via_device_id():
+        if not parent_device_id:
+            raise HomeAssistantError(
+                f"Fritz!Box parent device is missing for config entry {entry.entry_id}"
+            )
+        info["via_device_id"] = parent_device_id
+        return info
+    info["via_device"] = (DOMAIN, entry.entry_id)
+    return info
 
 
 def connection_available(
@@ -168,8 +191,12 @@ class FritzBoxVPNEntity(CoordinatorEntity):
         self._connection_data = connection_payload
         self._attr_unique_id = vpn_unique_id(connection_uid, unique_id_suffix)
         self._attr_device_info = vpn_device_info(
-            entry, connection_uid, connection_payload
+            entry,
+            connection_uid,
+            connection_payload,
+            parent_device_id_from_entry(entry),
         )
+        self._attr_available = connection_available(coordinator, connection_uid)
         if translation_key is not None:
             self._attr_translation_key = translation_key
             self._attr_object_id_suffix = (
@@ -182,6 +209,14 @@ class FritzBoxVPNEntity(CoordinatorEntity):
     def available(self) -> bool:
         """True if coordinator has valid data and this connection is present."""
         return connection_available(self.coordinator, self._connection_uid)
+
+    @callback
+    def _handle_coordinator_update(self) -> None:
+        """Keep HA entity availability in sync with trusted coordinator data."""
+        self._attr_available = connection_available(
+            self.coordinator, self._connection_uid
+        )
+        super()._handle_coordinator_update()
 
     def _vpn_connection(self) -> dict[str, Any] | None:
         """Current connection dict from coordinator, if available."""

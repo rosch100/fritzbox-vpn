@@ -7,6 +7,7 @@ from custom_components.fritzbox_vpn.binary_sensor import (
     FritzBoxVPNConnectedBinarySensor,
 )
 from custom_components.fritzbox_vpn.const import STATUS_ENABLED
+from custom_components.fritzbox_vpn.models import FritzboxVpnRuntimeData
 from custom_components.fritzbox_vpn.sensor import (
     FritzBoxVPNStatusSensor,
     FritzBoxVPNUIDSensor,
@@ -20,7 +21,7 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 from tests.fixtures import MOCK_VPN_CONNECTIONS
 
 
-def _mock_coordinator() -> MagicMock:
+def _mock_coordinator(entry: MockConfigEntry) -> MagicMock:
     coordinator = MagicMock()
     coordinator.data = MOCK_VPN_CONNECTIONS
     coordinator.last_update_success = True
@@ -28,6 +29,10 @@ def _mock_coordinator() -> MagicMock:
     coordinator.toggle_vpn = AsyncMock(return_value=True)
     coordinator.async_request_refresh = AsyncMock()
     coordinator.resolve_connection_uid = lambda uid: uid
+    coordinator.entities_trusted = MagicMock(return_value=True)
+    entry.runtime_data = FritzboxVpnRuntimeData(
+        coordinator=coordinator, parent_device_id="parent-device"
+    )
     return coordinator
 
 
@@ -36,7 +41,7 @@ async def test_switch_turn_on(
     hass: HomeAssistant, mock_config_entry: MockConfigEntry
 ) -> None:
     """Switch turn_on calls coordinator toggle."""
-    coordinator = _mock_coordinator()
+    coordinator = _mock_coordinator(mock_config_entry)
     conn = MOCK_VPN_CONNECTIONS["conn-abc"]
     entity = FritzBoxVPNSwitch(coordinator, mock_config_entry, "conn-abc", conn)
     await entity.async_turn_on()
@@ -48,7 +53,7 @@ async def test_switch_turn_on_failure(
     hass: HomeAssistant, mock_config_entry: MockConfigEntry
 ) -> None:
     """Switch turn_on raises HomeAssistantError when toggle fails."""
-    coordinator = _mock_coordinator()
+    coordinator = _mock_coordinator(mock_config_entry)
     coordinator.toggle_vpn = AsyncMock(return_value=False)
     entity = FritzBoxVPNSwitch(
         coordinator, mock_config_entry, "conn-abc", MOCK_VPN_CONNECTIONS["conn-abc"]
@@ -59,7 +64,7 @@ async def test_switch_turn_on_failure(
 
 def test_switch_available_and_state(mock_config_entry: MockConfigEntry) -> None:
     """Switch reflects coordinator VPN active state."""
-    coordinator = _mock_coordinator()
+    coordinator = _mock_coordinator(mock_config_entry)
     entity = FritzBoxVPNSwitch(
         coordinator, mock_config_entry, "conn-abc", MOCK_VPN_CONNECTIONS["conn-abc"]
     )
@@ -71,7 +76,7 @@ def test_switch_available_and_state(mock_config_entry: MockConfigEntry) -> None:
 
 def test_binary_sensor_connected(mock_config_entry: MockConfigEntry) -> None:
     """Binary sensor is off when VPN is not connected."""
-    coordinator = _mock_coordinator()
+    coordinator = _mock_coordinator(mock_config_entry)
     entity = FritzBoxVPNConnectedBinarySensor(
         coordinator, mock_config_entry, "conn-abc", MOCK_VPN_CONNECTIONS["conn-abc"]
     )
@@ -82,7 +87,7 @@ def test_binary_sensor_connected(mock_config_entry: MockConfigEntry) -> None:
 
 def test_status_sensor_enum(mock_config_entry: MockConfigEntry) -> None:
     """Status sensor exposes enum options and value."""
-    coordinator = _mock_coordinator()
+    coordinator = _mock_coordinator(mock_config_entry)
     entity = FritzBoxVPNStatusSensor(
         coordinator, mock_config_entry, "conn-abc", MOCK_VPN_CONNECTIONS["conn-abc"]
     )
@@ -93,7 +98,7 @@ def test_status_sensor_enum(mock_config_entry: MockConfigEntry) -> None:
 
 def test_uid_sensors(mock_config_entry: MockConfigEntry) -> None:
     """UID sensors expose connection identifiers."""
-    coordinator = _mock_coordinator()
+    coordinator = _mock_coordinator(mock_config_entry)
     uid_sensor = FritzBoxVPNUIDSensor(
         coordinator, mock_config_entry, "conn-abc", MOCK_VPN_CONNECTIONS["conn-abc"]
     )

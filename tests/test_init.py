@@ -8,9 +8,11 @@ from custom_components.fritzbox_vpn import (
     async_setup_entry,
     async_unload_entry,
 )
+from custom_components.fritzbox_vpn.const import DOMAIN
 from custom_components.fritzbox_vpn.models import FritzboxVpnRuntimeData
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed
+from homeassistant.helpers import device_registry as dr
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from tests.fixtures import MOCK_VPN_CONNECTIONS
@@ -45,6 +47,12 @@ async def test_setup_entry_success(
 
     assert isinstance(mock_config_entry.runtime_data, FritzboxVpnRuntimeData)
     assert mock_config_entry.runtime_data.coordinator is mock_coordinator
+    parent = dr.async_get(hass).async_get_device_by_identifier(
+        (DOMAIN, mock_config_entry.entry_id),
+        mock_config_entry.entry_id,
+    )
+    assert parent is not None
+    assert mock_config_entry.runtime_data.parent_device_id == parent.id
     forward_mock.assert_awaited_once_with(mock_config_entry, PLATFORMS)
 
 
