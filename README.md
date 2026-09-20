@@ -198,7 +198,7 @@ Replace `<connection_uid>` with the UID shown on the disabled **Connection UID**
 
 ## Diagnostics
 
-Under **Settings → Devices & Services → Fritz!Box VPN → ⋮ → Download diagnostics** you get a redacted JSON report (no passwords): host, update interval, VPN count, and per-connection names/status.
+Under **Settings → Devices & Services → Fritz!Box VPN → ⋮ → Download diagnostics** you get a JSON report without passwords: host, update interval, VPN count, and per-connection names/status. Attach that JSON on a [GitHub bug report](https://github.com/rosch100/fritzbox-vpn/issues/new/choose). Redact VPN names if they should not be public. Do not attach `home-assistant.log`.
 
 ## Troubleshooting
 
@@ -244,19 +244,17 @@ Before configuring the integration, you need to enable the required settings in 
 
 ## Support
 
-For problems or questions:
-- Create an issue on [GitHub](https://github.com/rosch100/fritzbox-vpn/issues)
-- Check the Home Assistant logs
+For problems or ideas, open a [GitHub issue](https://github.com/rosch100/fritzbox-vpn/issues/new/choose) (Bug report or Feature request). Prefer **Download diagnostics** over Home Assistant log files (see below).
 
 ### Debug logging
 
-1. Install the beta version.
-2. Open the integration page: **Settings → Devices & Services → Fritz!Box VPN**.
-3. Open the **options menu (⋮)** (top right) and select **Enable debug logging**.
-4. Click **Reload** (integration reload) so the next update uses the new log level.
-5. Reproduce the issue (or wait for the next update).
-6. Disable debug logging. The log file download should start automatically. Attach the downloaded log file to the GitHub issue.
-7. (Optional) Go to **Settings → System → Logs** and use **Download** to get `home-assistant.log`.
+1. Open the integration page: **Settings → Devices & Services → Fritz!Box VPN**.
+2. Open the **options menu (⋮)** (top right) and select **Enable debug logging**.
+3. Click **Reload** so the next update uses the new log level.
+4. Reproduce the issue (or wait for the next update).
+5. Select **Disable debug logging**. Home Assistant may download a log file — **do not attach that file** to the GitHub issue.
+6. Paste a **redacted excerpt** (relevant lines only) into the bug form. Prefer **Download diagnostics** (JSON) on the same menu.
+7. Do **not** use **Settings → System → Logs → Download** (`home-assistant.log`).
 
 ## Buy me a coffee
 
