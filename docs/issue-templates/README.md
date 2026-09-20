@@ -14,8 +14,8 @@ or secrets:
 1. Comment on the issue in English:
 
    The attachment is too broad or likely contains secrets. Please use
-   **Download diagnostics** (JSON) and/or a redacted debug excerpt as text.
-   Do not attach `home-assistant.log` or `.log` files.
+   **Download diagnostics** (JSON, drag-and-drop) and/or paste a useful
+   log excerpt as text. Do not attach `home-assistant.log` or `.log` files.
 
 2. Ask the reporter to remove the attachment or clean the issue.
 

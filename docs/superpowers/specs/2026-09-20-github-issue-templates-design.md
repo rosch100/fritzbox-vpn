@@ -33,8 +33,8 @@ geregelt:
 | Ablage | `.github/ISSUE_TEMPLATE/` im Repo (SSOT; kein Hub, kein Sync) |
 | Pflege | YAML im Repo; knappe Maintainer-Antwortvorlage unter `docs/issue-templates/` |
 | Sprache | Nur Englisch (Forms, Chooser, Maintainer-Vorlage) |
-| Form | GitHub Issue Forms (YAML), inkl. `upload` für diagnostics JSON |
-| Diagnose | Diagnostics JSON bevorzugt (Upload `.json`); Debug-Ausschnitt als Text; kein `.log`-Upload, kein vollständiges `home-assistant.log` |
+| Form | GitHub Issue Forms (YAML), angelehnt an HA Core (`bug_report.yml`) |
+| Diagnose | Diagnostics JSON bevorzugt (Drag-and-Drop in textarea, wie HA Core); Logs optional als Text; kein `.log`-Datei-Anhang, kein vollständiges `home-assistant.log` |
 
 ## Sprache
 
@@ -45,7 +45,7 @@ Checkbox-Labels oder Contact-Links.
 | Schicht | Sprache |
 | --- | --- |
 | `name`, `description`, `title`-Prefix | Englisch |
-| Feld-`label`, Dropdown-Optionen, Checkbox-`label` | Englisch |
+| Feld-`label`, Dropdown-Optionen | Englisch |
 | Markdown (privacy, diagnostics), Feld-`description` | Englisch |
 | `config.yml` Contact-Links (`name`, `about`) | Englisch |
 | Maintainer-Antwortvorlage | Englisch |
@@ -62,13 +62,13 @@ deutschen Text.
 | --- | --- | --- |
 | Acht Plugin-Repos + Hub-SSOT + Sync-Skript | Ein Repo; YAML liegt direkt unter `.github/ISSUE_TEMPLATE/` | Kein Hub; Sync wäre YAGNI |
 | Hub ohne eigene Issue-Templates | Entfällt | — |
-| MoneyMoney-Protokollfenster; keine Logdateien | HA diagnostics JSON-Upload + redigierter Debug-Text; `.log`-Uploads und vollständiges `home-assistant.log` verboten | HA-Debug-Download ist auswertbar und integrationsbezogen; das App-Log von MoneyMoney war für Maintainer unlesbar |
-| MoneyMoney-/Extension-/macOS-Version, Auth-Weg | HA version, HA installation type, integration version, install source, Fritz!OS/model, setup path, availability mode | Anderer Stack |
+| MoneyMoney-Protokollfenster; keine Logdateien | HA diagnostics JSON (Drag-and-Drop) + optionale Log-Textzeilen; vollständiges `home-assistant.log` verboten | Wie HA Core; Debug-Download ist auswertbar |
+| MoneyMoney-/Extension-/macOS-Version, Auth-Weg | HA Core-Version + Integrations-Version (Pflicht); Rest optional unter Additional information | HA Core fragt Umgebung knapp; extra Dropdowns waren YAGNI |
 | Labels in acht Repos anlegen | Labels `bug` und `enhancement` existieren bereits | Nur prüfen, nicht neu anlegen |
 | README-Link nur in Plugin-READMEs | Bestehende Abschnitte `Support` / `Unterstützung` in `README.md` und `README.de.md` | Nutzer-Doku bleibt zweisprachig; Forms nicht |
 | Forms nur Deutsch | Forms nur Englisch | HA-Community und bestehende Issues sind überwiegend Englisch |
 | Contact-Link zum Hub | Ein Contact-Link auf `README.md` (Englisch) | Kein Hub; Chooser ohne deutschen Text |
-| Diagnose-Hinweis als textarea | Diagnostics JSON als GitHub-`upload` (`accept: ".json"`) | Aktuelle Form-API (Changelog 2026-03-05); kein Textarea-Workaround für Dateien |
+| Diagnose-Hinweis als textarea | Diagnostics JSON per Drag-and-Drop in textarea (wie HA Core) | HA Core nutzt textarea, kein `upload`-Feld |
 
 ## Scope
 
@@ -90,7 +90,8 @@ deutschen Text.
 - Blank Issues für Contributor beibehalten (werden für Read/Triage
   ausgeschaltet; Maintainer sehen GitHub-seitig weiter „Blank issue
   (Maintainers only)“)
-- `.log` im `upload`-`accept` (würde `home-assistant.log` einladen)
+- Pflicht-Dropdowns für Install source, Setup, Availability, HA-Installationsart
+- Drei Bestätigungs-Checkboxen und ein `upload`-Feld (HA Core nutzt textarea)
 - Contact-Link auf `README.de.md` im Issue-Chooser
 
 ## Dateistruktur
@@ -112,12 +113,11 @@ Link aus der Nutzer-README.
 
 - Jedes Body-Element außer `markdown` hat eine eindeutige `id`
   (nur `A–Z`/`a–z`/`0–9`/`-`/`_`).
-- Pflicht-Checkboxen über `options[].required: true` (nicht nur
-  `validations.required` am Block).
 - YAML UTF-8 ohne BOM.
-- `upload` nur für diagnostics JSON: `validations.accept: ".json"`, nicht required.
+- Diagnostics wie HA Core: textarea mit Drag-and-Drop, kein `upload`-Feld.
 - Kein deutscher Text in `name`, `description`, `label`, `options`,
   Markdown oder Contact-Links.
+- Nur wirklich nötige Pflichtfelder (Vorbild HA Core `bug_report.yml`).
 
 ### Kein Sync
 
@@ -134,7 +134,7 @@ jeweils in der Sprache der Datei:
   `https://github.com/rosch100/fritzbox-vpn/issues/new/choose`.
 - Debug-Logging-Absätze an die Diagnose-Regeln dieses Specs anpassen:
 
-  1. Diagnostics JSON herunterladen und im Bug-Form-Upload anhängen
+  1. Diagnostics JSON herunterladen und per Drag-and-Drop ins Bug-Formular
      (bevorzugt; VPN-Namen bei Bedarf schwärzen).
   2. Optional Integrations-Debug-Log über ⋮ → Enable debug logging,
      reproduzieren, Debug-Logging wieder aus. Nur einen **redigierten
@@ -144,7 +144,7 @@ jeweils in der Sprache der Datei:
      englischen Bug-Template).
 
 Der Abschnitt `## Diagnostics` / `## Diagnose` in beiden READMEs bleibt;
-er beschreibt denselben JSON-Download und darf den Issue-Form-Upload
+er beschreibt denselben JSON-Download und darf den Issue-Form-Drop
 kurz erwähnen, ohne die Regeln zu widersprechen.
 
 ## Datenschutz & Logs (Best Practice)
@@ -177,25 +177,18 @@ mit Passwörtern, keine HAR-/LocalStorage-Dumps.
 
 ### Regeln für Melder (im Bug-Template sichtbar, nur Englisch)
 
-1. Do not attach a full `home-assistant.log`.
-2. Do not upload `.log` files (including the integration debug download).
-3. Do not attach Fritz!Box backups, WireGuard `.conf`, or
-   `.storage`/HAR/LocalStorage dumps.
-4. Instead: HA diagnostics JSON (upload field; redact VPN names if needed)
-   and/or a redacted debug excerpt as text.
-5. Never post: Fritz!Box passwords, HA secrets, session cookies,
-   WireGuard private keys, PSKs, public or private keys, OTP, unnecessary
-   login names.
-6. Allowed after redaction: integration errors, HTTP status without query
-   secrets, HA version, integration version, Fritz!OS, reproduction steps,
-   diagnostics JSON, redacted debug excerpt as text.
+Kurz im Markdown, ohne Pflicht-Checkboxen (wie HA Core):
+
+- Do not attach `home-assistant.log`, backups, passwords, or WireGuard keys.
+- Prefer Download diagnostics; drag the JSON into the diagnostics field.
+- Redact VPN names if they should not be public.
+- Logs: paste useful error text only, do not attach `.log` files.
 
 ### Feature-Template
 
-Short English markdown: no logs, no credentials, no personal example
-data, no key material.
-Required checkbox (English label): no credentials, no personal examples,
-no keys.
+Short English markdown: search existing issues; no logs, credentials, or
+key material. Keine Pflicht-Checkbox. Felder: problem, solution,
+additional (optional).
 
 ### Maintainer-Antwortvorlage (Pflichtinhalt der `docs/issue-templates/README.md`)
 
@@ -217,27 +210,21 @@ Form-Metadaten (GitHub-Pflicht): `name`, `description`, `title` (Prefix
 
 | Element | Typ | Pflicht |
 | --- | --- | --- |
-| Privacy / log notice | markdown | — |
-| Searched existing issues | checkboxes | ja |
-| Short summary | input | ja |
-| Expected behavior | textarea | ja |
-| Actual behavior | textarea | ja |
-| Steps to reproduce | textarea | ja |
-| Home Assistant version | input | ja |
-| HA installation type | dropdown: Home Assistant OS, Container, Core, Supervised, unclear | ja |
-| Integration version | input | ja |
-| Install source | dropdown: HACS, manual, Beta/pre-release, unclear | ja |
-| Fritz!Box model and Fritz!OS | input | ja |
-| Setup | dropdown: SSDP/discovery, credentials from Fritz!Box Tools, manual, unclear | ja |
-| Availability mode | dropdown: Graceful, Strict, Persistent, unclear | nein |
-| Diagnostics JSON | upload, `accept: ".json"` | nein |
-| Redacted debug log excerpt | textarea, `render: shell` | nein |
-| Confirmation: no secrets / no key material | checkboxes | ja |
-| Confirmation: no `.log` file and no full `home-assistant.log` | checkboxes | ja |
-| Confirmation: content redacted (including VPN names if needed) | checkboxes | ja |
+| Privacy / search notice | markdown | — |
+| The problem | textarea | ja |
+| Reproduction steps | textarea | ja |
+| Environment (heading) | markdown | — |
+| Home Assistant Core version | input | ja |
+| Fritz!Box VPN version | input | ja |
+| Details (heading) | markdown | — |
+| Diagnostics information | textarea (drag-and-drop JSON) | nein |
+| Logs | textarea, `render: txt` | nein |
+| Additional information | textarea | nein |
 
-`Integration version` is the version string only (e.g. `1.2.7`).
-Origin is exclusively the `Install source` dropdown.
+Keine Pflicht-Checkboxen, keine Dropdowns, kein `upload`. Fritz!Box-Modell,
+Installationsart, Setup und Availability nur in Additional information,
+wenn relevant. Vorbild: HA Core `bug_report.yml` (ein Problem-Feld,
+knappe Umgebung, Diagnose per Drag-and-Drop).
 
 ### Labels
 
@@ -254,13 +241,10 @@ Form-Metadaten: `name`, `description`, `title` (Prefix `"[Feature]: "`),
 
 | Element | Typ | Pflicht |
 | --- | --- | --- |
-| Privacy short notice | markdown | — |
-| Searched existing issues | checkboxes | ja |
-| Problem / motivation | textarea | ja |
+| Search / privacy notice | markdown | — |
+| The problem | textarea | ja |
 | Proposed solution | textarea | ja |
-| Alternatives | textarea | nein |
-| Affected flow | dropdown: Setup/SSDP, Switch (VPN on/off), Status/Connected, Availability/recovery, Options/services, Core/PyPI, Other | nein |
-| No credentials / no personal examples / no keys | checkboxes | ja |
+| Additional information | textarea | nein |
 
 ## `config.yml`
 
@@ -284,9 +268,8 @@ Akzeptanzkriterium „Blank Issues aus“ meint die Contributor-Ansicht.
 2. „New issue“ zeigt Bug- und Feature-Form auf Englisch; Blank Issues
    sind in der Contributor-Ansicht aus; ein Contact-Link auf README.md.
 3. Bug-Form nennt explizit auf Englisch: diagnostics JSON bevorzugt
-   (`upload` `.json`); debug only as redacted text; no `.log` uploads;
-   full `home-assistant.log` forbidden; no secrets, backups, or key
-   material.
+   (Drag-and-Drop); logs only as pasted text; no `.log` files; no
+   `home-assistant.log`; no secrets, backups, or key material.
 4. Alle sichtbaren Form-/Chooser-Strings sind Englisch. Kein deutscher
    Text in YAML/Markdown/`description`. Kein zweites YAML-Set.
 5. `README.md` (`## Support`) und `README.de.md` (`## Unterstützung`)
@@ -297,20 +280,20 @@ Akzeptanzkriterium „Blank Issues aus“ meint die Contributor-Ansicht.
    verifizieren).
 7. Keine Secrets oder Klartext-Beispiele mit echten Credentials in den
    Templates.
-8. Bug-Form trennt Integration version (input) und Install source
-   (dropdown); enthält HA installation type; diagnostics JSON is
-   `upload`, not textarea.
+8. Bug-Form folgt HA Core: problem + reproduction + HA version +
+   integration version Pflicht; diagnostics/logs/additional optional.
+   Keine extra Dropdowns, keine Bestätigungs-Checkboxen, kein `upload`.
 
 ## Risiken
 
 | Risiko | Mitigation |
 | --- | --- |
-| Melder hängen trotzdem `home-assistant.log` oder `.log` an | English template text, kein `.log` in `accept`; Maintainer-Antwortvorlage; README-Debug-Abschnitt anpassen |
-| VPN-Namen in der Diagnose-JSON sind personenbezogen | Template + Upload-Beschreibung: redact names if they should not be public |
+| Melder hängen trotzdem `home-assistant.log` oder `.log` an | Kurzer Markdown-Hinweis + Maintainer-Antwortvorlage; README-Debug-Abschnitt |
+| VPN-Namen in der Diagnose-JSON sind personenbezogen | Markdown + Diagnostics-Beschreibung: Namen redigieren, wenn sie nicht öffentlich sein sollen |
 | README (EN/DE) driftet von den Forms | Beide READMEs im selben PR wie die YAML ändern; bestehende Support-Abschnitte, keine parallele Überschrift |
 | Deutschsprachige Melder ohne DE-Forms | Bewusste Wahl; `README.de.md` erklärt den Chooser auf Deutsch, Forms bleiben Englisch |
 | Blank Issues bleiben für Maintainer sichtbar | Dokumentiertes GitHub-Verhalten; Contributor sehen nur die Forms |
-| Textarea erlaubt trotzdem Drag-and-Drop von Dateien | Markdown-Verbot + Pflicht-Checkbox „no `.log` file“ |
+| Textarea erlaubt Drag-and-Drop von `.log` | Markdown-Verbot; HA Core macht dasselbe bei Diagnostics |
 
 ## Umsetzungsreihenfolge (für Plan)
 
