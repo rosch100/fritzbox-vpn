@@ -198,7 +198,7 @@ actions:
 
 ## Diagnose
 
-Unter **Einstellungen → Geräte & Dienste → Fritz!Box VPN → ⋮ → Diagnose herunterladen** erhältst du eine JSON-Datei ohne Passwörter: Host, Intervall, Anzahl VPNs, Namen/Status je Verbindung.
+Unter **Einstellungen → Geräte & Dienste → Fritz!Box VPN → ⋮ → Diagnose herunterladen** erhältst du eine JSON-Datei ohne Passwörter: Host, Intervall, Anzahl VPNs, Namen/Status je Verbindung. Diese JSON kannst du einem [GitHub-Bug-Report](https://github.com/rosch100/fritzbox-vpn/issues/new/choose) anhängen (Formulare sind auf Englisch). VPN-Namen bei Bedarf schwärzen. Nicht `home-assistant.log` anhängen.
 
 ## Fehlerbehebung
 
@@ -240,19 +240,17 @@ Vor der Konfiguration der Integration musst du die erforderlichen Einstellungen 
 
 ## Unterstützung
 
-Bei Problemen oder Fragen:
-- Erstelle ein [Issue auf GitHub](https://github.com/rosch100/fritzbox-vpn/issues)
-- Überprüfe die Home Assistant Logs
+Bei Problemen oder Ideen öffne ein [GitHub-Issue](https://github.com/rosch100/fritzbox-vpn/issues/new/choose) (Bug report oder Feature request; Formulare auf Englisch). Bevorzuge **Diagnose herunterladen** gegenüber Home-Assistant-Logdateien (siehe unten).
 
 ### Debug-Logging
 
-1. Installiere die Beta-Version.
-2. Öffne die Integrationsseite: **Einstellungen → Geräte & Dienste → Fritz!Box VPN**.
-3. Öffne das **Optionsmenü (⋮)** (oben rechts) und wähle **Enable debug logging**.
-4. Klicke **Neu laden** (Integration reload), damit das nächste Update den neuen Log-Level nutzt.
-5. Reproduziere das Problem (oder warte auf das nächste Update).
-6. Deaktiviere Debug-Logging wieder. Das Logfile wird automatisch heruntergeladen. Hänge das Log dem GitHub-Issue an.
-7. (Optional) Öffne **Einstellungen → System → Logs** und verwende **Download**, um `home-assistant.log` zu erhalten.
+1. Öffne die Integrationsseite: **Einstellungen → Geräte & Dienste → Fritz!Box VPN**.
+2. Öffne das **Optionsmenü (⋮)** (oben rechts) und wähle **Enable debug logging**.
+3. Klicke **Neu laden**, damit das nächste Update den neuen Log-Level nutzt.
+4. Reproduziere das Problem (oder warte auf das nächste Update).
+5. Wähle **Disable debug logging**. Home Assistant bietet ggf. einen Log-Download an — **diese Datei nicht** an das GitHub-Issue anhängen.
+6. Füge einen **redigierten Ausschnitt** (nur relevante Zeilen) als Text in das Bug-Formular ein. Bevorzuge **Diagnose herunterladen** (JSON) im selben Menü.
+7. **Nicht** unter **Einstellungen → System → Logs → Download** die `home-assistant.log` verwenden.
 
 ## Buy me a coffee
 
