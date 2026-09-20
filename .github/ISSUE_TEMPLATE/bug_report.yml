@@ -6,165 +6,69 @@ body:
   - type: markdown
     attributes:
       value: |
-        Thanks for reporting a bug.
+        This form is for bugs only. For ideas, open a feature request.
 
-        **Do not attach secrets or log files.**
+        Search [existing issues](https://github.com/rosch100/fritzbox-vpn/issues) first.
 
-        1. Do not attach a full `home-assistant.log`.
-        2. Do not upload `.log` files (including the integration debug download as a file).
-        3. Do not attach Fritz!Box backups, WireGuard `.conf`, or `.storage` / HAR / LocalStorage dumps.
-        4. Prefer **Download diagnostics** (JSON) from Settings → Devices & Services → Fritz!Box VPN → ⋮. Passwords are redacted; host and VPN names are not. Redact VPN names if they should not be public.
-        5. You may paste a **redacted debug excerpt as text** (Enable debug logging → reproduce → Disable debug logging → copy relevant lines only). Do not attach that download as a `.log` file.
-        6. Never post Fritz!Box passwords, Home Assistant secrets, session cookies, WireGuard private keys, PSKs, public or private keys, OTP, or unnecessary login names.
-
-        Allowed after redaction: integration error messages, HTTP status without query secrets, Home Assistant version, integration version, Fritz!OS, reproduction steps, diagnostics JSON, and a redacted debug excerpt as text.
-
-        You can still drag files onto textareas. Do not attach `.log` files there either.
-  - type: checkboxes
-    id: searched-issues
-    attributes:
-      label: Existing issues
-      description: Search https://github.com/rosch100/fritzbox-vpn/issues before filing.
-      options:
-        - label: I have searched existing issues
-          required: true
-  - type: input
-    id: summary
-    attributes:
-      label: Short summary
-      description: One line describing the failure.
-      placeholder: VPN switch stays unavailable after Fritz!Box reboot
-    validations:
-      required: true
+        Do not attach `home-assistant.log`, backups, passwords, or WireGuard keys.
+        Prefer **Download diagnostics** (Settings → Devices & Services → Fritz!Box VPN → ⋮).
+        Drag the JSON into the diagnostics field below. Redact VPN names if they should not be public.
   - type: textarea
-    id: expected
+    id: problem
     attributes:
-      label: Expected behavior
-      description: What should have happened.
-    validations:
-      required: true
-  - type: textarea
-    id: actual
-    attributes:
-      label: Actual behavior
-      description: What happened instead.
+      label: The problem
+      description: What you were trying to do and what happened.
     validations:
       required: true
   - type: textarea
     id: reproduce
     attributes:
-      label: Steps to reproduce
-      description: Numbered steps another person can follow.
+      label: Reproduction steps
+      description: Without steps to reproduce, the issue is hard to fix.
       value: |
         1.
         2.
         3.
     validations:
       required: true
+  - type: markdown
+    attributes:
+      value: |
+        ## Environment
   - type: input
     id: ha-version
     attributes:
-      label: Home Assistant version
-      description: Core version from Settings → About (for example 2026.9.0).
+      label: What version of Home Assistant Core has the issue?
+      description: Settings → System → Repairs → ⋮ → System information.
       placeholder: "2026.9.0"
-    validations:
-      required: true
-  - type: dropdown
-    id: ha-install-type
-    attributes:
-      label: HA installation type
-      options:
-        - Home Assistant OS
-        - Container
-        - Core
-        - Supervised
-        - unclear
     validations:
       required: true
   - type: input
     id: integration-version
     attributes:
-      label: Integration version
-      description: Version string only (for example 1.2.7). Source is the Install source field.
+      label: What version of Fritz!Box VPN has the issue?
+      description: Settings → Devices & Services → Fritz!Box VPN.
       placeholder: "1.2.7"
     validations:
       required: true
-  - type: dropdown
-    id: install-source
+  - type: markdown
     attributes:
-      label: Install source
-      options:
-        - HACS
-        - manual
-        - Beta/pre-release
-        - unclear
-    validations:
-      required: true
-  - type: input
-    id: fritzbox
-    attributes:
-      label: Fritz!Box model and Fritz!OS
-      description: For example 7590 AX, Fritz!OS 8.20.
-      placeholder: 7590 AX, Fritz!OS 8.20
-    validations:
-      required: true
-  - type: dropdown
-    id: setup
-    attributes:
-      label: Setup
-      options:
-        - SSDP/discovery
-        - credentials from Fritz!Box Tools
-        - manual
-        - unclear
-    validations:
-      required: true
-  - type: dropdown
-    id: availability-mode
-    attributes:
-      label: Availability mode
-      description: Integration option. Use unclear if you did not change it.
-      options:
-        - Graceful
-        - Strict
-        - Persistent
-        - unclear
-    validations:
-      required: false
-  - type: upload
-    id: diagnostics-json
-    attributes:
-      label: Diagnostics JSON
-      description: Settings → Devices & Services → Fritz!Box VPN → ⋮ → Download diagnostics. Redact VPN names if they should not be public. JSON only.
-    validations:
-      required: false
-      accept: ".json"
+      value: |
+        ## Details
   - type: textarea
-    id: debug-excerpt
+    id: diagnostics
     attributes:
-      label: Redacted debug log excerpt
-      description: Paste relevant lines only. Do not upload a `.log` file.
-      render: shell
-    validations:
-      required: false
-  - type: checkboxes
-    id: confirm-no-secrets
+      label: Diagnostics information
+      description: Download diagnostics from the integration card, then drag-and-drop the JSON file here (do not copy-and-paste the content).
+      placeholder: drag-and-drop the diagnostics data file here
+  - type: textarea
+    id: logs
     attributes:
-      label: No secrets
-      options:
-        - label: I am not posting passwords, cookies, OTP, WireGuard keys, PSKs, or other secrets
-          required: true
-  - type: checkboxes
-    id: confirm-no-log
+      label: Anything in the logs that might be useful for us?
+      description: Error messages or stack traces. Paste text only. Do not attach `.log` files.
+      render: txt
+  - type: textarea
+    id: additional
     attributes:
-      label: No log files
-      options:
-        - label: I am not attaching a `.log` file or a full home-assistant.log
-          required: true
-  - type: checkboxes
-    id: confirm-redacted
-    attributes:
-      label: Redaction
-      options:
-        - label: I have redacted VPN names and other personal data where needed
-          required: true
+      label: Additional information
+      description: Fritz!Box model and Fritz!OS if relevant, last working version, or anything else.
