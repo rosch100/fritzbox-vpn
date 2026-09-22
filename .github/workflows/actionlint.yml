@@ -23,7 +23,7 @@ permissions: {}
 jobs:
   actionlint:
     name: Lint workflows
-    runs-on: [self-hosted, linux]
+    runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && fromJSON('["self-hosted", "linux"]') || 'ubuntu-latest' }}
     timeout-minutes: 5
     permissions:
       contents: read

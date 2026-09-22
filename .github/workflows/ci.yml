@@ -46,7 +46,7 @@ jobs:
   ruff:
     name: Ruff
     if: github.event_name != 'schedule'
-    runs-on: [self-hosted, linux]
+    runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && fromJSON('["self-hosted", "linux"]') || 'ubuntu-latest' }}
     timeout-minutes: 10
     permissions:
       contents: read
@@ -73,7 +73,7 @@ jobs:
     if: |
       github.event_name != 'schedule'
       && github.event.inputs.lint-only != 'true'
-    runs-on: [self-hosted, linux]
+    runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && fromJSON('["self-hosted", "linux"]') || 'ubuntu-latest' }}
     timeout-minutes: 20
     permissions:
       contents: read
@@ -105,7 +105,7 @@ jobs:
 
   hacs:
     name: HACS validate
-    runs-on: [self-hosted, linux]
+    runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && fromJSON('["self-hosted", "linux"]') || 'ubuntu-latest' }}
     timeout-minutes: 10
     permissions:
       contents: read
@@ -137,7 +137,7 @@ jobs:
 
   hassfest:
     name: hassfest
-    runs-on: [self-hosted, linux]
+    runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && fromJSON('["self-hosted", "linux"]') || 'ubuntu-latest' }}
     timeout-minutes: 10
     permissions:
       contents: read
@@ -159,7 +159,7 @@ jobs:
       - pytest
       - hacs
       - hassfest
-    runs-on: [self-hosted, linux]
+    runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && fromJSON('["self-hosted", "linux"]') || 'ubuntu-latest' }}
     timeout-minutes: 5
     permissions: {}
     steps:
