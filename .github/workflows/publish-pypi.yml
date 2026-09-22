@@ -27,7 +27,7 @@ jobs:
     # Publish when the library version in pyproject.toml changed (including beta
     # tags). Skip when unchanged so re-tags do not hit "File already exists".
     if: github.event_name != 'workflow_dispatch' || github.event.inputs.confirm == 'publish'
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux]
     timeout-minutes: 15
     environment: pypi
     permissions:

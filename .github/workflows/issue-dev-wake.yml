@@ -33,7 +33,7 @@ permissions:
 jobs:
   forward:
     name: Forward to Issue-Dev inbox / Grok
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux]
     timeout-minutes: 5
     if: github.event.repository.fork == false
     steps:
