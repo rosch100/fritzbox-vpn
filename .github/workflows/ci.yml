@@ -46,7 +46,7 @@ jobs:
   ruff:
     name: Ruff
     if: github.event_name != 'schedule'
-    runs-on: ubuntu-24.04
+    runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '["ubuntu-24.04"]') }}
     timeout-minutes: 10
     permissions:
       contents: read
@@ -73,7 +73,7 @@ jobs:
     if: |
       github.event_name != 'schedule'
       && github.event.inputs.lint-only != 'true'
-    runs-on: ubuntu-24.04
+    runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '["ubuntu-24.04"]') }}
     timeout-minutes: 20
     permissions:
       contents: read
@@ -105,7 +105,7 @@ jobs:
 
   hacs:
     name: HACS validate
-    runs-on: ubuntu-24.04
+    runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '["ubuntu-24.04"]') }}
     timeout-minutes: 10
     permissions:
       contents: read
@@ -137,7 +137,7 @@ jobs:
 
   hassfest:
     name: hassfest
-    runs-on: ubuntu-24.04
+    runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '["ubuntu-24.04"]') }}
     timeout-minutes: 10
     permissions:
       contents: read
@@ -159,7 +159,7 @@ jobs:
       - pytest
       - hacs
       - hassfest
-    runs-on: ubuntu-24.04
+    runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '["ubuntu-24.04"]') }}
     timeout-minutes: 5
     permissions: {}
     steps:
