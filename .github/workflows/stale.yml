@@ -16,7 +16,7 @@ permissions:
 jobs:
   stale:
     name: Mark stale issues and PRs
-    runs-on: [self-hosted, linux]
+    runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '["ubuntu-latest"]') }}
     timeout-minutes: 5
     steps:
       - uses: actions/stale@v10

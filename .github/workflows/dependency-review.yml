@@ -13,7 +13,7 @@ permissions: {}
 jobs:
   dependency-review:
     name: Review dependencies
-    runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && fromJSON('["self-hosted", "linux"]') || 'ubuntu-latest' }}
+    runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '["ubuntu-24.04"]') }}
     timeout-minutes: 5
     permissions:
       contents: read
