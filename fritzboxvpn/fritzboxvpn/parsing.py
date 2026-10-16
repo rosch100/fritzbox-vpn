@@ -25,10 +25,15 @@ from .const import (
     LOGIN_TAG_BLOCKTIME,
     LOGIN_TAG_CHALLENGE,
     LOGIN_TAG_SID,
+    WIREGUARD_STATE_NOT_ACTIVE,
     WIREGUARD_STATE_READY,
 )
 
 _LOGGER = logging.getLogger(__name__)
+_REST_CONNECTED_BY_STATE = {
+    WIREGUARD_STATE_READY: True,
+    WIREGUARD_STATE_NOT_ACTIVE: False,
+}
 
 
 def connection_active_from_api(conn: dict[str, Any]) -> bool:
@@ -200,10 +205,12 @@ def extract_box_connections_from_data(data: dict[str, Any], page: str) -> Any:
 
 
 def _connection_connected_from_rest(conn: dict[str, Any]) -> bool:
-    """Connected flag from FRITZ!OS 8.40 REST connection fields."""
+    """Connected flag from FRITZ!OS 8.40 REST fields; known state beats connected_since."""
     state = conn.get(API_KEY_STATE)
-    if isinstance(state, str) and state.strip() == WIREGUARD_STATE_READY:
-        return True
+    if isinstance(state, str):
+        known = _REST_CONNECTED_BY_STATE.get(state.strip())
+        if known is not None:
+            return known
     raw_since = conn.get(API_KEY_CONNECTED_SINCE)
     if raw_since is None:
         return False

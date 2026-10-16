@@ -53,6 +53,49 @@ def test_extract_wireguard_connections_from_rest_fritzos_840() -> None:
     assert "ipsec-1" not in connections
 
 
+def test_rest_not_active_overrides_stale_connected_since() -> None:
+    """Explicit REST state 'not active' is disconnected despite a leftover timestamp."""
+    payload = {
+        "connection": [
+            {
+                "UID": "peer-down",
+                "name": "Phone",
+                "activated": "1",
+                "access_type": "4",
+                "state": "not active",
+                "connected_since": "1710000000",
+            }
+        ]
+    }
+    box = extract_wireguard_connections_from_rest(payload)
+    assert box is not None
+    connections = normalize_box_connections(box)
+    assert connections["peer-down"][API_KEY_ACTIVE] is True
+    assert connections["peer-down"][API_KEY_CONNECTED] is False
+
+
+def test_rest_connected_since_fallback_without_state() -> None:
+    """Without a known REST state, connected follows connected_since."""
+
+    def connected(since: str | None) -> bool:
+        conn = {
+            "UID": "peer",
+            "name": "Phone",
+            "activated": "1",
+            "access_type": "4",
+        }
+        if since is not None:
+            conn["connected_since"] = since
+        box = extract_wireguard_connections_from_rest({"connection": [conn]})
+        assert box is not None
+        return bool(normalize_box_connections(box)["peer"][API_KEY_CONNECTED])
+
+    assert connected(None) is False
+    assert connected("not-a-timestamp") is False
+    assert connected("0") is False
+    assert connected("1710000000") is True
+
+
 def test_extract_wireguard_connections_from_rest_missing_payload() -> None:
     """Missing connection list is an explicit miss, not an empty success."""
     assert extract_wireguard_connections_from_rest({"other": []}) is None
