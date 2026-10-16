@@ -112,6 +112,69 @@ async def test_partial_during_recovery_does_not_confirm_orphan(
     callback.assert_not_called()
 
 
+@pytest.mark.asyncio
+async def test_partial_during_recovery_keeps_same_name_generation(
+    hass: HomeAssistant,
+) -> None:
+    """A short list during recovery must not delete the other same-named device."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={"host": MOCK_HOST, "username": "u", "password": "p"},
+    )
+    entry.add_to_hass(hass)
+    entry.mock_state(hass, ConfigEntryState.LOADED)
+    coordinator = FritzBoxVPNCoordinator(hass, entry.data, None, entry.entry_id)
+    entry.runtime_data = FritzboxVpnRuntimeData(coordinator=coordinator)
+    old = {
+        "vpn-a": {
+            "uid": "vpn-a",
+            "name": "Galaxy",
+            "active": True,
+            "connected": False,
+        },
+        "vpn-b": {
+            "uid": "vpn-b",
+            "name": "Galaxy",
+            "active": True,
+            "connected": False,
+        },
+    }
+    coordinator.async_set_updated_data(old)
+    coordinator._seen_uids = set(old)
+    coordinator._remember_connection_names(old)
+    registry = er.async_get(hass)
+    device_registry = dr.async_get(hass)
+    for uid in old:
+        registry.async_get_or_create(
+            "switch",
+            DOMAIN,
+            vpn_unique_id(uid, UNIQUE_ID_SUFFIX_SWITCH),
+            config_entry=entry,
+        )
+        device_registry.async_get_or_create(
+            config_entry_id=entry.entry_id,
+            identifiers={(DOMAIN, entry.entry_id, uid)},
+            name="Galaxy",
+        )
+
+    coordinator.fritz_session.async_get_vpn_connections = AsyncMock(
+        side_effect=ConnectionError("refused")
+    )
+    with pytest.raises(UpdateFailed):
+        await coordinator._async_update_data()
+    assert coordinator._in_recovery()
+
+    coordinator.fritz_session.async_get_vpn_connections = AsyncMock(
+        return_value={"vpn-a": old["vpn-a"]}
+    )
+    await coordinator._async_update_data()
+
+    assert coordinator._in_recovery()
+    assert registry.async_get_entity_id(
+        "switch", DOMAIN, vpn_unique_id("vpn-b", UNIQUE_ID_SUFFIX_SWITCH)
+    )
+
+
 def test_name_bijection_uid_remap_success_and_refuse() -> None:
     """Bijection requires unique matching names; duplicates refuse remap."""
     mapping, reason = name_bijection_uid_remap(

@@ -516,7 +516,8 @@ class FritzBoxVPNCoordinator(DataUpdateCoordinator):
             self._remember_connection_names(connections)
             self._log_uid_delta(current_uids)
             self._apply_uid_remap_if_needed(connections)
-            self._drop_superseded_generations(connections)
+            if not self._in_recovery():
+                self._drop_superseded_generations(connections)
 
             if self._in_recovery():
                 self._reset_orphan_miss_streaks()
