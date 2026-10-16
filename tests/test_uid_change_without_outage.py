@@ -169,7 +169,9 @@ async def test_first_poll_remaps_one_uid_when_another_connection_stays(
         vpn_unique_id("vpnconnection7200", UNIQUE_ID_SUFFIX_SWITCH),
         vpn_unique_id("vpnconnection7118", UNIQUE_ID_SUFFIX_SWITCH),
     }
-    assert coordinator.resolve_connection_uid("vpnconnection7117") == "vpnconnection7200"
+    assert (
+        coordinator.resolve_connection_uid("vpnconnection7117") == "vpnconnection7200"
+    )
 
 
 @pytest.mark.asyncio
@@ -203,7 +205,9 @@ async def test_second_uid_change_still_keeps_one_entity(
         for item in er.async_entries_for_config_entry(registry, entry.entry_id)
     }
     assert unique_ids == {vpn_unique_id("vpnconnection7300", UNIQUE_ID_SUFFIX_SWITCH)}
-    assert coordinator.resolve_connection_uid("vpnconnection7117") == "vpnconnection7300"
+    assert (
+        coordinator.resolve_connection_uid("vpnconnection7117") == "vpnconnection7300"
+    )
 
 
 @pytest.mark.asyncio
