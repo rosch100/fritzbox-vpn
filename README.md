@@ -86,7 +86,7 @@ After a router reboot or longer power-off, you should **not** need to reload the
 4. Only after the minimum window has elapsed **and** a few stable non-empty polls succeed does orphan cleanup resume. A VPN that was really removed on the box is confirmed only after several consecutive misses.
 5. If the VPN list stays empty for a long time after the box answers again (hard cap: about **twice** the minimum recovery window), recovery ends so cleanup cannot hang forever. A multi-hour power-off is fine: recovery stays active for the outage; remapping runs when the box returns.
 
-You may see log lines such as “recovery window armed” or “UID remapped after outage recovery”. That is expected. A later “no longer available” line for **old** UIDs after a remap refers to the replaced IDs, not new duplicates.
+You may see log lines such as “recovery window armed” or “VPN connection UID remapped”. That is expected. A later “no longer available” line for **old** UIDs after a remap refers to the replaced IDs, not new duplicates.
 
 ### Options and services
 

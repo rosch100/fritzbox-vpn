@@ -93,11 +93,9 @@ LOG_MSG_RECOVERY_EMPTY_ACCEPTED = (
     "accepting empty result and clearing recovery (seen_uids=%d)."
 )
 LOG_MSG_UID_DELTA = "VPN UID delta on %s: added=%s removed=%s"
-LOG_MSG_UID_REMAP = (
-    "VPN connection UID remapped after outage recovery on %s: %s → %s (name=%r)"
-)
+LOG_MSG_UID_REMAP = "VPN connection UID remapped on %s: %s → %s (name=%r)"
 LOG_MSG_UID_REMAP_REFUSED = (
-    "VPN UID set changed after outage on %s but name bijection remap was refused "
+    "VPN UID set changed on %s but name bijection remap was refused "
     "(%s). added=%s removed=%s"
 )
 LOG_MSG_AVAILABILITY_STALE = (

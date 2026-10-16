@@ -86,7 +86,7 @@ Nach einem Router-Reboot oder längerem Ausschalten solltest du die Integration 
 4. Erst wenn das Mindestfenster vorbei ist **und** einige stabile, nicht-leere Abfragen gelungen sind, läuft die Orphan-Bereinigung wieder. Eine wirklich auf der Box gelöschte VPN wird erst nach mehreren fehlenden Polls bestätigt.
 5. Bleibt die VPN-Liste lange leer, obwohl die Box wieder antwortet (Harte Obergrenze: etwa **das Doppelte** des Mindest-Recovery-Fensters), endet die Recovery, damit nichts ewig hängen bleibt. Mehrstündiger Stromausfall ist unproblematisch: Recovery bleibt während des Ausfalls aktiv; Remapping läuft, wenn die Box zurück ist.
 
-Logzeilen wie „recovery window armed“ oder „UID remapped after outage recovery“ sind erwartet. Eine spätere Meldung „no longer available“ zu **alten** UIDs nach einem Remap betrifft die ersetzten IDs, keine neuen Duplikate.
+Logzeilen wie „recovery window armed“ oder „VPN connection UID remapped“ sind erwartet. Eine spätere Meldung „no longer available“ zu **alten** UIDs nach einem Remap betrifft die ersetzten IDs, keine neuen Duplikate.
 
 ### Optionen und Dienste
 

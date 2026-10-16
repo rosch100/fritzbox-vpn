@@ -51,7 +51,11 @@ from .const import (
     UPDATE_INTERVAL_MIN,
     host_from_config,
 )
-from .entity_registry import remap_connection_uids
+from .entity_registry import (
+    connection_names_from_devices,
+    remap_connection_uids,
+    remove_superseded_connection_generations,
+)
 from .fritzconnection_session import FritzConnectionVPNSession
 from .uid_identity import name_bijection_uid_remap
 
@@ -155,6 +159,7 @@ class FritzBoxVPNCoordinator(DataUpdateCoordinator):
         self._confirmed_orphan_uids: set[str] = set()
         self._uid_names: dict[str, str] = {}
         self._uid_remap: dict[str, str] = {}
+        self._registry_identity_seeded = False
         self._recovering_until: float | None = None
         self._recovery_started_at: float | None = None
         self._recovery_stable_polls: int = 0
@@ -342,9 +347,57 @@ class FritzBoxVPNCoordinator(DataUpdateCoordinator):
             _labeled(removed),
         )
 
+    def _seed_registry_identity(self, connections: dict[str, Any]) -> None:
+        """Remember registry UIDs so the first poll can tell stable IDs from new ones.
+
+        A UID on this poll counts as already seen when its device name matches
+        the payload. A UID absent from the poll stays seen so remap can move it.
+        """
+        if self._registry_identity_seeded or not self.entry_id:
+            return
+        self._registry_identity_seeded = True
+        names = connection_names_from_devices(self.hass, self.entry_id)
+        for uid, name in names.items():
+            if not self._registry_uid_counts_as_seen(uid, name, connections):
+                continue
+            self._seen_uids.add(uid)
+            self._uid_names.setdefault(uid, name)
+
+    def _registry_uid_counts_as_seen(
+        self, uid: str, name: str, connections: dict[str, Any]
+    ) -> bool:
+        """True when this registry UID is stable or an older generation."""
+        if uid not in connections:
+            return True
+        payload = connections.get(uid)
+        if not isinstance(payload, dict):
+            return False
+        payload_name = payload.get(API_KEY_NAME)
+        if payload_name is None:
+            return False
+        return str(payload_name).strip() == name
+
+    def _drop_superseded_generations(self, connections: dict[str, Any]) -> None:
+        """Remove older same-name generations and forget their UIDs."""
+        if not self.entry_id:
+            return
+        self._forget_uids(
+            remove_superseded_connection_generations(
+                self.hass, self.entry_id, connections
+            )
+        )
+
+    def _forget_uids(self, uids: set[str]) -> None:
+        """Drop UIDs that were remapped or removed as an older generation."""
+        for uid in uids:
+            self._seen_uids.discard(uid)
+            self._uid_names.pop(uid, None)
+            self._missing_uid_counts.pop(uid, None)
+            self._confirmed_orphan_uids.discard(uid)
+
     def _apply_uid_remap_if_needed(self, connections: dict[str, Any]) -> None:
-        """During recovery, remap registry UIDs when names form a 1:1 bijection."""
-        if not self._in_recovery() or not self.entry_id or not connections:
+        """Remap registry UIDs when names form a 1:1 bijection."""
+        if not self.entry_id or not connections:
             return
         current_uids = set(connections.keys())
         removed = self._seen_uids - current_uids
@@ -397,16 +450,23 @@ class FritzBoxVPNCoordinator(DataUpdateCoordinator):
             )
         if applied:
             _LOGGER.info(
-                "Remapped %d connection UID(s) after outage recovery for entry %s",
+                "Remapped %d connection UID(s) for entry %s",
                 len(applied),
                 self.entry_id,
             )
 
+    def _previous_unmapped_uids(self) -> set[str]:
+        """Previous poll UIDs that were not replaced by a remap."""
+        if not self.data:
+            return set()
+        return {uid for uid in self.data if uid not in self._uid_remap}
+
     def _track_missing_uids(self, current_uids: set[str]) -> set[str]:
         """Return UIDs newly confirmed missing after ORPHAN_CONFIRM_POLLS polls."""
-        if self.data:
-            self._seen_uids |= set(self.data.keys())
-            self._remember_connection_names(self.data)
+        previous = self._previous_unmapped_uids()
+        if previous and self.data:
+            self._seen_uids |= previous
+            self._remember_connection_names({uid: self.data[uid] for uid in previous})
         self._seen_uids |= current_uids
         for uid in current_uids:
             self._missing_uid_counts.pop(uid, None)
@@ -452,14 +512,15 @@ class FritzBoxVPNCoordinator(DataUpdateCoordinator):
                     )
 
             current_uids = set(connections.keys())
+            self._seed_registry_identity(connections)
             self._remember_connection_names(connections)
             self._log_uid_delta(current_uids)
             self._apply_uid_remap_if_needed(connections)
+            self._drop_superseded_generations(connections)
 
             if self._in_recovery():
                 self._reset_orphan_miss_streaks()
-                if self.data:
-                    self._seen_uids |= set(self.data.keys())
+                self._seen_uids |= self._previous_unmapped_uids()
                 self._seen_uids |= current_uids
                 newly_confirmed: set[str] = set()
             else:
