@@ -54,6 +54,16 @@ def _domain_store(hass: HomeAssistant) -> dict:
     return hass.data.setdefault(DOMAIN, {})
 
 
+def _drop_confirmed_orphan_entities(
+    hass: HomeAssistant, entry_id: str, current_uids: set[str]
+) -> None:
+    """Remove entities whose connection stayed missing for the confirm window."""
+    to_remove, error = get_orphaned_entity_entries(hass, entry_id, current_uids)
+    if error or not to_remove:
+        return
+    remove_orphaned_entities(hass, entry_id, to_remove)
+
+
 def _entry_host(entry: ConfigEntry) -> str:
     """Host from config entry."""
     return host_from_config(entry.data)
@@ -201,11 +211,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: FritzboxVpnConfigEntry) 
     host = _entry_host(entry)
     _LOGGER.info("Setting up FritzBox VPN integration for host: %s", host)
 
+    def _on_orphaned_removed(entry_id: str, current_uids: set[str]) -> None:
+        _drop_confirmed_orphan_entities(hass, entry_id, current_uids)
+
     coordinator = FritzBoxVPNCoordinator(
         hass,
         entry.data,
         entry.options,
         entry.entry_id,
+        on_orphaned_removed=_on_orphaned_removed,
     )
 
     try:

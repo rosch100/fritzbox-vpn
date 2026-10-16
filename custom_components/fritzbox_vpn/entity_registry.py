@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import re
+from typing import Any
 
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr
@@ -103,6 +104,92 @@ def get_orphaned_entity_entries(
         if uid is not None and uid not in current_uids:
             to_remove.append(entry)
     return (to_remove, None)
+
+
+def _connection_uid_on_device(device: dr.DeviceEntry, entry_id: str) -> str | None:
+    """VPN connection UID stored on a device identifier, if any."""
+    for identifier in device.identifiers:
+        if len(identifier) != 3:
+            continue
+        if identifier[0] != DOMAIN or identifier[1] != entry_id:
+            continue
+        return identifier[2]
+    return None
+
+
+def connection_names_from_devices(hass: HomeAssistant, entry_id: str) -> dict[str, str]:
+    """Connection UID → device name for this config entry."""
+    device_registry = dr.async_get(hass)
+    names: dict[str, str] = {}
+    for device in dr.async_entries_for_config_entry(device_registry, entry_id):
+        device_name = (device.name or "").strip()
+        uid = _connection_uid_on_device(device, entry_id)
+        if not device_name or uid is None:
+            continue
+        names[uid] = device_name
+    return names
+
+
+def _uids_by_device_name(names: dict[str, str]) -> dict[str, list[str]]:
+    """Group connection UIDs by device name."""
+    by_name: dict[str, list[str]] = {}
+    for uid, name in names.items():
+        by_name.setdefault(name, []).append(uid)
+    return by_name
+
+
+def _single_live_uid(uids: list[str], connections: dict[str, Any]) -> str | None:
+    """The one UID of this name that is on the poll, if the group is larger."""
+    if len(uids) < 2:
+        return None
+    live = [uid for uid in uids if uid in connections]
+    if len(live) != 1:
+        return None
+    return live[0]
+
+
+def _extra_generation_uids(uids: list[str], connections: dict[str, Any]) -> set[str]:
+    """UIDs to drop when several devices share a name and one is on the poll."""
+    live_uid = _single_live_uid(uids, connections)
+    if live_uid is None:
+        return set()
+    return {uid for uid in uids if uid != live_uid}
+
+
+def superseded_connection_uids(
+    names: dict[str, str], connections: dict[str, Any]
+) -> set[str]:
+    """Older UIDs whose device name is already represented by the live UID."""
+    superseded: set[str] = set()
+    for uids in _uids_by_device_name(names).values():
+        superseded.update(_extra_generation_uids(uids, connections))
+    return superseded
+
+
+def remove_superseded_connection_generations(
+    hass: HomeAssistant,
+    entry_id: str,
+    connections: dict[str, Any],
+) -> set[str]:
+    """Drop extra devices that share a name with the one UID still on the poll.
+
+    A lone previous UID is not removed here; remap owns that case. Names absent
+    from the current poll stay for the debounced orphan path.
+    """
+    superseded = superseded_connection_uids(
+        connection_names_from_devices(hass, entry_id), connections
+    )
+    if not superseded:
+        return set()
+
+    registry = er.async_get(hass)
+    to_remove = [
+        entry
+        for entry in er.async_entries_for_config_entry(registry, entry_id)
+        if connection_uid_from_entity_unique_id(entry.unique_id or "") in superseded
+    ]
+    remove_orphaned_entities(hass, entry_id, to_remove)
+    return superseded
 
 
 def remove_unexpected_entity_entries(
