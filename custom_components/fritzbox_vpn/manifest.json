@@ -17,7 +17,7 @@
   ],
   "quality_scale": "gold",
   "requirements": [
-    "fritzboxvpn==1.0.4",
+    "fritzboxvpn==1.1.0",
     "fritzconnection"
   ],
   "ssdp": [

@@ -148,6 +148,7 @@ class FritzBoxVPNCoordinator(DataUpdateCoordinator):
             host_from_config(config),
             config[CONF_USERNAME],
             config[CONF_PASSWORD],
+            include_ipsec=True,
             use_tls=True,
         )
         self.config = config

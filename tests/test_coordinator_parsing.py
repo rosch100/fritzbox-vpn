@@ -53,6 +53,25 @@ def test_extract_wireguard_connections_from_rest_fritzos_840() -> None:
     assert "ipsec-1" not in connections
 
 
+def test_rest_listing_includes_ipsec_user_only_when_requested() -> None:
+    """Recognize FRITZ!OS IPSec user connections without exposing other types."""
+    payload = {
+        "connection": [
+            {
+                "UID": "ipsec-user",
+                "name": "Phone",
+                "activated": "1",
+                "access_type": "2",
+            },
+            {"UID": "other", "name": "Other", "activated": "1", "access_type": "9"},
+        ]
+    }
+    assert extract_wireguard_connections_from_rest(payload) == []
+    rows = extract_wireguard_connections_from_rest(payload, include_ipsec=True)
+    assert set(normalize_box_connections(rows)) == {"ipsec-user"}
+    assert normalize_box_connections(rows)["ipsec-user"][API_KEY_ACTIVE] is True
+
+
 def test_rest_not_active_overrides_stale_connected_since() -> None:
     """Explicit REST state 'not active' is disconnected despite a leftover timestamp."""
     payload = {

@@ -7,6 +7,7 @@ import xml.etree.ElementTree as ET
 from typing import Any
 
 from .const import (
+    ACCESS_TYPE_IPSEC_USER,
     ACCESS_TYPE_WIREGUARD,
     ACTIVE_STATE_STRINGS_TRUE,
     API_KEY_ACCESS_TYPE,
@@ -220,10 +221,15 @@ def _connection_connected_from_rest(conn: dict[str, Any]) -> bool:
         return False
 
 
-def _rest_wireguard_entry(conn: dict[str, Any]) -> dict[str, Any] | None:
+def _rest_wireguard_entry(
+    conn: dict[str, Any], *, include_ipsec: bool = False
+) -> dict[str, Any] | None:
     """Map one REST connection to the shared boxConnections entry shape."""
     access_type = conn.get(API_KEY_ACCESS_TYPE)
-    if str(access_type).strip() != ACCESS_TYPE_WIREGUARD:
+    allowed_types = {ACCESS_TYPE_WIREGUARD}
+    if include_ipsec:
+        allowed_types.add(ACCESS_TYPE_IPSEC_USER)
+    if str(access_type).strip() not in allowed_types:
         return None
     uid = conn.get(API_KEY_UID)
     if uid is None:
@@ -240,6 +246,8 @@ def _rest_wireguard_entry(conn: dict[str, Any]) -> dict[str, Any] | None:
 
 def extract_wireguard_connections_from_rest(
     data: dict[str, Any],
+    *,
+    include_ipsec: bool = False,
 ) -> list[dict[str, Any]] | None:
     """Extract WireGuard connections from GET /api/v0/generic/vpn JSON.
 
@@ -265,7 +273,7 @@ def extract_wireguard_connections_from_rest(
     for conn in raw_connections:
         if not isinstance(conn, dict):
             continue
-        entry = _rest_wireguard_entry(conn)
+        entry = _rest_wireguard_entry(conn, include_ipsec=include_ipsec)
         if entry is not None:
             result.append(entry)
     return result
