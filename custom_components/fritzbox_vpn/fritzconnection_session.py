@@ -39,12 +39,14 @@ class FritzConnectionVPNSession:
         password: str,
         *,
         use_tls: bool = True,
+        include_ipsec: bool = False,
     ) -> None:
         self._hass = hass
         self._host = host
         self._username = username
         self._password = password
         self._use_tls = use_tls
+        self._include_ipsec = include_ipsec
 
         self._mode: str | None = None
         self._fallback_mode_logged = False
@@ -61,6 +63,21 @@ class FritzConnectionVPNSession:
         ):
             return
         if self._mode == "fritzboxvpn" and self._fallback_session is not None:
+            return
+
+        if self._include_ipsec:
+            from fritzboxvpn import FritzBoxVPNSession
+            from homeassistant.helpers.aiohttp_client import async_get_clientsession
+
+            self._fallback_session = FritzBoxVPNSession(
+                async_get_clientsession(self._hass),
+                self._host,
+                self._username,
+                self._password,
+                protocol="https" if self._use_tls else "http",
+                include_ipsec=True,
+            )
+            self._mode = "fritzboxvpn"
             return
 
         # Import lazily so unit tests can run even when `fritzconnection`
@@ -182,7 +199,11 @@ class FritzConnectionVPNSession:
     ) -> T:
         """Run call; on HTTPS connect error retry once over HTTP."""
         try:
-            await self._hass.async_add_executor_job(self._ensure_client)
+            if self._include_ipsec:
+                # Home Assistant's aiohttp session must be obtained in the loop.
+                self._ensure_client()
+            else:
+                await self._hass.async_add_executor_job(self._ensure_client)
             if self._mode == "fritzboxvpn":
                 return await fallback_primary()
             return await self._hass.async_add_executor_job(sync_call)

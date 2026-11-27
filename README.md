@@ -2,11 +2,11 @@
 
 [🇩🇪 Deutsch](README.de.md) | [🇬🇧 English](README.md)
 
-This integration allows you to control WireGuard VPN connections on an AVM Fritz!Box directly through Home Assistant.
+This integration allows you to control WireGuard VPN connections and supported IPSec user VPN connections on an AVM Fritz!Box directly through Home Assistant.
 
 ## Features
 
-- Automatic detection of all WireGuard VPN connections
+- Automatic detection of WireGuard and supported IPSec user VPN connections
 - Turn VPN connections on/off via Switch entities
 - Easy configuration through the Home Assistant UI
 - Support for multiple VPN connections
@@ -58,7 +58,7 @@ Beta releases are published as GitHub Pre-releases (tags like `v0.10.0b1`).
    - Password: Your FritzBox password
 4. Click Submit
 
-The integration automatically detects all WireGuard VPN connections on your FritzBox and creates a Switch entity for each one.
+The integration detects WireGuard VPN connections and IPSec user VPN connections exposed by the FRITZ!OS VPN REST API, and creates a switch entity for each. On older firmware without that endpoint, WireGuard detection falls back to the legacy API; IPSec user connections are not detected through that fallback.
 
 ### Update Interval Configuration
 

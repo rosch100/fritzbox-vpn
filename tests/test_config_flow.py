@@ -46,6 +46,10 @@ async def test_user_flow_create_entry(hass: HomeAssistant) -> None:
             "custom_components.fritzbox_vpn.flow_forms.validate_input",
             new=AsyncMock(return_value={"title": f"Fritz!Box VPN ({MOCK_HOST})"}),
         ),
+        patch(
+            "custom_components.fritzbox_vpn.async_setup_entry",
+            new=AsyncMock(return_value=True),
+        ),
     ):
         result = await hass.config_entries.flow.async_init(
             DOMAIN, context={"source": SOURCE_USER}
@@ -61,6 +65,7 @@ async def test_user_flow_create_entry(hass: HomeAssistant) -> None:
                 CONF_PASSWORD: MOCK_PASSWORD,
             },
         )
+        await hass.async_block_till_done()
 
     assert result["type"] == FlowResultType.CREATE_ENTRY
     assert result["data"][CONF_HOST] == MOCK_HOST
@@ -125,9 +130,15 @@ async def test_reauth_updates_credentials(
     """Reauth flow updates entry data after successful validation."""
     mock_config_entry.add_to_hass(hass)
 
-    with patch(
-        "custom_components.fritzbox_vpn.flow_forms.validate_input",
-        new=AsyncMock(return_value={"title": mock_config_entry.title}),
+    with (
+        patch(
+            "custom_components.fritzbox_vpn.flow_forms.validate_input",
+            new=AsyncMock(return_value={"title": mock_config_entry.title}),
+        ),
+        patch(
+            "custom_components.fritzbox_vpn.async_setup_entry",
+            new=AsyncMock(return_value=True),
+        ),
     ):
         result = await hass.config_entries.flow.async_init(
             DOMAIN,
@@ -145,6 +156,7 @@ async def test_reauth_updates_credentials(
             result["flow_id"],
             {CONF_USERNAME: "new-user", CONF_PASSWORD: "new-pass"},
         )
+        await hass.async_block_till_done()
 
     assert result["type"] == FlowResultType.ABORT
     assert result["reason"] == "reauth_successful"

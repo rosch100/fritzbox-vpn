@@ -135,10 +135,15 @@ async def test_user_autoconfig_from_fritz(hass: HomeAssistant) -> None:
             "custom_components.fritzbox_vpn.flow_forms.validate_input",
             new=AsyncMock(return_value={"title": "Fritz!Box VPN"}),
         ),
+        patch(
+            "custom_components.fritzbox_vpn.async_setup_entry",
+            new=AsyncMock(return_value=True),
+        ),
     ):
         result = await hass.config_entries.flow.async_init(
             DOMAIN, context={"source": SOURCE_USER}
         )
+        await hass.async_block_till_done()
 
     assert result["type"] == FlowResultType.CREATE_ENTRY
 

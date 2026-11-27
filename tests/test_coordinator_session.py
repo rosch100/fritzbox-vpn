@@ -265,6 +265,54 @@ async def test_session_fritzos_840_rest_listing_after_data_lua_miss() -> None:
 
 
 @pytest.mark.asyncio
+async def test_ipsec_rest_listing_and_toggle() -> None:
+    """Read, switch and verify an IPSec user connection through the REST API."""
+    enabled = {
+        "connection": [
+            {"UID": "phone", "name": "Phone", "access_type": "2", "activated": "1"}
+        ]
+    }
+    disabled = {
+        "connection": [
+            {"UID": "phone", "name": "Phone", "access_type": "2", "activated": "0"}
+        ]
+    }
+    http = QueuedAiohttpSession(
+        [
+            *_login_sequence(),
+            json_response(enabled),
+            MockAiohttpResponse(200, text="ok"),
+            json_response(disabled),
+        ]
+    )
+    fb = FritzBoxVPNSession(
+        http, MOCK_HOST, MOCK_USERNAME, MOCK_PASSWORD, include_ipsec=True
+    )
+    with patch("fritzboxvpn.session.asyncio.sleep", new=AsyncMock()):
+        assert await fb.async_toggle_vpn("phone", False) is True
+    puts = [(url, kwargs) for method, url, kwargs in http.requests if method == "PUT"]
+    assert len(puts) == 1
+    assert puts[0][0].endswith("/connection/phone")
+    assert puts[0][1]["json"] == {"activated": "0"}
+
+
+@pytest.mark.asyncio
+async def test_ipsec_mode_falls_back_to_wireguard_on_older_firmware() -> None:
+    """Legacy firmware without the REST endpoint retains WireGuard support."""
+    http = QueuedAiohttpSession(
+        [
+            *_login_sequence(),
+            MockAiohttpResponse(404),
+            json_response(MOCK_DATA_LUA_JSON),
+        ]
+    )
+    fb = FritzBoxVPNSession(
+        http, MOCK_HOST, MOCK_USERNAME, MOCK_PASSWORD, include_ipsec=True
+    )
+    assert "conn-abc" in await fb.async_get_vpn_connections()
+
+
+@pytest.mark.asyncio
 async def test_session_fritzos_840_rest_mode_skips_data_lua_on_next_poll() -> None:
     """After REST listing succeeds once, subsequent polls use REST only."""
     data_lua_without_box = {"data": {"init": {"pageTitle": "VPN"}}}

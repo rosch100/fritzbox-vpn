@@ -17,6 +17,27 @@ from requests.exceptions import ConnectionError as RequestsConnectionError
 from requests.exceptions import Timeout as RequestsTimeout
 
 
+def test_ipsec_uses_library_session_even_when_fritzconnection_exists() -> None:
+    """The WireGuard-only FritzConnection path must not hide IPSec users."""
+    hass = MagicMock()
+    session = FritzConnectionVPNSession(
+        hass, "192.168.20.1", "u", "p", include_ipsec=True
+    )
+    client = MagicMock()
+    with (
+        patch(
+            "homeassistant.helpers.aiohttp_client.async_get_clientsession",
+            return_value=client,
+        ),
+        patch("fritzboxvpn.FritzBoxVPNSession") as session_class,
+    ):
+        session._ensure_client()
+    session_class.assert_called_once_with(
+        client, "192.168.20.1", "u", "p", protocol="https", include_ipsec=True
+    )
+    assert session._mode == "fritzboxvpn"
+
+
 @pytest.mark.asyncio
 async def test_async_close_does_not_bootstrap_client() -> None:
     """Unload must not create a FritzConnection against an unavailable router."""

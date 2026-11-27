@@ -283,6 +283,7 @@ async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> dict[str,
         data[CONF_HOST],
         data[CONF_USERNAME],
         password_from_sources(data),
+        include_ipsec=True,
         use_tls=True,
     )
 

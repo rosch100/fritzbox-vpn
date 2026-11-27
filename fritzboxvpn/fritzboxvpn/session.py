@@ -80,11 +80,14 @@ class FritzBoxVPNSession:
         username: str,
         password: str,
         protocol: str = DEFAULT_PROTOCOL,
+        *,
+        include_ipsec: bool = False,
     ) -> None:
         self.session = session
         self.host = host
         self.username = username
         self.password = password
+        self.include_ipsec = include_ipsec
         self.protocol = protocol if protocol in PROTOCOLS_ALLOWED else DEFAULT_PROTOCOL
         self.sid: str | None = None
         self._listing_mode: str | None = None
@@ -379,7 +382,9 @@ class FritzBoxVPNSession:
                 data = await self._response_json_dict(response)
                 if data is None:
                     return None
-                box = extract_wireguard_connections_from_rest(data)
+                box = extract_wireguard_connections_from_rest(
+                    data, include_ipsec=self.include_ipsec
+                )
                 if box is None:
                     return None
                 return normalize_box_connections(box)
@@ -428,7 +433,15 @@ class FritzBoxVPNSession:
                 return result
             self._listing_mode = None
 
-        for mode in LISTING_PROBE_ORDER:
+        # The legacy WireGuard page cannot list IPSec connections. Prefer the
+        # unified endpoint when IPSec is requested, while preserving support for
+        # older firmware that only exposes the legacy WireGuard page.
+        modes = (
+            tuple(reversed(LISTING_PROBE_ORDER))
+            if self.include_ipsec
+            else LISTING_PROBE_ORDER
+        )
+        for mode in modes:
             if mode == preferred:
                 continue
             result = await self._fetch_listing_by_mode(mode, session, sid)
@@ -485,7 +498,11 @@ class FritzBoxVPNSession:
         session, sid = await self.async_get_session()
         api_url = f"{self._base_url()}{API_VPN_CONNECTION.format(uid=vpn_uid)}"
         headers = self._rest_headers(sid, mutation=True)
-        request_body = {API_KEY_ACTIVATED: 1 if enable else 0}
+        request_body = {
+            API_KEY_ACTIVATED: ("1" if enable else "0")
+            if self.include_ipsec
+            else (1 if enable else 0)
+        }
 
         timeout = ClientTimeout(total=DEFAULT_TIMEOUT)
         try:
